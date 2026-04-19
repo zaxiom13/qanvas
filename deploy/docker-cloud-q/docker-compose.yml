@@ -1,0 +1,16 @@
+services:
+  qanvas:
+    build:
+      context: ../..
+      dockerfile: deploy/docker-cloud-q/Dockerfile
+    ports:
+      - "8080:8080"
+    volumes:
+      # your real q license lives outside the image
+      - ${HOME}/.kx/kc.lic:/root/.kx/kc.lic:ro
+    environment:
+      QANVAS_BRIDGE_PORT: "8080"
+      QANVAS_Q_PORT: "5042"
+      QANVAS_SPAWN_Q: "true"
+      QANVAS_SERVE_DIST: "true"
+    restart: unless-stopped

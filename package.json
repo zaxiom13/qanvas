@@ -1,0 +1,28 @@
+{
+  "name": "qanvas",
+  "version": "0.1.0",
+  "private": true,
+  "description": "p5.js-like creative coding environment powered by q/kdb+. Runs client-side (jqport), against your local q license, or against a cloud q.",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "app"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace app",
+    "dev:web": "npm run dev --workspace app",
+    "dev:local-q": "concurrently -n app,q-bridge -c cyan,yellow \"npm run dev --workspace app\" \"node server/q-bridge.js\"",
+    "build": "npm run build --workspace app",
+    "preview": "npm run preview --workspace app",
+    "static": "node scripts/build-static.mjs",
+    "q:serve": "node server/q-bridge.js",
+    "q:direct": "q server/qanvas-boot.q -p 5042",
+    "typecheck": "npm run check --workspace app"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}
