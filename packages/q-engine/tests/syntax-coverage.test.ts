@@ -5,8 +5,6 @@ import { describe, expect, it } from "vitest";
 import { listBuiltins } from "../src/index";
 
 const trackedGaps = new Set([
-  "aj",
-  "ej",
   "exec",
   "exit",
   "if",
@@ -35,7 +33,14 @@ describe("syntax keyword coverage", () => {
     const match = source.match(/keywords:\s*\[((?:.|\n)*?)\]/m);
     const keywords = [...(match?.[1] ?? "").matchAll(/"([^"]+)"/g)].map((entry) => entry[1]);
 
-    const implemented = new Set([...listBuiltins().monads, ...listBuiltins().diads, "each"]);
+    const builtins = listBuiltins();
+    const implemented = new Set([
+      ...builtins.monads,
+      ...builtins.diads,
+      ...(builtins.triads ?? []),
+      ...(builtins.quads ?? []),
+      "each"
+    ]);
     const uncovered = keywords.filter(
       (keyword) => !implemented.has(keyword) && !trackedGaps.has(keyword)
     );

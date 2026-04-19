@@ -1,6 +1,122 @@
 /// <reference lib="webworker" />
 
-import { createSession } from '@qpad/engine';
+import { createSession, type HostFileSystem } from '@qpad/engine';
+
+const FS_STORAGE_PREFIX = 'qanvas5:browser:fs:';
+
+const normalizeFsPath = (path: string) => path.replace(/^:+/, '').replace(/^\/+/, '');
+
+function createWorkerFileSystem(seedFiles: SketchFile[]): HostFileSystem {
+  const mem = new Map<string, string>();
+  const bins = new Map<string, Uint8Array>();
+
+  for (const file of seedFiles) {
+    mem.set(normalizeFsPath(file.name), file.content ?? '');
+  }
+
+  const fsKey = (path: string) => `${FS_STORAGE_PREFIX}${normalizeFsPath(path)}`;
+  const readPersisted = (path: string): string | null => {
+    try {
+      return self.localStorage?.getItem(fsKey(path)) ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const writePersisted = (path: string, contents: string) => {
+    try {
+      self.localStorage?.setItem(fsKey(path), contents);
+    } catch {
+      // best-effort only
+    }
+  };
+  const deletePersisted = (path: string) => {
+    try {
+      self.localStorage?.removeItem(fsKey(path));
+    } catch {
+      // noop
+    }
+  };
+  const listPersisted = (): string[] => {
+    const out: string[] = [];
+    try {
+      const storage = self.localStorage;
+      if (!storage) return out;
+      for (let index = 0; index < storage.length; index += 1) {
+        const key = storage.key(index);
+        if (!key || !key.startsWith(FS_STORAGE_PREFIX)) continue;
+        out.push(key.slice(FS_STORAGE_PREFIX.length));
+      }
+    } catch {
+      // ignore
+    }
+    return out;
+  };
+
+  return {
+    readText(path) {
+      const key = normalizeFsPath(path);
+      if (mem.has(key)) return mem.get(key)!;
+      return readPersisted(key);
+    },
+    writeText(path, contents) {
+      const key = normalizeFsPath(path);
+      mem.set(key, contents);
+      bins.delete(key);
+      writePersisted(key, contents);
+    },
+    readBinary(path) {
+      return bins.get(normalizeFsPath(path)) ?? null;
+    },
+    writeBinary(path, bytes) {
+      const key = normalizeFsPath(path);
+      bins.set(key, bytes);
+      mem.delete(key);
+      // stored encoded as base64 for persistence
+      try {
+        const binaryString = Array.from(bytes, (byte) => String.fromCharCode(byte)).join('');
+        writePersisted(key, `__BINARY__:${self.btoa?.(binaryString) ?? ''}`);
+      } catch {
+        // ignore persistence failure
+      }
+    },
+    deletePath(path) {
+      const key = normalizeFsPath(path);
+      const had = mem.delete(key) || bins.delete(key);
+      deletePersisted(key);
+      return had;
+    },
+    list(directory) {
+      const prefix = normalizeFsPath(directory);
+      const entries = new Set<string>();
+      const collect = (name: string) => {
+        if (!prefix) {
+          entries.add(name.split('/')[0] ?? name);
+          return;
+        }
+        if (name === prefix) entries.add(name);
+        else if (name.startsWith(`${prefix}/`)) {
+          const tail = name.slice(prefix.length + 1).split('/')[0]!;
+          entries.add(tail);
+        }
+      };
+      for (const name of mem.keys()) collect(name);
+      for (const name of bins.keys()) collect(name);
+      for (const name of listPersisted()) collect(name);
+      return [...entries].sort();
+    },
+    exists(path) {
+      const key = normalizeFsPath(path);
+      return mem.has(key) || bins.has(key) || readPersisted(key) !== null;
+    },
+    size(path) {
+      const key = normalizeFsPath(path);
+      if (mem.has(key)) return mem.get(key)!.length;
+      if (bins.has(key)) return bins.get(key)!.byteLength;
+      const persisted = readPersisted(key);
+      return persisted === null ? -1 : persisted.length;
+    }
+  };
+}
 
 type InterpreterRuntimeSession = {
   mode: 'interpreter';
@@ -268,7 +384,7 @@ function createRuntimeSession(payload: RuntimeStartPayload) {
 }
 
 function createInterpreterRuntimeSession(files: SketchFile[]) {
-  const session = createSession();
+  const session = createSession({ fs: createWorkerFileSystem(files) });
   loadSource(session, BOOT_SOURCE);
 
   const runtimeFiles = files

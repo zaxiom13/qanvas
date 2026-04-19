@@ -21,21 +21,18 @@ describe("q engine mutation guards", () => {
     expect(formatValue(session.evaluate(".z.P").value)).toBe("\"2026-03-22T10:20:31.000Z\"\n");
   });
 
-  it("routes unsupported host verbs through the host adapter", () => {
-    const unsupportedCalls: string[] = [];
-    const session = createSession({
-      unsupported: (name) => {
-        unsupportedCalls.push(name);
-        throw new Error(`unsupported:${name}`);
-      }
-    });
+  it("serves file I/O through the host filesystem instead of host.unsupported", () => {
+    const session = createSession();
 
-    expect(() => session.evaluate("hopen 42")).toThrowError("unsupported:hopen");
-    expect(() => session.evaluate("read0 `file")).toThrowError("unsupported:read0");
-    expect(unsupportedCalls).toEqual(["hopen", "read0"]);
+    session.evaluate("`:sample.csv set ([] x:1 2 3; y:`a`b`c)");
+    expect(formatValue(session.evaluate("get `:sample.csv").value)).toContain("x y");
+    expect(formatValue(session.evaluate("hcount `:sample.csv").value)).toMatch(/\d+/);
+    expect(formatValue(session.evaluate("read0 `:sample.csv").value)).toContain("x,y");
+    session.evaluate("hdel `:sample.csv");
+    expect(() => session.evaluate("read0 `:sample.csv")).toThrowError(/not found/);
   });
 
-  it("treats system P as a no-op but rejects other system calls", () => {
+  it("treats system P as a no-op and still rejects truly unsupported system calls", () => {
     const session = createSession({
       unsupported: (name) => {
         throw new Error(`unsupported:${name}`);
@@ -43,7 +40,7 @@ describe("q engine mutation guards", () => {
     });
 
     expect(formatValue(session.evaluate("system \"P 0\"").value)).toBe("::\n");
-    expect(() => session.evaluate("system \"ls\"")).toThrowError("unsupported:system");
+    expect(() => session.evaluate("system \"xyz\"")).toThrowError(/unsupported:/);
   });
 
   it("returns root namespace keys including dynamically assigned namespaces", () => {

@@ -331,6 +331,149 @@ function joinBlocksVertically(blocks: string[][], blankLineCount: number): strin
   return result;
 }
 
+// -- q-native stdout reformatting -------------------------------------------
+//
+// The q interpreter (both the browser `@qpad/engine` and real kdb+) writes
+// arrays in the classic q textual form:
+//
+//   rank 1 numeric:   "1 2 3"        or  "1 2 3f"   or  "101b"
+//   rank 2 numeric:   "1 2 3\n4 5 6"
+//   symbols / syms:   "`a`b`c"
+//
+// We intercept stdout, detect these shapes, and upgrade them to the Uiua
+// `╭─ … ╯` grid. Anything ambiguous (prose, tables with `|` dividers,
+// dictionaries, q errors, etc.) is returned unchanged.
+
+// Matches a single q-numeric atom, optionally with a type suffix.
+// Examples: 1  -1  1.5  -1.25e-3  0N  0W  -0W  0n  0w  -0w  1f  1.5f  1i  1h  1e
+const Q_NUM_ATOM = /^-?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?[hijef]?$/;
+const Q_SPECIAL = new Set(['0N', '0W', '-0W', '0n', '0w', '-0w', '0Ni', '0Wi', '-0Wi', '0Nh', '0Wh', '-0Wh', '0Ne', '0We', '-0We']);
+const Q_BOOL_LIST = /^[01]+b$/;
+
+function isQNumericToken(token: string): boolean {
+  if (!token) return false;
+  if (Q_SPECIAL.has(token)) return true;
+  return Q_NUM_ATOM.test(token);
+}
+
+// Expand `101b` → ['1','0','1'] (boolean list form). Returns null if not a
+// boolean list token.
+function expandBoolList(token: string): string[] | null {
+  if (!Q_BOOL_LIST.test(token)) return null;
+  return token.slice(0, -1).split('');
+}
+
+// Parse a single line of whitespace-separated q-numeric atoms.
+// Returns the tokens (as already-formatted display strings) or null if the
+// line does not parse cleanly.
+function parseQNumericLine(line: string): string[] | null {
+  const trimmed = line.trim();
+  if (!trimmed) return null;
+  // Reject lines with characters that clearly aren't in the numeric subset.
+  if (/[|`"@#$%^&*()\[\]{}<>:;,=/\\?!]/.test(trimmed)) return null;
+
+  const rawTokens = trimmed.split(/\s+/);
+  const out: string[] = [];
+  for (const raw of rawTokens) {
+    const bool = expandBoolList(raw);
+    if (bool) {
+      out.push(...bool);
+      continue;
+    }
+    if (isQNumericToken(raw)) {
+      // Strip trailing type suffix for display consistency inside a matrix;
+      // the overall type is communicated by a single suffix on the last atom,
+      // so aligning columns looks cleaner without per-cell suffixes.
+      out.push(raw.replace(/[hijef]$/, ''));
+      continue;
+    }
+    return null;
+  }
+  return out;
+}
+
+// Parse a single line of backtick-prefixed symbols: `` `a`b`c ``.
+// Returns tokens without the leading backticks, or null if not a symbol list.
+function parseQSymbolLine(line: string): string[] | null {
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('`')) return null;
+  // Split on backticks, drop the leading empty segment.
+  const parts = trimmed.split('`').slice(1);
+  if (parts.length < 2) return null;
+  // Each part should be a symbol (alphanumeric, dot, underscore).
+  if (!parts.every((p) => /^[A-Za-z_][A-Za-z0-9_.]*$/.test(p))) return null;
+  return parts.map((p) => `\`${p}`);
+}
+
+// Attempt to reformat q-native stdout into a Uiua-style grid.
+// Returns the upgraded string, or null when the input doesn't look like a
+// pure rectangular array.
+function formatQNativeStdoutBlock(text: string): string | null {
+  if (!text) return null;
+  // Preserve trailing newline awareness but work on a trimmed block.
+  const stripped = text.replace(/\n+$/, '');
+  if (!stripped) return null;
+  const lines = stripped.split('\n');
+  if (lines.length === 0) return null;
+
+  // Each line must parse as a q-numeric or q-symbol list; all lines must
+  // share the same kind and the same column count.
+  type LineKind = 'num' | 'sym';
+  const parsed: { kind: LineKind; tokens: string[] }[] = [];
+  for (const line of lines) {
+    const nums = parseQNumericLine(line);
+    if (nums && nums.length > 0) {
+      parsed.push({ kind: 'num', tokens: nums });
+      continue;
+    }
+    const syms = parseQSymbolLine(line);
+    if (syms && syms.length > 0) {
+      parsed.push({ kind: 'sym', tokens: syms });
+      continue;
+    }
+    return null;
+  }
+
+  const firstKind = parsed[0].kind;
+  if (!parsed.every((p) => p.kind === firstKind)) return null;
+
+  const columnCount = parsed[0].tokens.length;
+  if (columnCount === 0) return null;
+  const rectangular = parsed.every((p) => p.tokens.length === columnCount);
+  if (!rectangular) return null;
+
+  // Single-line single-atom → leave alone (don't box scalars).
+  if (lines.length === 1 && columnCount === 1) return null;
+
+  // Single-line list → bracketed rank-1 form.
+  if (lines.length === 1) {
+    return `[${parsed[0].tokens.join(' ')}]`;
+  }
+
+  // Rank-2 matrix → Uiua-style grid with box corners.
+  const tokenRows = parsed.map((p) => p.tokens);
+  const matrixLines = formatTokenMatrixLines(tokenRows, firstKind === 'num');
+  const framed = frameGrid(matrixLines, 2);
+  return framed.join('\n');
+}
+
+// Align pre-formatted string tokens into a matrix (right-aligned for numeric,
+// left-aligned for non-numeric) and return the resulting lines.
+function formatTokenMatrixLines(rows: string[][], numericColumns: boolean): string[] {
+  const columnCount = rows[0]?.length ?? 0;
+  const widths = Array.from({ length: columnCount }, (_unused, columnIndex) =>
+    Math.max(...rows.map((row) => row[columnIndex]?.length ?? 0)),
+  );
+  return rows.map((row) =>
+    row
+      .map((cell, columnIndex) => {
+        const width = widths[columnIndex] ?? cell.length;
+        return numericColumns ? cell.padStart(width) : cell.padEnd(width);
+      })
+      .join(' '),
+  );
+}
+
 // -- Objects ----------------------------------------------------------------
 
 function formatObject(value: Record<string, unknown>, indentLevel: number): string {

@@ -299,13 +299,79 @@ export interface EvalResult {
   canonical: CanonicalNode;
 }
 
+export interface HostFileSystem {
+  readText: (path: string) => string | null;
+  writeText: (path: string, contents: string) => void;
+  readBinary?: (path: string) => Uint8Array | null;
+  writeBinary?: (path: string, bytes: Uint8Array) => void;
+  deletePath: (path: string) => boolean;
+  list: (directory: string) => string[];
+  exists: (path: string) => boolean;
+  size?: (path: string) => number;
+}
+
 export interface HostAdapter {
   now?: () => Date;
   timezone?: () => string;
   env?: () => Record<string, string>;
   consoleSize?: () => { rows: number; columns: number };
   unsupported?: (name: string) => never;
+  fs?: HostFileSystem;
 }
+
+const createMemoryFileSystem = (): HostFileSystem => {
+  const files = new Map<string, string>();
+  const binaries = new Map<string, Uint8Array>();
+  const normalize = (path: string) => path.replace(/^:+/, "").replace(/^\/+/, "");
+  return {
+    readText: (path) => files.get(normalize(path)) ?? null,
+    writeText: (path, contents) => {
+      const key = normalize(path);
+      files.set(key, contents);
+      binaries.delete(key);
+    },
+    readBinary: (path) => binaries.get(normalize(path)) ?? null,
+    writeBinary: (path, bytes) => {
+      const key = normalize(path);
+      binaries.set(key, bytes);
+      files.delete(key);
+    },
+    deletePath: (path) => {
+      const key = normalize(path);
+      const had = files.delete(key) || binaries.delete(key);
+      return had;
+    },
+    list: (directory) => {
+      const prefix = normalize(directory);
+      const entries = new Set<string>();
+      const collect = (name: string) => {
+        if (!prefix) {
+          const head = name.split("/")[0]!;
+          entries.add(head);
+          return;
+        }
+        if (name === prefix) entries.add(name);
+        else if (name.startsWith(`${prefix}/`)) {
+          const tail = name.slice(prefix.length + 1).split("/")[0]!;
+          entries.add(tail);
+        }
+      };
+      for (const name of files.keys()) collect(name);
+      for (const name of binaries.keys()) collect(name);
+      return [...entries].sort();
+    },
+    exists: (path) => {
+      const key = normalize(path);
+      return files.has(key) || binaries.has(key);
+    },
+    size: (path) => {
+      const key = normalize(path);
+      if (files.has(key)) return files.get(key)!.length;
+      if (binaries.has(key)) return binaries.get(key)!.byteLength;
+      return -1;
+    }
+  };
+};
 
 export class QRuntimeError extends Error {
   readonly qName: string;
@@ -343,7 +409,8 @@ const createHostAdapter = (host: HostAdapter): Required<HostAdapter> => ({
     host.unsupported ??
     ((name: string) => {
       throw new QRuntimeError("nyi", `${name} is not available in the browser host`);
-    })
+    }),
+  fs: host.fs ?? createMemoryFileSystem()
 });
 
 const builtinRef = (name: string, arity: number): QBuiltin => ({
@@ -484,6 +551,10 @@ export class Session {
 
   hostEnv(): Record<string, string> {
     return this.host.env();
+  }
+
+  fs(): HostFileSystem {
+    return this.host.fs;
   }
 
   listTables(namespace: string): QValue {
@@ -836,7 +907,7 @@ export class Session {
     return last;
   }
 
-  private createTableContext(table: QTable, positions?: number[]) {
+  createTableContext(table: QTable, positions?: number[]) {
     const child = this.createChildScope();
     for (const [name, column] of Object.entries(table.columns)) {
       child.assign(name, column);
@@ -1369,6 +1440,10 @@ export class Session {
           .map((name) => qSymbol(name));
         return qList(roots, true, "namespaceKeys");
       }
+      if (arg.value.startsWith(":")) {
+        const entries = this.fs().list(arg.value.slice(1));
+        return qList(entries.map((entry) => qSymbol(entry)), true);
+      }
       return qList(
         namespaceKeys(this.get(arg.value.startsWith(".") ? arg.value : `.${arg.value}`)),
         true,
@@ -1625,12 +1700,76 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   });
   register("system", 1, (session, [arg]) => {
     const text = arg.kind === "string" ? arg.value : formatValue(arg, { trailingNewline: false });
-    if (text.startsWith("P ")) {
+    const trimmed = text.trim();
+    if (trimmed.startsWith("P ")) {
       return qNull();
     }
-    return session.unsupported("system");
+    if (trimmed.startsWith("l ")) {
+      const path = trimmed.slice(2).trim();
+      return loadScriptFromFs(session, path);
+    }
+    if (trimmed === "cd" || trimmed.startsWith("cd ")) {
+      return qNull();
+    }
+    if (trimmed === "pwd") {
+      return qString("/");
+    }
+    if (trimmed === "ls" || trimmed.startsWith("ls ")) {
+      const dir = trimmed === "ls" ? "" : trimmed.slice(3).trim();
+      const entries = session.fs().list(dir);
+      return qList(entries.map((entry) => qString(entry)), true);
+    }
+    return session.unsupported(`system "${trimmed}"`);
   });
-  registerUnsupported("hopen", "hclose", "hcount", "hdel", "read0", "read1");
+  register("read0", 1, (session, [arg]) => {
+    const path = fileHandlePath(arg, "read0");
+    const contents = session.fs().readText(path);
+    if (contents === null) {
+      throw new QRuntimeError("io", `read0: ${path} not found`);
+    }
+    const lines = contents.split(/\r?\n/);
+    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+    return qList(lines.map((line) => qString(line)), true);
+  });
+  register("read1", 1, (session, [arg]) => {
+    const path = fileHandlePath(arg, "read1");
+    const fs = session.fs();
+    if (fs.readBinary) {
+      const bytes = fs.readBinary(path);
+      if (bytes) {
+        const items: QValue[] = [];
+        for (const byte of bytes) items.push(qLong(byte));
+        return qList(items, true, "byte");
+      }
+    }
+    const text = fs.readText(path);
+    if (text === null) {
+      throw new QRuntimeError("io", `read1: ${path} not found`);
+    }
+    const items: QValue[] = [];
+    for (const code of text) items.push(qLong(code.codePointAt(0)!));
+    return qList(items, true, "byte");
+  });
+  register("hcount", 1, (session, [arg]) => {
+    const path = fileHandlePath(arg, "hcount");
+    const size = session.fs().size?.(path) ?? -1;
+    if (size < 0) {
+      throw new QRuntimeError("io", `hcount: ${path} not found`);
+    }
+    return qLong(size);
+  });
+  register("hdel", 1, (session, [arg]) => {
+    const path = fileHandlePath(arg, "hdel");
+    session.fs().deletePath(path);
+    return arg;
+  });
+  register("hopen", 1, (_, [arg]) => {
+    if (arg.kind !== "symbol") {
+      throw new QRuntimeError("type", "hopen expects a file-handle symbol");
+    }
+    return qLong(1);
+  });
+  register("hclose", 1, (_, [_arg]) => qNull());
   register("@", 2, (session, [target, arg, handler]) => {
     const args = arg.kind === "list" && !(arg.homogeneous ?? false) ? arg.items : [arg];
     try {
@@ -1914,8 +2053,12 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   register("pj", 2, (_, [left, right]) => plusJoin(left, right));
 
   register("asof", 2, (_, [left, right]) => asofValue(left, right));
-  register("wj", 3, (session, [wins, cols, right]) => session.unsupported("wj"));
-  register("wj1", 3, (session, [wins, cols, right]) => session.unsupported("wj1"));
+  register("wj", 4, (session, [wins, cols, left, rightSpec]) =>
+    windowJoinValue(session, wins, cols, left, rightSpec, "prevailing")
+  );
+  register("wj1", 4, (session, [wins, cols, left, rightSpec]) =>
+    windowJoinValue(session, wins, cols, left, rightSpec, "window")
+  );
 
   register("mmu", 2, (_, [left, right]) => mmuValue(left, right));
   register("inv", 1, (_, [arg]) => invValue(arg));
@@ -1942,12 +2085,19 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
 
   register("get", 1, (session, [arg]) => {
     if (arg.kind === "symbol") {
+      if (arg.value.startsWith(":")) {
+        return readQValueFromFs(session, arg.value.slice(1));
+      }
       return session.get(arg.value);
     }
     return arg;
   });
   register("set", 2, (session, [target, value]) => {
     if (target.kind === "symbol") {
+      if (target.value.startsWith(":")) {
+        writeQValueToFs(session, target.value.slice(1), value);
+        return target;
+      }
       session.assignGlobal(target.value, value);
       return value;
     }
@@ -1963,6 +2113,32 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
       return value;
     }
     throw new QRuntimeError("type", "set expects a symbol (or symbol list) target");
+  });
+  register("save", 1, (session, [arg]) => {
+    if (arg.kind !== "symbol" || !arg.value.startsWith(":")) {
+      throw new QRuntimeError("type", "save expects a file-handle symbol like `:foo.csv");
+    }
+    const path = arg.value.slice(1);
+    const slash = path.lastIndexOf("/");
+    const file = slash >= 0 ? path.slice(slash + 1) : path;
+    const dot = file.lastIndexOf(".");
+    const varName = dot >= 0 ? file.slice(0, dot) : file;
+    const value = session.get(varName);
+    writeQValueToFs(session, path, value);
+    return arg;
+  });
+  register("load", 1, (session, [arg]) => {
+    if (arg.kind !== "symbol" || !arg.value.startsWith(":")) {
+      throw new QRuntimeError("type", "load expects a file-handle symbol like `:foo.csv");
+    }
+    const path = arg.value.slice(1);
+    const slash = path.lastIndexOf("/");
+    const file = slash >= 0 ? path.slice(slash + 1) : path;
+    const dot = file.lastIndexOf(".");
+    const varName = dot >= 0 ? file.slice(0, dot) : file;
+    const value = readQValueFromFs(session, path);
+    session.assignGlobal(varName, value);
+    return qSymbol(varName);
   });
 
   register("getenv", 1, (session, [arg]) => {
@@ -2009,11 +2185,11 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     return qList(items.map((item) => session.invoke(callable, [item])), false);
   });
 
-  register("aj", 3, (session) => session.unsupported("aj"));
-  register("aj0", 3, (session) => session.unsupported("aj0"));
-  register("ajf", 3, (session) => session.unsupported("ajf"));
-  register("ajf0", 3, (session) => session.unsupported("ajf0"));
-  register("ej", 3, (session) => session.unsupported("ej"));
+  register("aj", 3, (_, [cols, left, right]) => asofJoinValue(cols, left, right, { useT2Time: false, fill: false }));
+  register("aj0", 3, (_, [cols, left, right]) => asofJoinValue(cols, left, right, { useT2Time: true, fill: false }));
+  register("ajf", 3, (_, [cols, left, right]) => asofJoinValue(cols, left, right, { useT2Time: false, fill: true }));
+  register("ajf0", 3, (_, [cols, left, right]) => asofJoinValue(cols, left, right, { useT2Time: true, fill: true }));
+  register("ej", 3, (_, [cols, left, right]) => equiJoinValue(cols, left, right));
   register("exit", 1, (session) => session.unsupported("exit"));
 
   return builtins;
@@ -2197,7 +2373,9 @@ export const listBuiltins = () => ({
     "upsert",
     "peach",
     "set"
-  ]
+  ],
+  triads: ["aj", "aj0", "ajf", "ajf0", "ej"],
+  quads: ["wj", "wj1"]
 });
 
 export const parse = (source: string): AstNode => {
@@ -4894,6 +5072,219 @@ const hsymValue = (value: QValue): QValue => {
   throw new QRuntimeError("type", "hsym expects a symbol");
 };
 
+const fileHandlePath = (value: QValue, caller: string): string => {
+  if (value.kind !== "symbol") {
+    throw new QRuntimeError("type", `${caller} expects a file-handle symbol`);
+  }
+  return value.value.startsWith(":") ? value.value.slice(1) : value.value;
+};
+
+const loadScriptFromFs = (session: Session, rawPath: string): QValue => {
+  const path = rawPath.startsWith(":") ? rawPath.slice(1) : rawPath;
+  const candidates = [path, `${path}.q`, `${path}.k`];
+  const fs = session.fs();
+  for (const candidate of candidates) {
+    const source = fs.readText(candidate);
+    if (source !== null) {
+      session.evaluate(source);
+      return qSymbol(candidate);
+    }
+  }
+  throw new QRuntimeError("io", `\\l: ${path} not found`);
+};
+
+const inferFormatFromExt = (path: string): "csv" | "tsv" | "txt" | "json" | "q" => {
+  const dot = path.lastIndexOf(".");
+  if (dot < 0) return "q";
+  const ext = path.slice(dot + 1).toLowerCase();
+  if (ext === "csv") return "csv";
+  if (ext === "tsv") return "tsv";
+  if (ext === "txt") return "txt";
+  if (ext === "json") return "json";
+  return "q";
+};
+
+const escapeCsvField = (text: string, delimiter: string): string => {
+  if (text.includes(delimiter) || text.includes("\"") || text.includes("\n") || text.includes("\r")) {
+    return `"${text.replaceAll("\"", "\"\"")}"`;
+  }
+  return text;
+};
+
+const cellToCsvText = (value: QValue): string => {
+  if (value.kind === "null") return "";
+  if (value.kind === "string") return value.value;
+  if (value.kind === "symbol") return value.value;
+  if (value.kind === "boolean") return value.value ? "1" : "0";
+  return formatValue(value, { trailingNewline: false });
+};
+
+const tableToCsv = (table: QTable, delimiter: string): string => {
+  const names = Object.keys(table.columns);
+  const rows = tableRowCount(table);
+  const lines: string[] = [names.map((name) => escapeCsvField(name, delimiter)).join(delimiter)];
+  for (let i = 0; i < rows; i += 1) {
+    const cells = names.map((name) =>
+      escapeCsvField(cellToCsvText(table.columns[name]!.items[i]!), delimiter)
+    );
+    lines.push(cells.join(delimiter));
+  }
+  return lines.join("\n");
+};
+
+const parseCsvLine = (line: string, delimiter: string): string[] => {
+  const out: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let i = 0; i < line.length; i += 1) {
+    const ch = line[i]!;
+    if (quoted) {
+      if (ch === "\"") {
+        if (line[i + 1] === "\"") {
+          field += "\"";
+          i += 1;
+        } else {
+          quoted = false;
+        }
+      } else {
+        field += ch;
+      }
+    } else if (ch === "\"") {
+      quoted = true;
+    } else if (ch === delimiter) {
+      out.push(field);
+      field = "";
+    } else {
+      field += ch;
+    }
+  }
+  out.push(field);
+  return out;
+};
+
+const inferCellValue = (text: string): QValue => {
+  if (text === "") return qNull();
+  if (text === "0b") return qBool(false);
+  if (text === "1b") return qBool(true);
+  if (/^-?\d+$/.test(text)) {
+    const n = Number(text);
+    if (Number.isFinite(n) && Number.isInteger(n)) return qLong(n);
+  }
+  if (/^-?\d+\.\d*$/.test(text) || /^-?\.\d+$/.test(text)) {
+    const n = Number(text);
+    if (Number.isFinite(n)) return numeric(n, true);
+  }
+  return qString(text);
+};
+
+const csvToTable = (text: string, delimiter: string): QTable => {
+  const lines = text.split(/\r?\n/).filter((line) => line.length > 0);
+  if (lines.length === 0) return qTable({});
+  const headers = parseCsvLine(lines[0]!, delimiter);
+  const columns: Record<string, QValue[]> = {};
+  for (const header of headers) columns[header] = [];
+  for (let i = 1; i < lines.length; i += 1) {
+    const cells = parseCsvLine(lines[i]!, delimiter);
+    for (let j = 0; j < headers.length; j += 1) {
+      columns[headers[j]!]!.push(inferCellValue(cells[j] ?? ""));
+    }
+  }
+  return qTable(
+    Object.fromEntries(
+      Object.entries(columns).map(([name, items]) => [
+        name,
+        qList(items, items.every((item) => item.kind === items[0]?.kind))
+      ])
+    )
+  );
+};
+
+const writeQValueToFs = (session: Session, path: string, value: QValue): void => {
+  const format = inferFormatFromExt(path);
+  const fs = session.fs();
+  if (format === "csv" || format === "tsv") {
+    const delimiter = format === "csv" ? "," : "\t";
+    const table =
+      value.kind === "keyedTable"
+        ? qTable({ ...value.keys.columns, ...value.values.columns })
+        : value.kind === "table"
+          ? value
+          : null;
+    if (!table) {
+      throw new QRuntimeError("type", `save ${format}: expected a table value`);
+    }
+    fs.writeText(path, tableToCsv(table, delimiter));
+    return;
+  }
+  if (format === "json") {
+    fs.writeText(path, JSON.stringify(canonicalize(value), null, 2));
+    return;
+  }
+  if (format === "txt") {
+    const text =
+      value.kind === "string"
+        ? value.value
+        : value.kind === "list" && value.items.every((item) => item.kind === "string")
+          ? value.items.map((item) => (item as QString).value).join("\n")
+          : formatValue(value, { trailingNewline: false });
+    fs.writeText(path, text);
+    return;
+  }
+  fs.writeText(path, JSON.stringify(canonicalize(value)));
+};
+
+const readQValueFromFs = (session: Session, path: string): QValue => {
+  const format = inferFormatFromExt(path);
+  const fs = session.fs();
+  const text = fs.readText(path);
+  if (text === null) {
+    throw new QRuntimeError("io", `get: ${path} not found`);
+  }
+  if (format === "csv") return csvToTable(text, ",");
+  if (format === "tsv") return csvToTable(text, "\t");
+  if (format === "json") {
+    return hydrateCanonical(JSON.parse(text));
+  }
+  if (format === "txt") return qString(text);
+  try {
+    return hydrateCanonical(JSON.parse(text));
+  } catch {
+    return qString(text);
+  }
+};
+
+const hydrateCanonical = (value: unknown): QValue => {
+  if (value === null || value === undefined) return qNull();
+  if (typeof value === "boolean") return qBool(value);
+  if (typeof value === "number") return Number.isInteger(value) ? qLong(value) : numeric(value, true);
+  if (typeof value === "string") return qString(value);
+  if (Array.isArray(value)) {
+    const items = value.map(hydrateCanonical);
+    return qList(items, items.every((item) => item.kind === items[0]?.kind));
+  }
+  if (typeof value === "object") {
+    const record = value as Record<string, unknown>;
+    if (record.kind === "symbol" && typeof record.value === "string") return qSymbol(record.value);
+    if (record.kind === "number" && typeof record.value === "number") {
+      return Number.isInteger(record.value) ? qLong(record.value) : numeric(record.value, true);
+    }
+    if (record.kind === "table" && record.columns) {
+      const columns: Record<string, QList> = {};
+      for (const [name, items] of Object.entries(record.columns as Record<string, unknown>)) {
+        const list = hydrateCanonical(items);
+        columns[name] = list.kind === "list" ? list : qList([list], true);
+      }
+      return qTable(columns);
+    }
+    const keys = Object.keys(record);
+    return qDictionary(
+      keys.map((key) => qSymbol(key)),
+      keys.map((key) => hydrateCanonical(record[key]))
+    );
+  }
+  return qNull();
+};
+
 const xcolsValue = (namesValue: QValue, tableValue: QValue): QValue => {
   const symbols = namesValue.kind === "list"
     ? namesValue.items
@@ -5183,7 +5574,7 @@ const scanValue = (session: Session, callable: QValue, value: QValue, seed?: QVa
   if (seed !== undefined) {
     if (callableArity(callable) === 1 && value.kind === "number") {
       const count = toNumber(value);
-      const outputs: QValue[] = [];
+      const outputs: QValue[] = [seed];
       let current = seed;
       for (let i = 0; i < count; i += 1) {
         current = session.invoke(callable, [current]);
@@ -5630,12 +6021,22 @@ const takeValue = (left: QValue, right: QValue): QValue => {
     if (right.items.length === 0) {
       return qList([]);
     }
-    const items = Array.from({ length: Math.abs(count) }, (_, index) => right.items[index % right.items.length]);
-    return qList(count >= 0 ? items : items.reverse(), right.homogeneous ?? false);
+    const n = Math.abs(count);
+    const len = right.items.length;
+    const items =
+      count >= 0
+        ? Array.from({ length: n }, (_, index) => right.items[index % len]!)
+        : Array.from({ length: n }, (_, index) => right.items[((len - n + index) % len + len) % len]!);
+    return qList(items, right.homogeneous ?? false);
   }
   if (right.kind === "string") {
-    const text = Array.from({ length: Math.abs(count) }, (_, index) => right.value[index % right.value.length] ?? " ").join("");
-    return qString(count >= 0 ? text : text.split("").reverse().join(""));
+    const n = Math.abs(count);
+    const len = right.value.length || 1;
+    const text =
+      count >= 0
+        ? Array.from({ length: n }, (_, index) => right.value[index % len] ?? " ").join("")
+        : Array.from({ length: n }, (_, index) => right.value[((len - n + index) % len + len) % len] ?? " ").join("");
+    return qString(text);
   }
   if (right.kind === "table") {
     const rowCount = tableRowCount(right);
@@ -6209,6 +6610,306 @@ const bangValue = (left: QValue, right: QValue): QValue => {
     }
   }
   throw new QRuntimeError("type", "Expected two lists for dictionary creation");
+};
+
+const asofJoinValue = (
+  cols: QValue,
+  left: QValue,
+  right: QValue,
+  options: { useT2Time: boolean; fill: boolean }
+): QValue => {
+  const keyNames = asSymbolList(cols);
+  if (keyNames.length === 0) {
+    throw new QRuntimeError("type", "aj expects at least one key column");
+  }
+  const timeName = keyNames[keyNames.length - 1]!;
+  const groupNames = keyNames.slice(0, -1);
+
+  const lt = asTable(left);
+  const rt = asTable(right);
+  const leftRows = tableRowCount(lt);
+  const rightRows = tableRowCount(rt);
+
+  for (const name of keyNames) {
+    if (!(name in lt.columns)) {
+      throw new QRuntimeError("type", `aj: column ${name} missing from left table`);
+    }
+    if (!(name in rt.columns)) {
+      throw new QRuntimeError("type", `aj: column ${name} missing from right table`);
+    }
+  }
+
+  const groupKeyForRow = (table: QTable, row: number) =>
+    groupNames.map((name) => table.columns[name]!.items[row]!);
+  const groupKeyString = (keys: QValue[]) =>
+    keys.map((key) => JSON.stringify(canonicalize(key))).join("\u0001");
+
+  const groupedRight = new Map<string, { rowIndex: number; time: QValue }[]>();
+  for (let j = 0; j < rightRows; j += 1) {
+    const key = groupKeyString(groupKeyForRow(rt, j));
+    const entry = groupedRight.get(key) ?? [];
+    entry.push({ rowIndex: j, time: rt.columns[timeName]!.items[j]! });
+    groupedRight.set(key, entry);
+  }
+  for (const entries of groupedRight.values()) {
+    entries.sort((a, b) => compare(a.time, b.time));
+  }
+
+  const leftColumnNames = tableColumnNames(lt);
+  const rightExtraColumns = tableColumnNames(rt).filter((name) => !leftColumnNames.includes(name));
+  const resultColumns: Record<string, QValue[]> = {};
+  for (const name of leftColumnNames) resultColumns[name] = [];
+  for (const name of rightExtraColumns) resultColumns[name] = [];
+
+  for (let i = 0; i < leftRows; i += 1) {
+    const leftTime = lt.columns[timeName]!.items[i]!;
+    const key = groupKeyString(groupKeyForRow(lt, i));
+    const candidates = groupedRight.get(key) ?? [];
+    let matched: { rowIndex: number; time: QValue } | null = null;
+    for (const candidate of candidates) {
+      if (compare(candidate.time, leftTime) <= 0) {
+        matched = candidate;
+      } else {
+        break;
+      }
+    }
+
+    for (const name of leftColumnNames) {
+      let cell = lt.columns[name]!.items[i]!;
+      if (name === timeName && options.useT2Time && matched) {
+        cell = rt.columns[timeName]!.items[matched.rowIndex]!;
+      } else if (matched && name !== timeName && !groupNames.includes(name) && name in rt.columns) {
+        const rightCell = rt.columns[name]!.items[matched.rowIndex]!;
+        if (!options.fill || !isNullish(rightCell)) {
+          cell = rightCell;
+        }
+      }
+      resultColumns[name]!.push(cell);
+    }
+
+    for (const name of rightExtraColumns) {
+      resultColumns[name]!.push(matched ? rt.columns[name]!.items[matched.rowIndex]! : qNull());
+    }
+  }
+
+  return qTable(
+    Object.fromEntries(
+      Object.entries(resultColumns).map(([name, items]) => [
+        name,
+        qList(items, items.every((item) => item.kind === items[0]?.kind))
+      ])
+    )
+  );
+};
+
+const equiJoinValue = (cols: QValue, left: QValue, right: QValue): QValue => {
+  const keyNames = asSymbolList(cols);
+  if (keyNames.length === 0) {
+    throw new QRuntimeError("type", "ej expects at least one key column");
+  }
+  const lt = asTable(left);
+  const rt = asTable(right);
+  for (const name of keyNames) {
+    if (!(name in lt.columns) || !(name in rt.columns)) {
+      throw new QRuntimeError("type", `ej: column ${name} must be in both tables`);
+    }
+  }
+
+  const rightRows = tableRowCount(rt);
+  const rightIndex = new Map<string, number[]>();
+  const keyString = (table: QTable, row: number) =>
+    keyNames.map((name) => JSON.stringify(canonicalize(table.columns[name]!.items[row]!))).join("\u0001");
+
+  for (let j = 0; j < rightRows; j += 1) {
+    const key = keyString(rt, j);
+    const bucket = rightIndex.get(key) ?? [];
+    bucket.push(j);
+    rightIndex.set(key, bucket);
+  }
+
+  const leftRows = tableRowCount(lt);
+  const leftColumnNames = tableColumnNames(lt);
+  const rightExtraColumns = tableColumnNames(rt).filter((name) => !leftColumnNames.includes(name));
+
+  const outputColumns: Record<string, QValue[]> = {};
+  for (const name of leftColumnNames) outputColumns[name] = [];
+  for (const name of rightExtraColumns) outputColumns[name] = [];
+
+  for (let i = 0; i < leftRows; i += 1) {
+    const matches = rightIndex.get(keyString(lt, i)) ?? [];
+    for (const j of matches) {
+      for (const name of leftColumnNames) {
+        outputColumns[name]!.push(lt.columns[name]!.items[i]!);
+      }
+      for (const name of rightExtraColumns) {
+        outputColumns[name]!.push(rt.columns[name]!.items[j]!);
+      }
+    }
+  }
+
+  return qTable(
+    Object.fromEntries(
+      Object.entries(outputColumns).map(([name, items]) => [
+        name,
+        qList(items, items.every((item) => item.kind === items[0]?.kind))
+      ])
+    )
+  );
+};
+
+const windowJoinValue = (
+  session: Session,
+  windows: QValue,
+  cols: QValue,
+  left: QValue,
+  rightSpec: QValue,
+  mode: "prevailing" | "window"
+): QValue => {
+  if (windows.kind !== "list" || windows.items.length !== 2) {
+    throw new QRuntimeError("type", "wj expects a 2-element windows list (starts;ends)");
+  }
+  const starts = windows.items[0]!;
+  const ends = windows.items[1]!;
+  if (starts.kind !== "list" || ends.kind !== "list" || starts.items.length !== ends.items.length) {
+    throw new QRuntimeError("type", "wj windows must be equal-length lists");
+  }
+
+  const keyNames = asSymbolList(cols);
+  if (keyNames.length === 0) {
+    throw new QRuntimeError("type", "wj expects at least one key column");
+  }
+  const timeName = keyNames[keyNames.length - 1]!;
+  const groupNames = keyNames.slice(0, -1);
+
+  const lt = asTable(left);
+
+  let rightTable: QTable;
+  const aggSpecs: { name: string; aggregator: QValue; column: string }[] = [];
+
+  if (rightSpec.kind === "list" && rightSpec.items.length === 2) {
+    rightTable = asTable(rightSpec.items[0]!);
+    const rawAggs = rightSpec.items[1]!;
+    const isSinglePair =
+      rawAggs.kind === "list" &&
+      rawAggs.items.length === 2 &&
+      (rawAggs.items[0]!.kind === "builtin" ||
+        rawAggs.items[0]!.kind === "lambda" ||
+        rawAggs.items[0]!.kind === "projection") &&
+      rawAggs.items[1]!.kind === "symbol";
+    const aggItems = isSinglePair
+      ? [rawAggs]
+      : rawAggs.kind === "list"
+        ? rawAggs.items
+        : [rawAggs];
+    for (const item of aggItems) {
+      if (
+        item.kind === "list" &&
+        item.items.length === 2 &&
+        item.items[1]!.kind === "symbol"
+      ) {
+        const aggregator = item.items[0]!;
+        const column = (item.items[1]! as QSymbol).value;
+        aggSpecs.push({ name: column, aggregator, column });
+      }
+    }
+  } else {
+    rightTable = asTable(rightSpec);
+  }
+
+  const leftRows = tableRowCount(lt);
+  if (starts.items.length !== leftRows) {
+    throw new QRuntimeError("length", "wj windows must match the left table length");
+  }
+
+  const rightRows = tableRowCount(rightTable);
+  const groupKeyForRow = (table: QTable, row: number) =>
+    groupNames.map((name) => table.columns[name]!.items[row]!);
+  const groupKeyString = (keys: QValue[]) =>
+    keys.map((key) => JSON.stringify(canonicalize(key))).join("\u0001");
+
+  const groupedRight = new Map<string, { rowIndex: number; time: QValue }[]>();
+  for (let j = 0; j < rightRows; j += 1) {
+    const key = groupKeyString(groupKeyForRow(rightTable, j));
+    const entry = groupedRight.get(key) ?? [];
+    entry.push({ rowIndex: j, time: rightTable.columns[timeName]!.items[j]! });
+    groupedRight.set(key, entry);
+  }
+  for (const entries of groupedRight.values()) {
+    entries.sort((a, b) => compare(a.time, b.time));
+  }
+
+  const leftColumnNames = tableColumnNames(lt);
+  const rightExtraColumns = tableColumnNames(rightTable).filter(
+    (name) => !leftColumnNames.includes(name)
+  );
+  const aggNames = aggSpecs.length > 0 ? aggSpecs.map((spec) => spec.name) : rightExtraColumns;
+
+  const resultColumns: Record<string, QValue[]> = {};
+  for (const name of leftColumnNames) resultColumns[name] = [];
+  for (const name of aggNames) if (!(name in resultColumns)) resultColumns[name] = [];
+
+  for (let i = 0; i < leftRows; i += 1) {
+    for (const name of leftColumnNames) {
+      resultColumns[name]!.push(lt.columns[name]!.items[i]!);
+    }
+
+    const key = groupKeyString(groupKeyForRow(lt, i));
+    const candidates = groupedRight.get(key) ?? [];
+    const startTime = starts.items[i]!;
+    const endTime = ends.items[i]!;
+
+    const rowsInWindow: number[] = [];
+    let prevailing: number | null = null;
+    for (const candidate of candidates) {
+      if (compare(candidate.time, startTime) < 0) {
+        prevailing = candidate.rowIndex;
+      } else if (compare(candidate.time, endTime) <= 0) {
+        rowsInWindow.push(candidate.rowIndex);
+      } else {
+        break;
+      }
+    }
+
+    const positions =
+      mode === "prevailing" && prevailing !== null
+        ? [prevailing, ...rowsInWindow]
+        : rowsInWindow;
+
+    if (aggSpecs.length === 0) {
+      for (const name of aggNames) {
+        const matchedItems = positions.map((p) => rightTable.columns[name]!.items[p]!);
+        resultColumns[name]!.push(qList(matchedItems, matchedItems.every((item) => item.kind === matchedItems[0]?.kind)));
+      }
+      continue;
+    }
+
+    for (const spec of aggSpecs) {
+      const items = positions.map((p) => rightTable.columns[spec.column]!.items[p]!);
+      const arg = qList(items, items.every((item) => item.kind === items[0]?.kind));
+      try {
+        if (
+          spec.aggregator.kind === "builtin" ||
+          spec.aggregator.kind === "lambda" ||
+          spec.aggregator.kind === "projection"
+        ) {
+          resultColumns[spec.name]!.push(session.invoke(spec.aggregator, [arg]));
+        } else {
+          resultColumns[spec.name]!.push(qNull());
+        }
+      } catch {
+        resultColumns[spec.name]!.push(qNull());
+      }
+    }
+  }
+
+  return qTable(
+    Object.fromEntries(
+      Object.entries(resultColumns).map(([name, items]) => [
+        name,
+        qList(items, items.every((item) => item.kind === items[0]?.kind))
+      ])
+    )
+  );
 };
 
 const asofValue = (left: QValue, right: QValue): QValue => {
