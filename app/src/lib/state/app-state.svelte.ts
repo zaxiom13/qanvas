@@ -285,6 +285,7 @@ class AppState {
     this.booted = true;
 
     this.clearConsole(true);
+    this.syncTourExampleWithCurrentSketch();
     this.validateRuntime();
     if (this.workspaceMode === 'practice') {
       this.applyPracticeStarter();
@@ -391,6 +392,8 @@ class AppState {
     if (mode === 'practice') {
       this.applyPracticeStarter();
     }
+
+    this.syncTourExampleWithCurrentSketch();
   }
 
   setPracticeChallenge(challengeId: string) {
@@ -428,6 +431,7 @@ class AppState {
     }
 
     if (!this.projectSession.updateActiveFileContent(this, content)) return;
+    this.syncTourExampleWithCurrentSketch();
     this.practiceVerification = null;
     this.markDirty({ refreshRuntime: !options.restartRuntime });
 
@@ -467,11 +471,13 @@ class AppState {
   }
 
   renameFile(oldName: string, newName: string) {
-    this.projectSession.renameFile(this, oldName, newName);
+    if (!this.projectSession.renameFile(this, oldName, newName)) return;
+    this.syncTourExampleWithCurrentSketch();
   }
 
   deleteFile(name: string) {
-    this.projectSession.deleteFile(this, name);
+    if (!this.projectSession.deleteFile(this, name)) return;
+    this.syncTourExampleWithCurrentSketch();
   }
 
   async importAssets() {
@@ -650,6 +656,7 @@ class AppState {
     this.runtimeRefreshWanted = false;
     this.overlayMessage = '';
     this.overlayMode = this.runtimeOk ? 'idle' : 'runtime-missing';
+    this.syncTourExampleWithCurrentSketch();
   }
 
   async saveProject(forceChoosePath: boolean, options: { silent?: boolean } = {}) {
@@ -993,6 +1000,23 @@ class AppState {
     this.runtimeRefreshWanted = false;
     this.overlayMessage = '';
     this.overlayMode = this.runtimeOk ? 'idle' : 'runtime-missing';
+    this.syncTourExampleWithCurrentSketch();
+  }
+
+  private syncTourExampleWithCurrentSketch() {
+    if (this.workspaceMode !== 'studio') {
+      this.setLastExampleId(null);
+      return;
+    }
+
+    const sketch = this.files.find((file) => file.name === 'sketch.q');
+    if (!sketch) {
+      this.setLastExampleId(null);
+      return;
+    }
+
+    const matchingExample = EXAMPLES.find((example) => example.code === sketch.content) ?? null;
+    this.setLastExampleId(matchingExample?.id ?? null);
   }
 }
 
