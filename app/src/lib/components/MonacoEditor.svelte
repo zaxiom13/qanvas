@@ -67,6 +67,11 @@
     window.dispatchEvent(new CustomEvent(name));
   }
 
+  function isSafariBrowser() {
+    const { userAgent, vendor } = navigator;
+    return /Safari/i.test(userAgent) && /Apple/i.test(vendor) && !/Chrome|Chromium|CriOS|FxiOS|EdgiOS/i.test(userAgent);
+  }
+
   function runEditorAction(actionId: string) {
     void editor?.getAction(actionId)?.run();
   }
@@ -572,6 +577,8 @@
 
     if (!container) return;
 
+    const safariCompatibilityMode = isSafariBrowser();
+
     editor = monaco.editor.create(container, {
       value,
       language: 'q',
@@ -606,6 +613,9 @@
         verticalScrollbarSize: 6,
         horizontalScrollbarSize: 6,
       },
+      // Monaco's layer hinting can make the text layer disappear in Safari/WebKit.
+      disableLayerHinting: safariCompatibilityMode,
+      useShadowDOM: !safariCompatibilityMode,
     });
 
     inlineControlWidget = {
