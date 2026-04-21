@@ -34,6 +34,9 @@ import {
   type QTable,
   type QValue
 } from "@qpad/core";
+import { lexKdbLex, type KdbLexToken } from "../../q-language/src/index.js";
+
+import { parse as pegParse } from "./q-parser.js";
 
 export type AstNode =
   | { kind: "program"; statements: AstNode[]; source: string }
@@ -2170,9 +2173,7 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   });
   register("views", 1, () => qList([], true));
 
-  register("while", 2, (session, args) => {
-    session.unsupported("while (expression form)");
-  });
+  register("while", 2, (session) => session.unsupported("while (expression form)"));
 
   register("in", 2, (_, [left, right]) => inValue(left, right));
   register("each", 2, (session, [callable, arg]) => {
@@ -2378,13 +2379,15 @@ export const listBuiltins = () => ({
   quads: ["wj", "wj1"]
 });
 
+const buildTokenTape = (tokens: Token[]) => "x".repeat(tokens.length);
+
 export const parse = (source: string): AstNode => {
-  const parser = new Parser(tokenize(source));
-  return parser.parseProgram(source);
+  const tokens = tokenize(source);
+  return pegParse(buildTokenTape(tokens), { tokens, Parser, source }) as AstNode;
 };
 
 export class Parser {
-  private index = 0;
+  index = 0;
   private readonly tokens: Token[];
   private readonly stopIdentifiers: Set<string>[] = [];
   private readonly stopOperators: Set<string>[] = [];
@@ -2406,7 +2409,7 @@ export class Parser {
     return { kind: "program", statements, source };
   }
 
-  private parseStatement(): AstNode {
+  parseStatement(): AstNode {
     if (
       this.peek().kind === "operator" &&
       this.peek().value === ":" &&
@@ -2419,7 +2422,7 @@ export class Parser {
     return this.parseExpression();
   }
 
-  private parseExpression(): AstNode {
+  parseExpression(): AstNode {
     if (this.peek().kind === "identifier") {
       switch (this.peek().value) {
         case "select":
@@ -2435,7 +2438,7 @@ export class Parser {
     return this.parseAssignment();
   }
 
-  private parseSelectExpression(): AstNode {
+  parseSelectExpression(): AstNode {
     this.consume("identifier", "select");
     const columns =
       this.peek().kind === "identifier" &&
@@ -2449,7 +2452,7 @@ export class Parser {
     return { kind: "select", columns, by, source, where };
   }
 
-  private parseExecExpression(): AstNode {
+  parseExecExpression(): AstNode {
     this.consume("identifier", "exec");
     const value = this.withStopIdentifiers(["by", "from"], () => this.parseAssignment());
     const by = this.parseOptionalByClause();
@@ -2459,7 +2462,7 @@ export class Parser {
     return { kind: "exec", value, by, source, where };
   }
 
-  private parseUpdateExpression(): AstNode {
+  parseUpdateExpression(): AstNode {
     this.consume("identifier", "update");
     const updates = this.parseUpdateClauses();
     this.consume("identifier", "from");
@@ -2468,7 +2471,7 @@ export class Parser {
     return { kind: "update", updates, source, where };
   }
 
-  private parseDeleteExpression(): AstNode {
+  parseDeleteExpression(): AstNode {
     this.consume("identifier", "delete");
     const columns =
       this.peek().kind === "identifier" && this.peek().value === "from"
@@ -3207,275 +3210,73 @@ export class Parser {
 }
 
 export const tokenize = (source: string): Token[] => {
-  const tokens: Token[] = [];
-  let i = 0;
+  return lexKdbLex(source).flatMap(adaptKdbLexToken);
+};
 
-  while (i < source.length) {
-    const char = source[i];
-
-    if (char === " " || char === "\t" || char === "\r") {
-      i += 1;
-      continue;
-    }
-
-    if (char === "/") {
-      const next = source[i + 1] ?? "";
-      let previousIndex = i - 1;
-      while (
-        previousIndex >= 0 &&
-        (source[previousIndex] === " " ||
-          source[previousIndex] === "\t" ||
-          source[previousIndex] === "\r")
+const adaptKdbLexToken = (token: KdbLexToken): Token[] => {
+  switch (token.kind) {
+    case "whitespace":
+    case "comment":
+    case "directive":
+      return [];
+    case "newline":
+      return [{ kind: "newline", value: token.value }];
+    case "separator":
+      return [{ kind: "separator", value: token.value }];
+    case "identifier":
+      return [{ kind: "identifier", value: token.value }];
+    case "symbol":
+      return [{ kind: "symbol", value: token.value.slice(1) }];
+    case "operator":
+      if (
+        token.value.length === 2 &&
+        (token.value === "+/" || token.value === "+\\" || token.value === ",/" || token.value === ",\\")
       ) {
-        previousIndex -= 1;
+        return [{ kind: "operator", value: token.value }];
       }
-      const previousNonSpace = previousIndex >= 0 ? source[previousIndex] : "\n";
-      const previousChar = source[i - 1] ?? "";
-      const atStatementStart =
-        previousIndex < 0 || previousNonSpace === "\n" || previousNonSpace === ";";
-      const startsCommentText =
-        next === " " ||
-        next === "\t" ||
-        /[A-Za-z0-9`"]/.test(next);
-      const looksLikeTrailingComment =
-        (previousChar === " " || previousChar === "\t" || previousChar === "\r") &&
-        startsCommentText &&
-        next !== ":" &&
-        next !== "/" &&
-        next !== "\\";
-      const inCommentPosition =
-        next !== ":" && (atStatementStart || looksLikeTrailingComment);
-      if (inCommentPosition) {
-        while (i < source.length && source[i] !== "\n") {
-          i += 1;
+      return [{ kind: "operator", value: token.value }];
+    case "date":
+      return [{ kind: "date", value: token.value }];
+    case "number":
+      return [{ kind: "number", value: token.value }];
+    case "boolean":
+      return [{ kind: "boolean", value: token.value }];
+    case "boolvector":
+      return [{ kind: "boolvector", value: token.value.replace(/[ \t]+/g, "") }];
+    case "string":
+      return [
+        {
+          kind: "string",
+          value:
+            token.value.length >= 2 && token.value.startsWith("\"") && token.value.endsWith("\"")
+              ? token.value.slice(1, -1).replace(/\\(.)/g, "$1")
+              : token.value.replace(/^"/, "").replace(/\\(.)/g, "$1")
         }
-        continue;
-      }
-    }
-
-    if (char === "\\") {
-      const previous = source[i - 1] ?? "\n";
-      const atDirectiveStart =
-        i === 0 ||
-        previous === "\n" ||
-        previous === ";" ||
-        previous === " " ||
-        previous === "\t" ||
-        previous === "\r";
-      if (atDirectiveStart) {
-        while (i < source.length && source[i] !== "\n") {
-          i += 1;
-        }
-        continue;
-      }
-    }
-
-    if (char === "\n") {
-      tokens.push({ kind: "newline", value: "\n" });
-      i += 1;
-      continue;
-    }
-
-    if (char === ";") {
-      tokens.push({ kind: "separator", value: ";" });
-      i += 1;
-      continue;
-    }
-
-    if (
-      (char === "+" || char === ",") &&
-      (source[i + 1] === "/" || source[i + 1] === "\\") &&
-      source[i + 2] !== ":" &&
-      source[i + 2] !== "'"
-    ) {
-      tokens.push({ kind: "operator", value: `${char}${source[i + 1]}` });
-      i += 2;
-      continue;
-    }
-
-    if (char === "(") {
-      tokens.push({ kind: "lparen", value: char });
-      i += 1;
-      continue;
-    }
-
-    if (char === ")") {
-      tokens.push({ kind: "rparen", value: char });
-      i += 1;
-      continue;
-    }
-
-    if (char === "[") {
-      tokens.push({ kind: "lbracket", value: char });
-      i += 1;
-      continue;
-    }
-
-    if (char === "]") {
-      tokens.push({ kind: "rbracket", value: char });
-      i += 1;
-      continue;
-    }
-
-    if (char === "{") {
-      tokens.push({ kind: "lbrace", value: char });
-      i += 1;
-      continue;
-    }
-
-    if (char === "}") {
-      tokens.push({ kind: "rbrace", value: char });
-      i += 1;
-      continue;
-    }
-
-    if (char === "_") {
-      tokens.push({ kind: "operator", value: char });
-      i += 1;
-      continue;
-    }
-
-    if (char === "\"") {
-      let value = "";
-      i += 1;
-      while (i < source.length && source[i] !== "\"") {
-        if (source[i] === "\\" && i + 1 < source.length) {
-          value += source[i + 1];
-          i += 2;
-        } else {
-          value += source[i];
-          i += 1;
-        }
-      }
-      i += 1;
-      tokens.push({ kind: "string", value });
-      continue;
-    }
-
-    if (char === "`") {
-      let value = "";
-      i += 1;
-      while (i < source.length && /[a-zA-Z0-9_./:]/.test(source[i])) {
-        value += source[i];
-        i += 1;
-      }
-      tokens.push({ kind: "symbol", value });
-      continue;
-    }
-
-    const spacedBoolMatch = source.slice(i).match(/^[01](?:[ \t]+[01])+b(?![a-zA-Z0-9_])/);
-    if (spacedBoolMatch) {
-      const compact = spacedBoolMatch[0].replace(/[ \t]+/g, "");
-      tokens.push({ kind: "boolvector", value: compact });
-      i += spacedBoolMatch[0].length;
-      continue;
-    }
-
-    const booleanMatch = source.slice(i).match(/^[01]+b/);
-    if (booleanMatch) {
-      tokens.push({
-        kind: booleanMatch[0].length === 2 ? "boolean" : "boolvector",
-        value: booleanMatch[0]
-      });
-      i += booleanMatch[0].length;
-      continue;
-    }
-
-    const nullMatch = source.slice(i).match(/^(0Wj|-0Wj|0N|0n|-0W|0W|-0w|0w)/);
-    if (nullMatch) {
-      tokens.push({ kind: "number", value: nullMatch[1] });
-      i += nullMatch[1].length;
-      continue;
-    }
-
-    const dateMatch = source.slice(i).match(/^\d{4}\.\d{2}\.\d{2}/);
-    if (dateMatch) {
-      tokens.push({ kind: "date", value: dateMatch[0] });
-      i += dateMatch[0].length;
-      continue;
-    }
-
-    const temporalBoundary = "(?=$|[ \\t\\r\\n\\]\\)\\};,])";
-    const monthMatch = source
-      .slice(i)
-      .match(new RegExp(`^\\d{4}\\.\\d{2}m?${temporalBoundary}`));
-    if (monthMatch) {
-      tokens.push({ kind: "date", value: monthMatch[0] });
-      i += monthMatch[0].length;
-      continue;
-    }
-
-    const timespanMatch = source
-      .slice(i)
-      .match(new RegExp(`^\\d{1,2}:\\d{2}:\\d{2}\\.\\d{9}${temporalBoundary}`));
-    if (timespanMatch) {
-      tokens.push({ kind: "date", value: timespanMatch[0] });
-      i += timespanMatch[0].length;
-      continue;
-    }
-
-    const timeMatch = source
-      .slice(i)
-      .match(new RegExp(`^\\d{1,2}:\\d{2}:\\d{2}\\.\\d{3}${temporalBoundary}`));
-    if (timeMatch) {
-      tokens.push({ kind: "date", value: timeMatch[0] });
-      i += timeMatch[0].length;
-      continue;
-    }
-
-    const secondMatch = source
-      .slice(i)
-      .match(new RegExp(`^\\d{1,2}:\\d{2}:\\d{2}${temporalBoundary}`));
-    if (secondMatch) {
-      tokens.push({ kind: "date", value: secondMatch[0] });
-      i += secondMatch[0].length;
-      continue;
-    }
-
-    const minuteMatch = source
-      .slice(i)
-      .match(new RegExp(`^\\d{1,2}:\\d{2}${temporalBoundary}`));
-    if (minuteMatch) {
-      tokens.push({ kind: "date", value: minuteMatch[0] });
-      i += minuteMatch[0].length;
-      continue;
-    }
-
-    const canStartSignedNumber =
-      i === 0 ||
-      [" ", "\t", "\r", "\n", "(", "[", "{", ";", ":"].includes(source[i - 1] ?? "") ||
-      "+-*%=<>,!#_~?/^&|\\'$".includes(source[i - 1] ?? "");
-    const numberPattern = canStartSignedNumber
-      ? /^-?(?:\d+\.\d+|\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?[fhij]?/
-      : /^(?:\d+\.\d+|\d+\.\d*|\.\d+|\d+)(?:[eE][+-]?\d+)?[fhij]?/;
-    const numberMatch = source.slice(i).match(numberPattern);
-    if (numberMatch) {
-      tokens.push({ kind: "number", value: numberMatch[0] });
-      i += numberMatch[0].length;
-      continue;
-    }
-
-    const identifierMatch = source.slice(i).match(/^[a-zA-Z_.][a-zA-Z0-9_.]*/);
-    if (identifierMatch) {
-      tokens.push({ kind: "identifier", value: identifierMatch[0] });
-      i += identifierMatch[0].length;
-      continue;
-    }
-
-    const opMatch = source
-      .slice(i)
-      .match(/^(<=|>=|<>|::|\/:|\\:|[+\-*%=<>,!#_~?/^&|@\\$']\:|[+\-*%=<>,!#_~:?/^&|@\\'$])/);
-    if (opMatch) {
-      tokens.push({ kind: "operator", value: opMatch[1] });
-      i += opMatch[1].length;
-      continue;
-    }
-
-    throw new QRuntimeError("parse", `Unexpected character: ${char}`);
+      ];
+    case "bracket":
+      return [{ kind: bracketKind(token.value), value: token.value }];
+    case "eof":
+      return [{ kind: "eof", value: "" }];
   }
+};
 
-  tokens.push({ kind: "eof", value: "" });
-  return tokens;
+const bracketKind = (value: string): Token["kind"] => {
+  switch (value) {
+    case "(":
+      return "lparen";
+    case ")":
+      return "rparen";
+    case "[":
+      return "lbracket";
+    case "]":
+      return "rbracket";
+    case "{":
+      return "lbrace";
+    case "}":
+      return "rbrace";
+    default:
+      throw new QRuntimeError("parse", `Unexpected bracket token: ${value}`);
+  }
 };
 
 const isCallableAst = (node: AstNode) =>

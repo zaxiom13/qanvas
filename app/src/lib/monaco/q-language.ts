@@ -1,4 +1,5 @@
 import type * as Monaco from 'monaco-editor';
+import { KDBLex } from '@qpad/language';
 
 const registeredMonacoInstances = new WeakSet<object>();
 
@@ -518,6 +519,71 @@ function buildWordBoundaryPattern(words: string[]) {
   return new RegExp(`\\b(${words.join('|')})\\b`);
 }
 
+function translateKdbLexToken(token: string) {
+  switch (token) {
+    case 'variable':
+      return 'identifier';
+    case 'delimiter':
+      return 'operator';
+    default:
+      return token;
+  }
+}
+
+function translateKdbLexRule(rule: unknown): Monaco.languages.IMonarchLanguageRule {
+  if (!Array.isArray(rule)) {
+    return rule as Monaco.languages.IMonarchLanguageRule;
+  }
+
+  const [pattern, action] = rule;
+  if (typeof action === 'string') {
+    return [pattern, translateKdbLexToken(action)] as Monaco.languages.IMonarchLanguageRule;
+  }
+
+  if (action && typeof action === 'object' && 'cases' in action) {
+    const cases = Object.fromEntries(
+      Object.entries(action.cases as Record<string, string>).map(([key, value]) => [key, translateKdbLexToken(value)])
+    );
+    return [pattern, { ...action, cases }] as Monaco.languages.IMonarchLanguageRule;
+  }
+
+  return rule as Monaco.languages.IMonarchLanguageRule;
+}
+
+function buildMonacoKdbLexLanguage(): Monaco.languages.IMonarchLanguage {
+  const canonicalRoot = KDBLex.tokenizer.root as readonly unknown[];
+  const canonicalString = KDBLex.tokenizer.string as readonly unknown[];
+  const identifierRule = canonicalRoot[0];
+  const trailingRules = canonicalRoot.slice(1).map(translateKdbLexRule);
+
+  return {
+    ...KDBLex,
+    qanvasIdentifiers: Q_QANVAS_IDENTIFIERS,
+    builtinFunctions: Q_BUILTIN_FUNCTIONS,
+    tokenizer: {
+      root: [
+        [
+          (identifierRule as [RegExp])[0],
+          {
+            cases: {
+              '@qanvasIdentifiers': 'qanvas',
+              '@builtinFunctions': 'builtin',
+              '@keywords': 'keyword',
+              '@default': 'identifier',
+            },
+          },
+        ],
+        ...trailingRules,
+      ] as Monaco.languages.IMonarchLanguageRule[],
+      whitespace: [
+        [/[ \t\r\n]+/, ''],
+        [/\/(?=\s).*$/, 'comment'],
+      ] as Monaco.languages.IMonarchLanguageRule[],
+      string: canonicalString.map(translateKdbLexRule),
+    },
+  } as Monaco.languages.IMonarchLanguage;
+}
+
 function dedupeSuggestions<T extends { label: string }>(items: T[]) {
   const seen = new Set<string>();
   return items.filter((item) => {
@@ -566,27 +632,7 @@ export function registerQLanguage(monaco: typeof Monaco) {
     ],
   });
 
-  monaco.languages.setMonarchTokensProvider('q', {
-    tokenizer: {
-      root: [
-        [/\/:|\\:|':/, 'operator'],
-        [/\/(?=\s).*$/, 'comment'],
-        [/^\\[a-z]+/, 'keyword'],
-        [/\{/, 'delimiter.curly'],
-        [/\}/, 'delimiter.curly'],
-        [/-?[0-9]+[.e]?[0-9]*[ijfhb]?/, 'number'],
-        [/`[a-zA-Z0-9._]*/, 'type'],
-        [/"([^"\\]|\\.)*"/, 'string'],
-        [buildWordBoundaryPattern(Q_QANVAS_IDENTIFIERS), 'qanvas'],
-        [buildWordBoundaryPattern(Q_BUILTIN_FUNCTIONS), 'builtin'],
-        [buildWordBoundaryPattern(Q_KEYWORDS), 'keyword'],
-        [/[a-zA-Z_][a-zA-Z0-9_.]*/, 'identifier'],
-        [/[/\\']/, 'operator'],
-        [/[+\-*%!@#$&|^~<>=?_,;:.]/, 'operator'],
-        [/\s+/, 'white'],
-      ],
-    },
-  });
+  monaco.languages.setMonarchTokensProvider('q', buildMonacoKdbLexLanguage());
 
   monaco.languages.registerCompletionItemProvider('q', {
     triggerCharacters: ['/', '\\', '`', '.'],
@@ -663,6 +709,13 @@ export function registerQLanguage(monaco: typeof Monaco) {
       { token: 'keyword', foreground: '7D4E2D' },
       { token: 'number', foreground: '5B6FE8' },
       { token: 'string', foreground: 'B35B3F' },
+      { token: 'string.escape', foreground: 'B35B3F' },
+      { token: 'string.invalid', foreground: 'C45C5C' },
+      { token: 'symbol', foreground: '8B674B' },
+      { token: 'variable', foreground: '2C2520' },
+      { token: 'delimiter', foreground: '5C534C' },
+      { token: 'date', foreground: '5B6FE8' },
+      { token: 'time', foreground: '5B6FE8' },
       { token: 'type', foreground: '8B674B' },
     ],
     colors: {

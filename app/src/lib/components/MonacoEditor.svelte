@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
+  import 'monaco-editor/min/vs/editor/editor.main.css';
   import type * as Monaco from 'monaco-editor';
   import noUiSlider, { type API as NoUiSliderApi } from 'nouislider';
   import Pickr from '@simonwep/pickr';

@@ -1,5 +1,6 @@
 node_modules/
 dist/
+dist-static/
 app/dist/
 app/node_modules/
 packages/*/node_modules/

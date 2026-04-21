@@ -13,6 +13,7 @@
   "dependencies": {
     "@qpad/core": "*",
     "@qpad/engine": "*",
+    "@qpad/language": "*",
     "@simonwep/pickr": "^1.9.1",
     "monaco-editor": "^0.52.2",
     "nouislider": "^15.8.1",

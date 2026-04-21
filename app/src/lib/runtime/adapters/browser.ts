@@ -40,11 +40,20 @@ export function createBrowserAdapter(): QanvasRuntime {
     info: new Set<(info: RuntimeBackendInfo) => void>(),
   };
 
-  worker.addEventListener('message', (event: MessageEvent<Response>) => {
-    const m = event.data;
-    if ('type' in m && m.type === 'stdout') { listeners.stdout.forEach((cb) => cb(m.value)); return; }
-    if ('type' in m && m.type === 'stderr') { listeners.stderr.forEach((cb) => cb(m.value)); return; }
-    if ('type' in m && m.type === 'exit') { listeners.exit.forEach((cb) => cb(m.code)); return; }
+  worker.addEventListener('message', (event: MessageEvent<unknown>) => {
+    const m = event.data as Response;
+    if ('type' in m && m.type === 'stdout') {
+      listeners.stdout.forEach((cb) => cb(String(m.value)));
+      return;
+    }
+    if ('type' in m && m.type === 'stderr') {
+      listeners.stderr.forEach((cb) => cb(String(m.value)));
+      return;
+    }
+    if ('type' in m && m.type === 'exit' && 'code' in m) {
+      listeners.exit.forEach((cb) => cb(m.code as number));
+      return;
+    }
     if (!('id' in m)) return;
 
     const p = pending.get(m.id);
