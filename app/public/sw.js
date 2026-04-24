@@ -1,11 +1,12 @@
-const CACHE_NAME = 'qanvas5-pwa-v1';
-const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg', '/qanvas-default-backend.json'];
+const CACHE_NAME = 'qanvas5-pwa-v2';
+const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
+const OPTIONAL_SHELL = ['/qanvas-default-backend.json'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches
       .open(CACHE_NAME)
-      .then((cache) => cache.addAll(APP_SHELL))
+      .then((cache) => cache.addAll(APP_SHELL).then(() => Promise.allSettled(OPTIONAL_SHELL.map((path) => cache.add(path)))))
       .then(() => self.skipWaiting()),
   );
 });
@@ -31,7 +32,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.pathname.startsWith('/assets/') || APP_SHELL.includes(url.pathname)) {
+  if (url.pathname.startsWith('/assets/') || APP_SHELL.includes(url.pathname) || OPTIONAL_SHELL.includes(url.pathname)) {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(request);

@@ -16,6 +16,40 @@ test('shows the mobile workspace with bottom navigation', async ({ page }) => {
   await expect(page.getByLabel('q sketch editor')).toBeVisible();
 });
 
+test('keeps the bottom navigation out of the active screen content', async ({ page }) => {
+  await page.goto('/');
+
+  const nav = page.getByRole('navigation', { name: 'Mobile workspace' });
+  const main = page.locator('.mobile-main');
+
+  await expect(nav).toBeVisible();
+  await expect(nav).not.toHaveCSS('position', 'fixed');
+
+  const boxes = await Promise.all([main.boundingBox(), nav.boundingBox()]);
+  expect(boxes[0]).not.toBeNull();
+  expect(boxes[1]).not.toBeNull();
+  expect(boxes[1]!.y).toBeGreaterThanOrEqual(boxes[0]!.y + boxes[0]!.height - 1);
+});
+
+test('uses the real sketch canvas on the mobile canvas tab', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Canvas' }).click();
+
+  await expect(page.getByLabel('Sketch canvas')).toBeVisible();
+  await expect(page.locator('.mobile-artboard')).toHaveCount(0);
+});
+
+test('runs the sketch from the mobile header', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Run sketch' }).first().click();
+
+  await expect(page.getByRole('button', { name: 'Canvas' })).toHaveClass(/active/);
+  await expect(page.getByLabel('Sketch canvas')).toBeVisible();
+  await expect(page.locator('.sketch-overlay--running')).toHaveCount(1);
+});
+
 test('edits the active sketch from the mobile editor', async ({ page }) => {
   await page.goto('/');
 
