@@ -55,6 +55,7 @@
       <button class="console-filter-btn" type="button" class:console-filter-btn--active={appState.consoleFilter === 'all'} data-filter="all" onclick={() => (appState.consoleFilter = 'all')}>All</button>
       <button class="console-filter-btn" type="button" class:console-filter-btn--active={appState.consoleFilter === 'stdout'} data-filter="stdout" onclick={() => (appState.consoleFilter = 'stdout')}>stdout</button>
       <button class="console-filter-btn" type="button" class:console-filter-btn--active={appState.consoleFilter === 'stderr'} data-filter="stderr" onclick={() => (appState.consoleFilter = 'stderr')}>stderr</button>
+      <button class="console-filter-btn" type="button" class:console-filter-btn--active={appState.consoleFilter === 'info'} data-filter="info" onclick={() => (appState.consoleFilter = 'info')}>info</button>
     </div>
     <button id="btn-clear-console" class="btn-icon-only console-clear-btn" type="button" title="Clear console" onclick={() => appState.clearConsole(false)}>
       <svg class="icon" viewBox="0 0 16 16" fill="none">

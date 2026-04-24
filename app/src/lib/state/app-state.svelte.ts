@@ -152,7 +152,7 @@ class AppState {
   sidebarCollapsed = $state(readStored(STORAGE_KEYS.sidebarCollapsed) === '1');
   consoleHeight = $state(readStoredNumber(STORAGE_KEYS.consoleHeight, 160));
   editorPanelWidth = $state(readStoredNumber(STORAGE_KEYS.editorPanelWidth, 520));
-  consoleFilter = $state<'all' | 'stdout' | 'stderr'>('all');
+  consoleFilter = $state<'all' | 'stdout' | 'stderr' | 'info'>('all');
   consoleEntries = $state<ConsoleEntry[]>([]);
   activeModal = $state<ModalName>(null);
   newFileName = $state('');
@@ -188,9 +188,8 @@ class AppState {
   }
 
   get filteredConsole() {
-    return this.consoleFilter === 'all'
-      ? this.consoleEntries
-      : this.consoleEntries.filter((entry) => entry.type === this.consoleFilter);
+    if (this.consoleFilter === 'all') return this.consoleEntries;
+    return this.consoleEntries.filter((entry) => entry.type === this.consoleFilter);
   }
 
   get running() {

@@ -4,20 +4,10 @@
   import { appState } from '$lib/state/app-state.svelte';
 
   type MobileTab = 'editor' | 'canvas' | 'examples' | 'data' | 'settings';
+  type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
 
   let activeTab = $state<MobileTab>('editor');
   let mobileCode = $state(appState.activeEditorValue);
-
-  const quickTools = [
-    { label: 'Clear', icon: 'clear' },
-    { label: 'Background', icon: 'dropper' },
-    { label: 'Stroke', icon: 'waves' },
-    { label: 'Fill', icon: 'fill' },
-    { label: 'Shape', icon: 'shape' },
-    { label: 'Grid', icon: 'grid' },
-    { label: 'Mirror', icon: 'mirror' },
-    { label: 'Export', icon: 'export' },
-  ];
 
   const bottomTabs: { id: MobileTab; label: string; icon: string }[] = [
     { id: 'editor', label: 'Editor', icon: 'code' },
@@ -28,7 +18,17 @@
   ];
 
   let examples = $derived(appState.filteredExamples.slice(0, 9));
-  let consoleEntries = $derived(appState.filteredConsole.slice(-7));
+  let filteredConsoleEntries = $derived(appState.filteredConsole);
+
+  function formatTimestamp(ts: number) {
+    const date = new Date(ts);
+    const pad = (value: number, width = 2) => String(value).padStart(width, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+  }
+
+  function setMobileConsoleFilter(filter: MobileConsoleFilter) {
+    appState.consoleFilter = filter;
+  }
 
   $effect(() => {
     mobileCode = appState.activeEditorValue;
@@ -43,6 +43,9 @@
     activeTab = tab;
     if (tab === 'canvas') {
       appState.setCanvasPanelTab('canvas');
+    }
+    if (tab === 'data') {
+      appState.consoleFilter = 'stdout';
     }
   }
 
@@ -114,17 +117,81 @@
           oninput={(event) => updateCode(event.currentTarget.value)}
           aria-label="q sketch editor"
         ></textarea>
-        <div class="mobile-console">
+        <div class="mobile-console" aria-label="Console output">
           <div class="sheet-handle"></div>
-          <div class="mobile-console-tabs">
-            <strong>Console</strong>
-            <span>Data</span>
-            <span>Errors</span>
+          <div class="mobile-console-toolbar">
+            <span class="mobile-console-title">Console</span>
+            <div class="mobile-console-filters" role="tablist" aria-label="Console filter">
+              <button
+                type="button"
+                class="mobile-console-filter-btn"
+                class:mobile-console-filter-btn--active={appState.consoleFilter === 'all'}
+                onclick={() => setMobileConsoleFilter('all')}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                class="mobile-console-filter-btn"
+                class:mobile-console-filter-btn--active={appState.consoleFilter === 'stdout'}
+                onclick={() => setMobileConsoleFilter('stdout')}
+              >
+                Data
+              </button>
+              <button
+                type="button"
+                class="mobile-console-filter-btn"
+                class:mobile-console-filter-btn--active={appState.consoleFilter === 'stderr'}
+                onclick={() => setMobileConsoleFilter('stderr')}
+              >
+                Errors
+              </button>
+              <button
+                type="button"
+                class="mobile-console-filter-btn"
+                class:mobile-console-filter-btn--active={appState.consoleFilter === 'info'}
+                onclick={() => setMobileConsoleFilter('info')}
+              >
+                Info
+              </button>
+            </div>
+            <button
+              class="btn-icon-only mobile-console-clear-btn"
+              type="button"
+              title="Clear console"
+              aria-label="Clear console"
+              onclick={() => appState.clearConsole(false)}
+            >
+              <svg class="icon" viewBox="0 0 16 16" fill="none">
+                <path d="M3 4h10M5 4V3h6v1M6 7v5M10 7v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M4 4l1 9h6l1-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              </svg>
+            </button>
           </div>
-          <pre>{#if consoleEntries.length}{#each consoleEntries as entry}{entry.type === 'stderr' ? 'err' : entry.type === 'info' ? 'info' : 'q'}&#41; {entry.text}
-{/each}{:else}q) qanvas5
-Qanvas5 ready.
-q){/if}</pre>
+          <div class="mobile-console-output">
+            {#each filteredConsoleEntries as entry (entry.id)}
+              <div class={`console-line console-line--${entry.type}`}>
+                <span class="console-prefix">{entry.type === 'stdout' ? '›' : entry.type === 'stderr' ? '✕' : '—'}</span>
+                {#if appState.debugConsole}
+                  <span class="console-timestamp">{formatTimestamp(entry.ts)}</span>
+                {/if}
+                <span class="console-text">{entry.text}</span>
+                <button
+                  type="button"
+                  class="console-line-delete"
+                  title="Delete line"
+                  aria-label="Delete line"
+                  onclick={() => appState.removeConsoleEntry(entry.id)}
+                >
+                  <svg viewBox="0 0 12 12" width="10" height="10" fill="none" aria-hidden="true">
+                    <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  </svg>
+                </button>
+              </div>
+            {:else}
+              <p class="mobile-console-empty">No lines for this filter. Run a sketch or switch tabs.</p>
+            {/each}
+          </div>
         </div>
       </section>
     {:else if activeTab === 'canvas'}
@@ -150,36 +217,6 @@ q){/if}</pre>
           <span><span class="status-dot"></span>{Math.round(appState.fps || 60)} FPS</span>
           <span>{appState.currentCanvasSize[0] || 800} x {appState.currentCanvasSize[1] || 600}</span>
           <span>t: 359</span>
-        </div>
-        <div class="mobile-tools-sheet">
-          <div class="sheet-handle"></div>
-          <h2>Quick Tools</h2>
-          <div class="quick-tools-grid">
-            {#each quickTools as tool}
-              <button class="quick-tool" type="button">
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  {#if tool.icon === 'clear'}
-                    <path d="M5 12a7 7 0 0 1 12.2-4.7M19 12a7 7 0 0 1-12.2 4.7M17 5v4h-4M7 19v-4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  {:else if tool.icon === 'dropper'}
-                    <path d="m14 5 5 5M11 8l5 5-7 7H4v-5zM13 6l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  {:else if tool.icon === 'waves'}
-                    <path d="M4 8c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2M4 16c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                  {:else if tool.icon === 'fill'}
-                    <path d="m5 14 7-7 6 6-7 7H5zM14 4l6 6M19 17c0 1.5-1 3-2.5 3S14 18.5 14 17c0-1 .9-2.4 2.5-4 1.6 1.6 2.5 3 2.5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-                  {:else if tool.icon === 'shape'}
-                    <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2" />
-                  {:else if tool.icon === 'grid'}
-                    <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-                  {:else if tool.icon === 'mirror'}
-                    <path d="M5 4h5v16H5zM14 4h5v16h-5zM12 3v18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-                  {:else}
-                    <path d="M12 4v11M8 8l4-4 4 4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  {/if}
-                </svg>
-                <span>{tool.label}</span>
-              </button>
-            {/each}
-          </div>
         </div>
       </section>
     {:else if activeTab === 'examples'}
@@ -214,11 +251,14 @@ q){/if}</pre>
         </div>
       </section>
     {:else if activeTab === 'data'}
-      <section class="mobile-empty-panel">
-        <h1>Data</h1>
-        {#if consoleEntries.length}
+      <section class="mobile-data-panel">
+        <div class="mobile-data-panel-header">
+          <h1>Data</h1>
+          <p class="mobile-data-panel-hint">Runtime tables and printed values appear as stdout in the console. Use the Editor tab to filter by Data or Errors.</p>
+        </div>
+        {#if filteredConsoleEntries.length}
           <div class="mobile-data-list">
-            {#each consoleEntries as entry}
+            {#each filteredConsoleEntries as entry}
               <article>
                 <strong>{entry.type}</strong>
                 <p>{entry.text}</p>
@@ -226,7 +266,7 @@ q){/if}</pre>
             {/each}
           </div>
         {:else}
-          <p>Run a sketch to inspect tables, arrays, runtime output, and errors here.</p>
+          <p class="mobile-data-panel-empty">Nothing in the current console filter. Open the Editor tab, choose the Data or All filter, or run a sketch to populate output.</p>
         {/if}
       </section>
     {:else}
@@ -369,13 +409,20 @@ q){/if}</pre>
 
   .mobile-canvas,
   .mobile-examples,
-  .mobile-empty-panel {
+  .mobile-empty-panel,
+  .mobile-data-panel {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
 
+  .mobile-canvas {
+    display: flex;
+    flex-direction: column;
+  }
+
   .mobile-examples,
-  .mobile-empty-panel {
+  .mobile-empty-panel,
+  .mobile-data-panel {
     height: 100%;
     min-height: 0;
   }
@@ -445,42 +492,98 @@ q){/if}</pre>
     outline: none;
   }
 
-  .mobile-console,
-  .mobile-tools-sheet {
+  .mobile-console {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    max-height: min(42dvh, 360px);
+    min-height: 140px;
     margin: 0;
-    padding: 10px 18px 20px;
+    padding: 8px 12px 12px;
     border-top: 1px solid var(--mobile-border);
-    background: color-mix(in srgb, var(--mobile-panel-2), white 12%);
+    background: var(--bg-console);
     box-shadow: 0 -12px 26px rgba(70, 50, 34, 0.12);
   }
 
   .sheet-handle {
     width: 48px;
     height: 5px;
-    margin: 0 auto 12px;
+    margin: 0 auto 8px;
     border-radius: 999px;
     background: rgba(120, 104, 84, 0.32);
+    flex-shrink: 0;
   }
 
-  .mobile-console-tabs {
+  .mobile-console-toolbar {
     display: flex;
-    gap: 28px;
-    margin-bottom: 12px;
-    color: var(--mobile-muted);
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 40px;
+    padding: 0 4px 6px;
+    background: var(--bg-chrome);
+    border-radius: 6px;
+    border: 1px solid var(--mobile-border);
   }
 
-  .mobile-console-tabs strong {
+  .mobile-console-title {
+    flex-shrink: 0;
+    padding: 0 4px 0 6px;
+    font-size: 12px;
+    font-weight: 700;
     color: var(--mobile-ink);
   }
 
-  .mobile-console pre {
-    max-height: 118px;
-    overflow: auto;
-    margin: 0;
-    color: var(--green);
+  .mobile-console-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-console-filter-btn {
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--mobile-muted);
+    font-size: 11px;
     font-family: var(--font-mono);
-    font-size: 13px;
-    line-height: 1.7;
+    background: transparent;
+  }
+
+  .mobile-console-filter-btn--active {
+    border-color: var(--mobile-border);
+    background: #fff;
+    color: var(--mobile-ink);
+  }
+
+  .mobile-console-clear-btn {
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .mobile-console-output {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 6px;
+    padding: 2px 0;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--mobile-panel-2), transparent 8%);
+  }
+
+  .mobile-console-output :global(.console-line) {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .mobile-console-empty {
+    margin: 12px 10px;
+    color: var(--mobile-muted);
+    font-size: 12px;
+    line-height: 1.45;
   }
 
   .mobile-playbar {
@@ -498,8 +601,8 @@ q){/if}</pre>
   }
 
   .mobile-canvas-stage {
-    height: clamp(280px, 48dvh, 460px);
-    min-height: 0;
+    flex: 1 1 auto;
+    min-height: 200px;
     border-bottom: 1px solid var(--mobile-border);
     background: var(--bg-canvas);
   }
@@ -539,40 +642,50 @@ q){/if}</pre>
     gap: 7px;
   }
 
-  .mobile-tools-sheet {
-    margin-top: 0;
-    border-radius: 0;
-  }
-
-  .mobile-tools-sheet h2,
   .mobile-search-row h1,
   .mobile-empty-panel h1 {
     margin: 0 0 18px;
     font-size: 18px;
   }
 
-  .quick-tools-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .quick-tool {
-    display: grid;
-    place-items: center;
-    gap: 8px;
-    min-height: 84px;
-    border: 1px solid var(--mobile-border);
-    border-radius: 8px;
-    background: var(--bg-editor);
-    color: var(--mobile-ink);
-    font-size: 12px;
-  }
-
-  .quick-tool-icon,
   .nav-icon {
     width: 26px;
     height: 26px;
+  }
+
+  .mobile-data-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    padding: 20px 16px 24px;
+    background: var(--mobile-panel);
+  }
+
+  .mobile-data-panel-header h1 {
+    margin: 0 0 8px;
+    font-size: 18px;
+  }
+
+  .mobile-data-panel-hint {
+    margin: 0;
+    max-width: 52ch;
+    color: var(--mobile-muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .mobile-data-panel-empty {
+    margin: 0;
+    max-width: 48ch;
+    color: var(--mobile-muted);
+    font-size: 14px;
+    line-height: 1.5;
+  }
+
+  .mobile-data-panel .mobile-data-list {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
   }
 
   .mobile-examples {

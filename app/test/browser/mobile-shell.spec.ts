@@ -40,10 +40,11 @@ test('uses the real sketch canvas on the mobile canvas tab', async ({ page }) =>
   await expect(page.locator('.mobile-artboard')).toHaveCount(0);
 });
 
-test('runs the sketch from the mobile header', async ({ page }) => {
+test('runs the sketch from the mobile canvas playbar', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('button', { name: 'Run sketch' }).first().click();
+  await page.getByRole('button', { name: 'Canvas' }).click();
+  await page.locator('.mobile-playbar').getByRole('button', { name: 'Run sketch' }).click();
 
   await expect(page.getByRole('button', { name: 'Canvas' })).toHaveClass(/active/);
   await expect(page.getByLabel('Sketch canvas')).toBeVisible();
@@ -69,4 +70,26 @@ test('loads an example from the mobile examples tab', async ({ page }) => {
   await page.getByRole('button', { name: /hello circle/i }).click();
 
   await expect(page.getByLabel('q sketch editor')).toHaveValue(/circle/);
+});
+
+test('does not show Quick Tools on the mobile canvas tab', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Canvas' }).click();
+  await expect(page.getByRole('heading', { name: 'Quick Tools' })).toHaveCount(0);
+});
+
+test('filters the mobile editor console by Data, Errors, and Info', async ({ page }) => {
+  await page.goto('/');
+
+  const consoleFilters = page.getByRole('tablist', { name: 'Console filter' });
+
+  await consoleFilters.getByRole('button', { name: 'Info' }).click();
+  await expect(page.getByText(/Qanvas5 ready/)).toBeVisible();
+
+  await consoleFilters.getByRole('button', { name: 'Data' }).click();
+  await expect(page.getByText('No lines for this filter.')).toBeVisible();
+
+  await consoleFilters.getByRole('button', { name: 'Errors' }).click();
+  await expect(page.getByText('No lines for this filter.')).toBeVisible();
 });
