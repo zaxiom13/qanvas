@@ -117,8 +117,14 @@
           oninput={(event) => updateCode(event.currentTarget.value)}
           aria-label="q sketch editor"
         ></textarea>
-        <div class="mobile-console" aria-label="Console output">
-          <div class="sheet-handle"></div>
+        <div
+          class="mobile-console"
+          class:mobile-console--collapsed={appState.mobileConsoleCollapsed}
+          aria-label="Console output"
+        >
+          {#if !appState.mobileConsoleCollapsed}
+            <div class="sheet-handle"></div>
+          {/if}
           <div class="mobile-console-toolbar">
             <span class="mobile-console-title">Console</span>
             <div class="mobile-console-filters" role="tablist" aria-label="Console filter">
@@ -156,6 +162,22 @@
               </button>
             </div>
             <button
+              class="btn-icon-only mobile-console-collapse-btn"
+              type="button"
+              aria-expanded={!appState.mobileConsoleCollapsed}
+              title={appState.mobileConsoleCollapsed ? 'Expand console' : 'Collapse console'}
+              aria-label={appState.mobileConsoleCollapsed ? 'Expand console' : 'Collapse console'}
+              onclick={() => appState.toggleMobileConsoleCollapsed()}
+            >
+              <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                {#if appState.mobileConsoleCollapsed}
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                {:else}
+                  <path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                {/if}
+              </svg>
+            </button>
+            <button
               class="btn-icon-only mobile-console-clear-btn"
               type="button"
               title="Clear console"
@@ -168,30 +190,32 @@
               </svg>
             </button>
           </div>
-          <div class="mobile-console-output">
-            {#each filteredConsoleEntries as entry (entry.id)}
-              <div class={`console-line console-line--${entry.type}`}>
-                <span class="console-prefix">{entry.type === 'stdout' ? '›' : entry.type === 'stderr' ? '✕' : '—'}</span>
-                {#if appState.debugConsole}
-                  <span class="console-timestamp">{formatTimestamp(entry.ts)}</span>
-                {/if}
-                <span class="console-text">{entry.text}</span>
-                <button
-                  type="button"
-                  class="console-line-delete"
-                  title="Delete line"
-                  aria-label="Delete line"
-                  onclick={() => appState.removeConsoleEntry(entry.id)}
-                >
-                  <svg viewBox="0 0 12 12" width="10" height="10" fill="none" aria-hidden="true">
-                    <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-                  </svg>
-                </button>
-              </div>
-            {:else}
-              <p class="mobile-console-empty">No lines for this filter. Run a sketch or switch tabs.</p>
-            {/each}
-          </div>
+          {#if !appState.mobileConsoleCollapsed}
+            <div class="mobile-console-output">
+              {#each filteredConsoleEntries as entry (entry.id)}
+                <div class={`console-line console-line--${entry.type}`}>
+                  <span class="console-prefix">{entry.type === 'stdout' ? '›' : entry.type === 'stderr' ? '✕' : '—'}</span>
+                  {#if appState.debugConsole}
+                    <span class="console-timestamp">{formatTimestamp(entry.ts)}</span>
+                  {/if}
+                  <span class="console-text">{entry.text}</span>
+                  <button
+                    type="button"
+                    class="console-line-delete"
+                    title="Delete line"
+                    aria-label="Delete line"
+                    onclick={() => appState.removeConsoleEntry(entry.id)}
+                  >
+                    <svg viewBox="0 0 12 12" width="10" height="10" fill="none" aria-hidden="true">
+                      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              {:else}
+                <p class="mobile-console-empty">No lines for this filter. Run a sketch or switch tabs.</p>
+              {/each}
+            </div>
+          {/if}
         </div>
       </section>
     {:else if activeTab === 'canvas'}
@@ -505,6 +529,13 @@
     box-shadow: 0 -12px 26px rgba(70, 50, 34, 0.12);
   }
 
+  .mobile-console--collapsed {
+    max-height: none;
+    min-height: 0;
+    padding-top: 6px;
+    padding-bottom: 8px;
+  }
+
   .sheet-handle {
     width: 48px;
     height: 5px;
@@ -557,6 +588,10 @@
     border-color: var(--mobile-border);
     background: #fff;
     color: var(--mobile-ink);
+  }
+
+  .mobile-console-collapse-btn {
+    flex-shrink: 0;
   }
 
   .mobile-console-clear-btn {

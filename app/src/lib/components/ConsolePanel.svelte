@@ -38,17 +38,25 @@
   });
 </script>
 
-<footer id="console-panel" style={`height: ${appState.consoleHeight}px; min-height: ${appState.consoleHeight}px;`}>
-  <button
-    id="console-resize-handle"
-    class="console-resize-handle"
-    type="button"
-    aria-label="Resize console"
-    title="Drag to resize console"
-    onpointerdown={startResize}
-  >
-    <span></span>
-  </button>
+<footer
+  id="console-panel"
+  class:console-panel--collapsed={appState.consoleCollapsed}
+  style={appState.consoleCollapsed
+    ? 'height:auto;min-height:calc(var(--tab-h) + 1px);'
+    : `height: ${appState.consoleHeight}px; min-height: ${appState.consoleHeight}px;`}
+>
+  {#if !appState.consoleCollapsed}
+    <button
+      id="console-resize-handle"
+      class="console-resize-handle"
+      type="button"
+      aria-label="Resize console"
+      title="Drag to resize console"
+      onpointerdown={startResize}
+    >
+      <span></span>
+    </button>
+  {/if}
   <div class="console-toolbar">
     <span class="console-title">Console</span>
     <div class="console-filters">
@@ -57,6 +65,24 @@
       <button class="console-filter-btn" type="button" class:console-filter-btn--active={appState.consoleFilter === 'stderr'} data-filter="stderr" onclick={() => (appState.consoleFilter = 'stderr')}>stderr</button>
       <button class="console-filter-btn" type="button" class:console-filter-btn--active={appState.consoleFilter === 'info'} data-filter="info" onclick={() => (appState.consoleFilter = 'info')}>info</button>
     </div>
+    <button
+      id="btn-console-collapse"
+      class="btn-icon-only console-collapse-btn"
+      type="button"
+      aria-expanded={!appState.consoleCollapsed}
+      aria-controls="console-output"
+      title={appState.consoleCollapsed ? 'Expand console' : 'Collapse console'}
+      aria-label={appState.consoleCollapsed ? 'Expand console' : 'Collapse console'}
+      onclick={() => appState.toggleConsoleCollapsed()}
+    >
+      <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        {#if appState.consoleCollapsed}
+          <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        {:else}
+          <path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        {/if}
+      </svg>
+    </button>
     <button id="btn-clear-console" class="btn-icon-only console-clear-btn" type="button" title="Clear console" onclick={() => appState.clearConsole(false)}>
       <svg class="icon" viewBox="0 0 16 16" fill="none">
         <path d="M3 4h10M5 4V3h6v1M6 7v5M10 7v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
@@ -64,26 +90,28 @@
       </svg>
     </button>
   </div>
-  <div id="console-output" class="console-output">
-    {#each appState.filteredConsole as entry (entry.id)}
-      <div class={`console-line console-line--${entry.type}`}>
-        <span class="console-prefix">{entry.type === 'stdout' ? '›' : entry.type === 'stderr' ? '✕' : '—'}</span>
-        {#if appState.debugConsole}
-          <span class="console-timestamp">{formatTimestamp(entry.ts)}</span>
-        {/if}
-        <span class="console-text">{entry.text}</span>
-        <button
-          type="button"
-          class="console-line-delete"
-          title="Delete line"
-          aria-label="Delete line"
-          onclick={() => appState.removeConsoleEntry(entry.id)}
-        >
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none" aria-hidden="true">
-            <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          </svg>
-        </button>
-      </div>
-    {/each}
-  </div>
+  {#if !appState.consoleCollapsed}
+    <div id="console-output" class="console-output">
+      {#each appState.filteredConsole as entry (entry.id)}
+        <div class={`console-line console-line--${entry.type}`}>
+          <span class="console-prefix">{entry.type === 'stdout' ? '›' : entry.type === 'stderr' ? '✕' : '—'}</span>
+          {#if appState.debugConsole}
+            <span class="console-timestamp">{formatTimestamp(entry.ts)}</span>
+          {/if}
+          <span class="console-text">{entry.text}</span>
+          <button
+            type="button"
+            class="console-line-delete"
+            title="Delete line"
+            aria-label="Delete line"
+            onclick={() => appState.removeConsoleEntry(entry.id)}
+          >
+            <svg viewBox="0 0 12 12" width="10" height="10" fill="none" aria-hidden="true">
+              <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+            </svg>
+          </button>
+        </div>
+      {/each}
+    </div>
+  {/if}
 </footer>

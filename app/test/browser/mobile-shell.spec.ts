@@ -93,3 +93,13 @@ test('filters the mobile editor console by Data, Errors, and Info', async ({ pag
   await consoleFilters.getByRole('button', { name: 'Errors' }).click();
   await expect(page.getByText('No lines for this filter.')).toBeVisible();
 });
+
+test('collapses the mobile editor console output', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.locator('.mobile-console-output')).toBeVisible();
+  await page.getByLabel('Console output').getByRole('button', { name: 'Collapse console' }).click();
+  await expect(page.locator('.mobile-console-output')).toHaveCount(0);
+  await page.getByLabel('Console output').getByRole('button', { name: 'Expand console' }).click();
+  await expect(page.locator('.mobile-console-output')).toBeVisible();
+});

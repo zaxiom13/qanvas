@@ -2022,6 +2022,15 @@ body.is-resizing-editor {
   border-top: 1px solid var(--border);
 }
 
+#console-panel.console-panel--collapsed {
+  flex: 0 0 auto;
+  overflow: hidden;
+}
+
+.console-collapse-btn {
+  flex-shrink: 0;
+}
+
 .console-resize-handle {
   position: absolute;
   top: -3px;
