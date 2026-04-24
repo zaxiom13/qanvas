@@ -13,6 +13,7 @@ test('shows the mobile workspace with bottom navigation', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Editor' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Canvas' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Examples' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Files' })).toBeVisible();
   await expect(page.getByLabel('q sketch editor')).toBeVisible();
 });
 
@@ -102,4 +103,14 @@ test('collapses the mobile editor console output', async ({ page }) => {
   await expect(page.locator('.mobile-console-output')).toHaveCount(0);
   await page.getByLabel('Console output').getByRole('button', { name: 'Expand console' }).click();
   await expect(page.locator('.mobile-console-output')).toBeVisible();
+});
+
+test('opens a sketch file from the Files tab', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Files' }).click();
+  await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible();
+  await page.getByRole('button', { name: /^sketch\.q/ }).click();
+  await expect(page.getByRole('button', { name: 'Editor' })).toHaveClass(/active/);
+  await expect(page.getByLabel('q sketch editor')).toBeVisible();
 });

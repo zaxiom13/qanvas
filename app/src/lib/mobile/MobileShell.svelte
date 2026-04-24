@@ -3,7 +3,7 @@
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
   import { appState } from '$lib/state/app-state.svelte';
 
-  type MobileTab = 'editor' | 'canvas' | 'examples' | 'data' | 'settings';
+  type MobileTab = 'editor' | 'canvas' | 'examples' | 'files' | 'settings';
   type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
 
   let activeTab = $state<MobileTab>('editor');
@@ -13,7 +13,7 @@
     { id: 'editor', label: 'Editor', icon: 'code' },
     { id: 'canvas', label: 'Canvas', icon: 'palette' },
     { id: 'examples', label: 'Examples', icon: 'cube' },
-    { id: 'data', label: 'Data', icon: 'table' },
+    { id: 'files', label: 'Files', icon: 'file' },
     { id: 'settings', label: 'Settings', icon: 'sliders' },
   ];
 
@@ -44,8 +44,16 @@
     if (tab === 'canvas') {
       appState.setCanvasPanelTab('canvas');
     }
-    if (tab === 'data') {
-      appState.consoleFilter = 'stdout';
+  }
+
+  function renameMobileFile(name: string) {
+    const next = window.prompt('Rename file', name);
+    if (next) appState.renameFile(name, next);
+  }
+
+  function deleteMobileFile(name: string) {
+    if (window.confirm(`Delete "${name}"?`)) {
+      appState.deleteFile(name);
     }
   }
 
@@ -274,24 +282,63 @@
           {/each}
         </div>
       </section>
-    {:else if activeTab === 'data'}
-      <section class="mobile-data-panel">
-        <div class="mobile-data-panel-header">
-          <h1>Data</h1>
-          <p class="mobile-data-panel-hint">Runtime tables and printed values appear as stdout in the console. Use the Editor tab to filter by Data or Errors.</p>
-        </div>
-        {#if filteredConsoleEntries.length}
-          <div class="mobile-data-list">
-            {#each filteredConsoleEntries as entry}
-              <article>
-                <strong>{entry.type}</strong>
-                <p>{entry.text}</p>
-              </article>
-            {/each}
+    {:else if activeTab === 'files'}
+      <section class="mobile-files-panel" aria-labelledby="mobile-files-heading">
+        <div class="mobile-files-panel-header">
+          <h1 id="mobile-files-heading">Files</h1>
+          <div class="mobile-files-panel-actions">
+            <button class="mobile-action" type="button" aria-label="New file" title="New file" onclick={() => appState.openNewFileModal()}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button class="mobile-action" type="button" aria-label="Import asset" title="Import asset" onclick={() => void appState.importAssets()}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v10M8 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M5 18h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
           </div>
-        {:else}
-          <p class="mobile-data-panel-empty">Nothing in the current console filter. Open the Editor tab, choose the Data or All filter, or run a sketch to populate output.</p>
-        {/if}
+        </div>
+        <p class="mobile-files-panel-hint">Tap a file to open it in the editor. Runtime output stays in the console (Data filter).</p>
+        <div class="mobile-file-list" role="list">
+          {#each appState.files as file (file.name)}
+            <div class="mobile-file-row" class:mobile-file-row--active={file.name === appState.activeFileName} role="listitem">
+              <button
+                class="mobile-file-row-main"
+                type="button"
+                onclick={() => {
+                  appState.selectFile(file.name);
+                  setActiveTab('editor');
+                }}
+              >
+                <svg class="mobile-file-row-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" stroke-width="1" fill="none" />
+                  <path d="M10 2v3h3" stroke="currentColor" stroke-width="1" fill="none" />
+                </svg>
+                <span class="mobile-file-row-name">{file.name}</span>
+                {#if file.name === appState.activeFileName && appState.unsaved}
+                  <span class="unsaved-dot" aria-hidden="true"></span>
+                {/if}
+              </button>
+              {#if file.name !== 'sketch.q'}
+                <div class="mobile-file-row-actions">
+                  <button class="mobile-file-action-btn" type="button" title="Rename" aria-label="Rename {file.name}" onclick={() => renameMobileFile(file.name)}>
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M3 13h10M8 3l-4 4v2h2l4-4-2-2zM10 5l2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                    </svg>
+                  </button>
+                  <button class="mobile-file-action-btn" type="button" title="Delete" aria-label="Delete {file.name}" onclick={() => deleteMobileFile(file.name)}>
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M3 4h10M5 4V3h6v1M6 7v5M10 7v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none" />
+                      <path d="M4 4l1 9h6l1-9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none" />
+                    </svg>
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
       </section>
     {:else}
       <section class="mobile-empty-panel">
@@ -312,8 +359,8 @@
             <path d="M8.5 10h.01M11 7.8h.01M14 8.3h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
           {:else if tab.icon === 'cube'}
             <path d="m12 3 7 4v10l-7 4-7-4V7zM12 11l7-4M12 11v10M12 11 5 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-          {:else if tab.icon === 'table'}
-            <path d="M4 5h16v14H4zM4 10h16M9 5v14M15 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+          {:else if tab.icon === 'file'}
+            <path d="M6 3h6l3 3v12H6zM12 3v3h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
           {:else}
             <path d="M5 7h14M5 17h14M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM16 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           {/if}
@@ -434,7 +481,7 @@
   .mobile-canvas,
   .mobile-examples,
   .mobile-empty-panel,
-  .mobile-data-panel {
+  .mobile-files-panel {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -446,7 +493,7 @@
 
   .mobile-examples,
   .mobile-empty-panel,
-  .mobile-data-panel {
+  .mobile-files-panel {
     height: 100%;
     min-height: 0;
   }
@@ -688,20 +735,33 @@
     height: 26px;
   }
 
-  .mobile-data-panel {
+  .mobile-files-panel {
     display: flex;
     flex-direction: column;
-    gap: 14px;
-    padding: 20px 16px 24px;
+    gap: 12px;
+    padding: 18px 14px 24px;
     background: var(--mobile-panel);
   }
 
-  .mobile-data-panel-header h1 {
-    margin: 0 0 8px;
+  .mobile-files-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .mobile-files-panel-header h1 {
+    margin: 0;
     font-size: 18px;
   }
 
-  .mobile-data-panel-hint {
+  .mobile-files-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-files-panel-hint {
     margin: 0;
     max-width: 52ch;
     color: var(--mobile-muted);
@@ -709,18 +769,80 @@
     line-height: 1.45;
   }
 
-  .mobile-data-panel-empty {
-    margin: 0;
-    max-width: 48ch;
-    color: var(--mobile-muted);
-    font-size: 14px;
-    line-height: 1.5;
-  }
-
-  .mobile-data-panel .mobile-data-list {
+  .mobile-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
     flex: 1 1 auto;
     min-height: 0;
-    overflow-y: auto;
+    margin-top: 4px;
+  }
+
+  .mobile-file-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border: 1px solid var(--mobile-border);
+    border-radius: 8px;
+    background: var(--bg-chrome);
+    overflow: hidden;
+  }
+
+  .mobile-file-row--active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent), transparent 55%);
+  }
+
+  .mobile-file-row-main {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px 14px;
+    text-align: left;
+    color: var(--mobile-ink);
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .mobile-file-row-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    color: var(--mobile-muted);
+  }
+
+  .mobile-file-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-file-row-actions {
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--mobile-border);
+    background: color-mix(in srgb, var(--bg-editor), transparent 40%);
+  }
+
+  .mobile-file-action-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 48px;
+    min-height: 100%;
+    padding: 0;
+    color: var(--mobile-muted);
+  }
+
+  .mobile-file-action-btn:active {
+    color: var(--mobile-ink);
+    background: var(--surface-hover, rgba(127, 127, 127, 0.12));
+  }
+
+  .mobile-file-action-btn svg {
+    width: 18px;
+    height: 18px;
   }
 
   .mobile-examples {
@@ -804,34 +926,6 @@
     color: var(--mobile-muted);
     font-size: 15px;
     line-height: 1.5;
-  }
-
-  .mobile-data-list {
-    display: grid;
-    gap: 10px;
-  }
-
-  .mobile-data-list article {
-    padding: 12px;
-    border: 1px solid var(--mobile-border);
-    border-radius: 8px;
-    background: var(--bg-chrome);
-  }
-
-  .mobile-data-list strong {
-    display: block;
-    margin-bottom: 6px;
-    color: var(--accent);
-    text-transform: uppercase;
-    font-size: 11px;
-  }
-
-  .mobile-data-list p {
-    max-width: none;
-    margin: 0;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    white-space: pre-wrap;
   }
 
   .mobile-bottom-nav {

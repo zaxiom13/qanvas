@@ -11,9 +11,9 @@ Svelte Native is still a real option through NativeScript, but it uses NativeScr
 The mobile app should be a focused creative coding cockpit:
 
 - **Editor**: full-height code editor, compact file tab, run controls in the top action strip, console as a bottom sheet.
-- **Canvas**: immersive sketch preview, large run/stop/snapshot controls, quick tools in a draggable lower sheet.
+- **Canvas**: immersive sketch preview with large run/stop/snapshot controls on the playbar.
 - **Examples**: searchable gallery with thumb-friendly category filters and a bottom tab entry point.
-- **Data**: table/array inspection and runtime output, kept separate from the editor so small screens do not become cramped.
+- **Files**: project sketch list, new file, and import asset—mirrors the desktop sidebar file tree. Runtime output stays in the editor console (stdout / “Data” filter).
 - **Settings**: runtime, display, exports, sync, and account/preferences.
 
 ## Navigation
@@ -23,7 +23,7 @@ Use a persistent bottom navigation bar:
 - Editor
 - Canvas
 - Examples
-- Data
+- Files
 - Settings
 
 The nav should use large icon targets, a raised active state, and iOS safe-area padding. Primary actions stay near the thumb zone unless they are playback controls, which can also sit in the top action strip like the reference.
