@@ -73,6 +73,15 @@ test('loads an example from the mobile examples tab', async ({ page }) => {
   await expect(page.getByLabel('q sketch editor')).toHaveValue(/circle/);
 });
 
+test('renders a canvas still on mobile example thumbnails', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Examples' }).click();
+  const helloCard = page.getByRole('button', { name: /hello circle/i });
+  await expect(helloCard.locator('.example-thumb img')).toBeVisible({ timeout: 20_000 });
+  await expect(helloCard.locator('.example-thumb img')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
+});
+
 test('does not show Quick Tools on the mobile canvas tab', async ({ page }) => {
   await page.goto('/');
 

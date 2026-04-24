@@ -1,6 +1,8 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
+  import type { ExampleSketch } from '$lib/examples';
+  import { captureExampleStillDataUrl } from '$lib/mobile/example-preview-still';
   import { appState } from '$lib/state/app-state.svelte';
 
   type MobileTab = 'editor' | 'canvas' | 'examples' | 'files' | 'settings';
@@ -19,6 +21,7 @@
 
   let examples = $derived(appState.filteredExamples.slice(0, 9));
   let filteredConsoleEntries = $derived(appState.filteredConsole);
+  let examplePreviewUrls = $state<Record<string, string>>({});
 
   function formatTimestamp(ts: number) {
     const date = new Date(ts);
@@ -32,6 +35,41 @@
 
   $effect(() => {
     mobileCode = appState.activeEditorValue;
+  });
+
+  $effect(() => {
+    if (activeTab !== 'examples' || typeof window === 'undefined') return;
+    // Track tab + category only — avoid subscribing to unrelated appState churn.
+    void appState.exampleCategory;
+
+    const list = untrack(() => appState.filteredExamples.slice(0, 9));
+    const existing = untrack(() => examplePreviewUrls);
+    if (!list.length) return;
+    if (list.every((ex) => Boolean(existing[ex.id]))) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      const out: Record<string, string> = { ...existing };
+      for (const ex of list) {
+        if (cancelled) return;
+        if (out[ex.id]) continue;
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+        if (cancelled) return;
+        const url = await captureExampleStillDataUrl(ex.code);
+        if (url) out[ex.id] = url;
+      }
+      if (!cancelled) {
+        examplePreviewUrls = out;
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
   });
 
   function updateCode(value: string) {
@@ -275,7 +313,11 @@
                 setActiveTab('editor');
               }}
             >
-              <span class="example-thumb"></span>
+              <span class="example-thumb">
+                {#if examplePreviewUrls[example.id]}
+                  <img src={examplePreviewUrls[example.id]} alt="" loading="lazy" decoding="async" />
+                {/if}
+              </span>
               <strong>{example.name}</strong>
               <small>by qanvas5</small>
             </button>
@@ -896,12 +938,23 @@
   }
 
   .example-thumb {
+    position: relative;
     aspect-ratio: 1;
     border-radius: 5px;
+    overflow: hidden;
     background:
       radial-gradient(circle at 50% 50%, var(--example-accent), transparent 42%),
       repeating-conic-gradient(from 0deg, var(--example-accent) 0 8deg, transparent 8deg 18deg),
       #171613;
+  }
+
+  .example-thumb img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .mobile-example-card strong {
