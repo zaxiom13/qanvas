@@ -73,9 +73,9 @@ draw:{[state; frame; input; document]
   background 10;
   / vectorized — one call per 500 particles
   n:500;
-  xs: 400 + 300 * sin frame % 30 + til n;
-  ys: 300 + 200 * cos frame % 25 + til n;
-  circle ([] p: xs ,' ys; r: n # 3f; fill: n # 255);
+  t:"f"$til n;
+  p:(400 300f) + flip(300 * sin frame % 30 + t; 200 * cos frame % 25 + t);
+  circle ([] p:p; r:n # 3f; fill:n # 255);
   state
  }
 ```
@@ -84,7 +84,12 @@ draw:{[state; frame; input; document]
 - `draw[state;frame;input;document]` is called per frame; return the next state.
 - Drawing primitives (`background`, `circle`, `rect`, `line`, `text`, `image`,
 `pixel`, `generic`) append **tables** of commands — one row per primitive
-— so you can paint thousands of shapes in a single vectorized call.
+— so you can paint thousands of shapes in a single vectorized call. In the
+examples, positions and velocities lean toward pair arrays like `p` and `v`
+instead of separate `x`/`y` scalar columns.
+- Qanvas provides color constants as dotted globals: `Color.BLUE`,
+`Color.YELLOW`, `Color.CREAM`, `Color.INK`, and friends. They work anywhere a
+24-bit color long is expected and autocomplete in the editor.
 
 See `[examples/](./examples/)` for array-heatmap, table-bars, and a
 QSQL-driven particle system.

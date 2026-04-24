@@ -15,7 +15,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
-    "build:parser": "peggy --format es --dts -o src/q-parser.ts src/q.peggy && node scripts/stamp-parser-nocheck.mjs",
+    "build:parser": "peggy --format es --dts --allowed-start-rules start,ExpressionStart -o src/q-parser.ts src/q.peggy && node scripts/stamp-parser-nocheck.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "pretest": "npm run build:parser",
     "test": "npx vitest run"

@@ -43,15 +43,15 @@ const STORAGE_KEYS = {
 const PRACTICE_FILE_NAME = 'practice.q';
 
 export const DEFAULT_SKETCH = `setup:{
-  \`size\`bg!(800 600;0xF4ECD8)
+  \`size\`bg!(800 600;Color.CREAM)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0xF4ECD8];
+  background[Color.CREAM];
   circle[([]
     p:enlist 0.5*canvas\`size;
     r:enlist 44+18*sin 0.05*frameInfo\`frameNum;
-    fill:enlist 0x5B6FE8;
+    fill:enlist Color.BLUE;
     alpha:enlist 0.92
   )];
   state

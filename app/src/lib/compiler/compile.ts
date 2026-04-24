@@ -40,14 +40,37 @@ export function compileSketch(source: string): CompiledSketchResult {
 }
 
 function emitProgram(program: LoweredProgram) {
-  return `(() => ({
+  return `(() => {
+  const Color = rtColors();
+  function rtColors() {
+    return {
+      INK: 0x0D0D1F,
+      NIGHT: 0x05060C,
+      MIDNIGHT: 0x0B0D1A,
+      DEEP: 0x081028,
+      BLUE: 0x5B6FE8,
+      SKY: 0x7CA6FF,
+      GOLD: 0xC4956E,
+      CORAL: 0xE07A52,
+      RED: 0xD1694E,
+      PURPLE: 0x8C6BC9,
+      GREEN: 0x4E9F92,
+      CREAM: 0xF4ECD8,
+      YELLOW: 0xFFE2A0,
+      SOFT_YELLOW: 0xFFE2B8,
+      LAVENDER: 0xE4B7FF,
+      ORBIT: 0x26294A
+    };
+  }
+  return ({
   setup(rt) {
 ${emitLambdaBody(program.setup, 2)}
   },
   draw(state, frameInfo, input, canvas, rt) {
 ${emitLambdaBody(program.draw, 2)}
   }
-}))()`;
+  });
+})()`;
 }
 
 function emitLambdaBody(lambda: LoweredLambda, indentLevel: number) {
@@ -108,11 +131,19 @@ function emitCallExpression(expression: Extract<LoweredExpression, { kind: 'call
   const builtinName = expression.callee.kind === 'identifier' ? expression.callee.name : null;
   const args = `[${expression.args.map((entry) => emitExpression(entry)).join(', ')}]`;
 
-  if (builtinName && BUILTIN_CALLS.has(builtinName)) {
+  if (builtinName && isBuiltinCall(builtinName)) {
     return `rt.callBuiltin(${JSON.stringify(builtinName)}, ${args})`;
   }
 
   return `rt.call(${emitExpression(expression.callee)}, ${builtinName ? JSON.stringify(builtinName) : 'null'}, ${args})`;
+}
+
+function isBuiltinCall(name: string) {
+  return BUILTIN_CALLS.has(name) || isDerivedPrimitiveAdverb(name);
+}
+
+function isDerivedPrimitiveAdverb(name: string) {
+  return /^[+\-*%&|,][/\\]$/.test(name);
 }
 
 const BUILTIN_CALLS = new Set([
@@ -133,6 +164,12 @@ const BUILTIN_CALLS = new Set([
   'raze',
   'reverse',
   'sum',
+  'prd',
+  'sums',
+  'prds',
+  'mins',
+  'maxs',
+  'avgs',
   'avg',
   'min',
   'max',

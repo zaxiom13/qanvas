@@ -36,23 +36,23 @@ export const EXAMPLES: ExampleSketch[] = [
         code: `circle[([]
   p:5#enlist p;
   r:20 40 64 92 124f + 12*sin each 0.07*t+0 10 20 30 40;
-  fill:5#enlist 0x5B6FE8;
+  fill:5#enlist Color.BLUE;
   alpha:0.88 0.6 0.38 0.2 0.09
 )]`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x0D0D1F)
+  \`size\`bg!(800 600;Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x0D0D1F];
+  background[Color.INK];
   p:$[null~input\`mouse;0.5*canvas\`size;input\`mouse];
   t:frameInfo\`frameNum;
   circle[([]
     p:5#enlist p;
     r:20 40 64 92 124f + 12*sin each 0.07*t+0 10 20 30 40;
-    fill:5#enlist 0x5B6FE8;
+    fill:5#enlist Color.BLUE;
     alpha:0.88 0.6 0.38 0.2 0.09
   )];
   state
@@ -72,29 +72,28 @@ draw:{[state;frameInfo;input;canvas]
       highlight: {
         caption: 'Rows = tiles, columns = properties. This is the q way.',
         code: `rect[([]
-  p:flip(cw*idx mod nc;ch*idx div nc);
-  s:count[idx]#enlist (cw-2;ch-2);
+  p:flip cell*(idx mod first n;idx div first n);
+  s:count[idx]#enlist cell-2;
   fill:clrs;
   alpha:count[idx]#0.9
 )]`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x0D0D1F)
+  \`size\`bg!(800 600;Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x0D0D1F];
-  nc:20; nr:15;
-  cw:first[canvas\`size]%nc;
-  ch:last[canvas\`size]%nr;
-  idx:til nc*nr;
-  palette:(0x5B6FE8;0xC4956E;0xD1694E;0x8C6BC9;0xE07A52;0x4E9F92);
+  background[Color.INK];
+  n:20 15;
+  cell:(canvas\`size)%n;
+  idx:til (*/) n;
+  palette:(Color.BLUE;Color.GOLD;Color.CORAL;Color.PURPLE;Color.GREEN;Color.YELLOW);
   t:floor 0.03*frameInfo\`frameNum;
   clrs:palette (idx+t) mod count palette;
   rect[([]
-    p:flip(cw*idx mod nc;ch*idx div nc);
-    s:count[idx]#enlist (cw-2;ch-2);
+    p:flip cell*(idx mod first n;idx div first n);
+    s:count[idx]#enlist cell-2;
     fill:clrs;
     alpha:count[idx]#0.9
   )];
@@ -117,41 +116,41 @@ draw:{[state;frameInfo;input;canvas]
         code: `r:"j"$255*0.22+0.67*t;
 g:"j"$255*0.14+0.36*t;
 b:"j"$255*0.42-0.22*t;
-fills:(65536*r)+(256*g)+b`,
+bandColors:(65536*r)+(256*g)+b`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x0D0D1F)
+  \`size\`bg!(800 600;Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  w:first canvas\`size;
-  h:last canvas\`size;
+  size:canvas\`size;
   n:40;
-  bandH:h%n;
+  bandH:last[size]%n;
   i:"f"$til n;
   t:i%n-1;
   r:"j"$255*0.22+0.67*t;
   g:"j"$255*0.14+0.36*t;
   b:"j"$255*0.42-0.22*t;
-  fills:(65536*r)+(256*g)+b;
+  bandColors:(65536*r)+(256*g)+b;
   rect[([]
     p:flip(n#0f;bandH*i);
-    s:n#enlist (w;bandH+1);
-    fill:fills;
+    s:n#enlist (first size;bandH+1);
+    fill:bandColors;
     alpha:n#1f
   )];
-  sunY:(0.5*h)+0.06*h*sin 0.012*frameInfo\`frameNum;
+  center:0.5*size;
+  sun:center + (0f;0.06*last[size]*sin 0.012*frameInfo\`frameNum);
   circle[([]
-    p:enlist (0.5*w;sunY);
+    p:enlist sun;
     r:enlist 58+4*sin 0.04*frameInfo\`frameNum;
-    fill:enlist 0xFFE2B8;
+    fill:enlist Color.SOFT_YELLOW;
     alpha:enlist 0.95
   )];
   circle[([]
-    p:enlist (0.5*w;sunY);
+    p:enlist sun;
     r:enlist 92+8*sin 0.04*frameInfo\`frameNum;
-    stroke:enlist 0xFFE2B8;
+    stroke:enlist Color.SOFT_YELLOW;
     weight:enlist 2f;
     alpha:enlist 0.28
   )];
@@ -168,12 +167,12 @@ draw:{[state;frameInfo;input;canvas]
     description: 'Ten coloured lines snake across the canvas in sinusoidal waves, shifting phase every frame.',
     lesson: {
       teaches: 'The `line[]` primitive — endpoints `p` and `p2` plus stroke/weight/alpha per row.',
-      intro: 'Lines need two endpoints. Drive `p2.y` with `sin each t+phase*i` and each of the ten strands gets its own wobble, with a palette column painting every strand a different colour.',
+      intro: 'Lines need two endpoints. Build a base point array for the left edge, then add a vector offset for `p2` so each strand gets its own wobble without breaking into scalar coordinates.',
       highlight: {
         caption: 'A phase offset per strand turns identical lines into a weave.',
         code: `line[([]
-  p:flip(n#0f;ys);
-  p2:flip(n#w*1f;ys+0.11*h*sin each t+0.7*til n);
+  p:flip(n#0f;last[size]*(1+til n)%(n+1));
+  p2:p + flip(n#first size;0.11*last[size]*sin each t+0.7*til n);
   stroke:palette;
   weight:n#3;
   alpha:n#0.7
@@ -181,20 +180,19 @@ draw:{[state;frameInfo;input;canvas]
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x0D0D1F)
+  \`size\`bg!(800 600;Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x0D0D1F];
+  background[Color.INK];
   t:0.04*frameInfo\`frameNum;
-  w:first canvas\`size;
-  h:last canvas\`size;
+  size:canvas\`size;
   n:10;
-  ys:h*(1+til n)%(n+1);
-  palette:(0x5B6FE8;0x7C8EF2;0xC4956E;0xE07A52;0xD1694E;0x8C6BC9;0x4E9F92;0x5B6FE8;0x7C8EF2;0xC4956E);
+  p:flip(n#0f;last[size]*(1+til n)%(n+1));
+  palette:(Color.BLUE;Color.SKY;Color.GOLD;Color.CORAL;Color.RED;Color.PURPLE;Color.GREEN;Color.BLUE;Color.SKY;Color.GOLD);
   line[([]
-    p:flip(n#0f;ys);
-    p2:flip(n#w*1f;ys+0.11*h*sin each t+0.7*til n);
+    p:p;
+    p2:p + flip(n#first[size];0.11*last[size]*sin each t+0.7*til n);
     stroke:palette;
     weight:n#3;
     alpha:n#0.7
@@ -216,25 +214,24 @@ draw:{[state;frameInfo;input;canvas]
       highlight: {
         caption: 'Parallel columns: positions, strings, fills. Four lines in one call.',
         code: `text[([]
-  p:((cx;cy-90);(cx;cy-34);(cx;cy+26);(cx;cy+76));
+  p:(4#enlist center) + (0 -90;0 -34;0 26;0 76);
   text:("q language";"data on canvas";"think in tables";"build with q");
-  fill:(0xF4ECD8;0x5B6FE8;0xC4956E;0x7C8EF2);
+  fill:(Color.CREAM;Color.BLUE;Color.GOLD;Color.SKY);
   alpha:4#0.95
 )]`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x0D0D1F)
+  \`size\`bg!(800 600;Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x0D0D1F];
-  cx:0.5*first canvas\`size;
-  cy:0.5*last canvas\`size;
+  background[Color.INK];
+  center:0.5*canvas\`size;
   text[([]
-    p:((cx;cy-90);(cx;cy-34);(cx;cy+26);(cx;cy+76));
+    p:(4#enlist center) + (0 -90;0 -34;0 26;0 76);
     text:("q language";"data on canvas";"think in tables";"build with q");
-    fill:(0xF4ECD8;0x5B6FE8;0xC4956E;0x7C8EF2);
+    fill:(Color.CREAM;Color.BLUE;Color.GOLD;Color.SKY);
     alpha:4#0.95
   )];
   state
@@ -263,7 +260,7 @@ draw:{[state;frameInfo;input;canvas]
     },
     code: `setup:{
   img:"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 120'%3E%3Crect width='120' height='120' rx='60' fill='%231C1030'/%3E%3Ccircle cx='60' cy='44' r='18' fill='%235B6FE8'/%3E%3Ccircle cx='60' cy='60' r='44' fill='none' stroke='%238C6BC9' stroke-width='7'/%3E%3Cpath d='M26 88c10-18 58-18 68 0' stroke='%23C4956E' stroke-width='9' stroke-linecap='round' fill='none'/%3E%3C/svg%3E";
-  \`size\`bg\`img!(800 600;0x0D0D1F;img)
+  \`size\`bg\`img!(800 600;Color.INK;img)
 }
 
 draw:{[state;frameInfo;input;canvas]
@@ -293,24 +290,24 @@ draw:{[state;frameInfo;input;canvas]
         code: `circle[([]
   p:4#enlist center;
   r:(50 82 118 162f) + 22*sin each t+0.9*til 4;
-  stroke:(0x5B6FE8;0x7C8EF2;0xC4956E;0xE07A52);
+  stroke:(Color.BLUE;Color.SKY;Color.GOLD;Color.CORAL);
   weight:4#6;
   alpha:0.8 0.6 0.42 0.25
 )]`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x0D0D1F)
+  \`size\`bg!(800 600;Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x0D0D1F];
+  background[Color.INK];
   t:0.05*frameInfo\`frameNum;
   center:0.5*canvas\`size;
   circle[([]
     p:4#enlist center;
     r:(50 82 118 162f) + 22*sin each t+0.9*til 4;
-    stroke:(0x5B6FE8;0x7C8EF2;0xC4956E;0xE07A52);
+    stroke:(Color.BLUE;Color.SKY;Color.GOLD;Color.CORAL);
     weight:4#6;
     alpha:0.8 0.6 0.42 0.25
   )];
@@ -333,34 +330,33 @@ draw:{[state;frameInfo;input;canvas]
         code: `i:"f"$til n;
 angs:(0.18*i) + t + 0.25*sin 0.05*i;
 radii:4+0.88*i;
-p:flip(cx+radii*cos angs;cy+radii*sin angs)`,
+p:(n#enlist center) + flip(radii*cos angs;radii*sin angs)`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x05060C)
+  \`size\`bg!(800 600;Color.NIGHT)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x05060C];
+  background[Color.NIGHT];
   t:0.004*frameInfo\`frameNum;
   n:320;
   i:"f"$til n;
   angs:(0.18*i) + t + 0.25*sin 0.05*i;
   radii:4+0.88*i;
-  cx:0.5*first canvas\`size;
-  cy:0.5*last canvas\`size;
-  palette:(0x5B6FE8;0x7C8EF2;0xC4956E;0xE07A52;0xD1694E;0x8C6BC9);
+  center:0.5*canvas\`size;
+  palette:(Color.BLUE;Color.SKY;Color.GOLD;Color.CORAL;Color.RED;Color.PURPLE);
   clrs:palette (til n) mod count palette;
   circle[([]
-    p:flip(cx+radii*cos angs;cy+radii*sin angs);
+    p:(n#enlist center) + flip(radii*cos angs;radii*sin angs);
     r:n#1.8;
     fill:clrs;
     alpha:n#0.82
   )];
   circle[([]
-    p:enlist (cx;cy);
+    p:enlist center;
     r:enlist 16+4*sin 0.03*frameInfo\`frameNum;
-    fill:enlist 0xFFE2B8;
+    fill:enlist Color.SOFT_YELLOW;
     alpha:enlist 0.95
   )];
   state
@@ -380,35 +376,39 @@ draw:{[state;frameInfo;input;canvas]
       highlight: {
         caption: 'A 3:2 frequency ratio with drifting phase makes the ribbon dance.',
         code: `phase:t+0.04*i;
-xs:cx+ax*sin 3*phase;
-ys:cy+ay*sin (2*phase)+0.7*t`,
+p:flip((first amp)*sin 3*phase;0.7*t+(last amp)*sin 2*phase);
+push[]; translate[center]; generic[enlist \`kind\`angle!(\`rotate;0.35*sin 0.6*t)];
+circle[([] p:p; r:n#3.4; fill:clrs; alpha:alphas)];
+pop[]`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x0B0D1A)
+  \`size\`bg!(800 600;Color.MIDNIGHT)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x0B0D1A];
+  background[Color.MIDNIGHT];
   n:220;
   t:0.015*frameInfo\`frameNum;
   i:"f"$til n;
   phase:t+0.04*i;
-  ax:0.34*first canvas\`size;
-  ay:0.34*last canvas\`size;
-  cx:0.5*first canvas\`size;
-  cy:0.5*last canvas\`size;
-  xs:cx+ax*sin 3*phase;
-  ys:cy+ay*sin (2*phase)+0.7*t;
-  palette:(0x5B6FE8;0x7C8EF2;0xC4956E;0xE07A52;0xD1694E;0x8C6BC9);
+  size:canvas\`size;
+  amp:0.34*size;
+  center:0.5*size;
+  p:flip((first amp)*sin 3*phase;0.7*t+(last amp)*sin 2*phase);
+  palette:(Color.BLUE;Color.SKY;Color.GOLD;Color.CORAL;Color.RED;Color.PURPLE);
   clrs:palette (til n) mod count palette;
   alphas:"f"$0.15+0.8*(til n)%n-1;
+  push[];
+  translate[center];
+  generic[enlist \`kind\`angle!(\`rotate;0.35*sin 0.6*t)];
   circle[([]
-    p:flip(xs;ys);
+    p:p;
     r:n#3.4;
     fill:clrs;
     alpha:alphas
   )];
+  pop[];
   state
 }
 `,
@@ -428,48 +428,45 @@ draw:{[state;frameInfo;input;canvas]
         code: `bodies:([]
   radius:75 140 205 275f;
   speed:0.9 0.62 0.44 0.32;
-  fill:(0x5B6FE8;0xC4956E;0x8C6BC9;0xE07A52);
+  fill:(Color.BLUE;Color.GOLD;Color.PURPLE;Color.CORAL);
   size:6 8 10 12f
 );
 ang:bodies[\`speed]*t;
-xs:cx+bodies[\`radius]*cos ang;
-ys:cy+bodies[\`radius]*sin ang`,
+p:(n#enlist center) + flip(bodies[\`radius]*cos ang;bodies[\`radius]*sin ang)`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x06071A)
+  \`size\`bg!(800 600;Color.NIGHT)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x06071A];
-  cx:0.5*first canvas\`size;
-  cy:0.5*last canvas\`size;
+  background[Color.NIGHT];
+  center:0.5*canvas\`size;
   t:0.02*frameInfo\`frameNum;
   bodies:([]
     radius:75 140 205 275f;
     speed:0.9 0.62 0.44 0.32;
-    fill:(0x5B6FE8;0xC4956E;0x8C6BC9;0xE07A52);
+    fill:(Color.BLUE;Color.GOLD;Color.PURPLE;Color.CORAL);
     size:6 8 10 12f
   );
   n:count bodies;
   ang:bodies[\`speed]*t;
-  xs:cx+bodies[\`radius]*cos ang;
-  ys:cy+bodies[\`radius]*sin ang;
+  p:(n#enlist center) + flip(bodies[\`radius]*cos ang;bodies[\`radius]*sin ang);
   circle[([]
-    p:n#enlist (cx;cy);
+    p:n#enlist center;
     r:bodies\`radius;
-    stroke:n#0x26294A;
+    stroke:n#Color.ORBIT;
     weight:n#1f;
     alpha:n#0.55
   )];
   circle[([]
-    p:enlist (cx;cy);
+    p:enlist center;
     r:enlist 18+2*sin 0.06*frameInfo\`frameNum;
-    fill:enlist 0xFFE2A0;
+    fill:enlist Color.YELLOW;
     alpha:enlist 0.95
   )];
   circle[([]
-    p:flip(xs;ys);
+    p:p;
     r:bodies\`size;
     fill:bodies\`fill;
     alpha:n#0.92
@@ -491,27 +488,25 @@ draw:{[state;frameInfo;input;canvas]
       highlight: {
         caption: 'Emit, integrate, filter. The whole simulation in three table ops.',
         code: `ticks:(state\`ticks),emit;
-ticks:update x:x+vx,y:y+vy,vy:vy+0.22,life:life-1 from ticks;
+ticks:update p:p+v,v:v+(count v)#enlist (0f;0.22),life:life-1 from ticks;
 ticks:select from ticks where life>0`,
       },
     },
     code: `setup:{
-  \`ticks\`bg!(([] x:\`float$();y:\`float$();vx:\`float$();vy:\`float$();life:\`float$());0x0D0D1F)
+  \`ticks\`bg!(([] p:();v:();life:\`float$());Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
   background[state\`bg];
-  width:first canvas\`size;
-  height:last canvas\`size;
-  vxs:-2.4 -1.2 -0.2 0.2 1.2 2.4;
-  vys:-9 -7.8 -6.6 -5.8 -5.2 -4.6;
-  emit:([] x:6#0.5*width; y:6#height-60f; vx:vxs; vy:vys; life:6#90f);
+  size:canvas\`size;
+  v:((-2.4;-9f);(-1.2;-7.8);(-0.2;-6.6);(0.2;-5.8);(1.2;-5.2);(2.4;-4.6));
+  emit:([] p:6#enlist (0.5*size)+(0  -60f); v:v; life:6#90f);
   ticks:(state\`ticks),emit;
-  ticks:update x:x+vx,y:y+vy,vy:vy+0.22,life:life-1 from ticks;
+  ticks:update p:p+v,v:v+(count v)#enlist (0f;0.22),life:life-1 from ticks;
   ticks:select from ticks where life>0;
-  palette:(0xE07A52;0x5B6FE8;0xC4956E;0x8C6BC9;0x4E9F92;0xD1694E);
+  palette:(Color.CORAL;Color.BLUE;Color.GOLD;Color.PURPLE;Color.GREEN;Color.RED);
   clrs:palette (til count ticks) mod count palette;
-  circle[([] p:flip(ticks\`x;ticks\`y); r:3+0.07*ticks\`life; fill:clrs; alpha:(count ticks)#0.88)];
+  circle[([] p:ticks\`p; r:3+0.07*ticks\`life; fill:clrs; alpha:(count ticks)#0.88)];
   \`ticks\`bg!(ticks;state\`bg)
 }
 `,
@@ -534,7 +529,7 @@ draw:{[state;frameInfo;input;canvas]
       },
     },
     code: `setup:{
-  \`marks\`bg!(([] p:();r:\`float$());0x0D0D1F)
+  \`marks\`bg!(([] p:();r:\`float$());Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
@@ -543,7 +538,7 @@ draw:{[state;frameInfo;input;canvas]
     marks,:([] p:enlist input\`mouse; r:enlist 12f+10*count[marks] mod 5)
   ];
   background[state\`bg];
-  palette:(0x5B6FE8;0xE07A52;0xC4956E;0x8C6BC9;0x4E9F92;0xD1694E);
+  palette:(Color.BLUE;Color.CORAL;Color.GOLD;Color.PURPLE;Color.GREEN;Color.RED);
   clrs:palette (til count marks) mod count palette;
   circle[([] p:marks\`p; r:marks\`r; fill:clrs; alpha:(count marks)#0.88)];
   \`marks\`bg!(marks;state\`bg)
@@ -567,7 +562,7 @@ trail:select from trail where life>0`,
       },
     },
     code: `setup:{
-  \`trail\`bg!(([] p:();life:\`float$());0x0D0D1F)
+  \`trail\`bg!(([] p:();life:\`float$());Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
@@ -578,7 +573,7 @@ draw:{[state;frameInfo;input;canvas]
   trail:update life:life-1 from trail;
   trail:select from trail where life>0;
   background[state\`bg];
-  circle[([] p:trail\`p; r:8+0.2*trail\`life; fill:count[trail]#enlist 0x8C6BC9; alpha:count[trail]#0.82)];
+  circle[([] p:trail\`p; r:8+0.2*trail\`life; fill:count[trail]#enlist Color.PURPLE; alpha:count[trail]#0.82)];
   \`trail\`bg!(trail;state\`bg)
 }
 `,
@@ -595,37 +590,37 @@ draw:{[state;frameInfo;input;canvas]
       intro: 'Instead of a countdown, stamp each click with the frame it happened on. Age is `current frame - t0`, which means any age-driven animation replays from the birth moment.',
       highlight: {
         caption: 'Birth frame → age → any age-driven animation you want.',
-        code: `clicks,:([] x:enlist "f"$first m; y:enlist "f"$last m; t0:enlist frameInfo\`frameNum);
+        code: `clicks,:([] p:enlist m; t0:enlist frameInfo\`frameNum);
 / ... later ...
 age:"f"$frameInfo[\`frameNum]-clicks\`t0`,
       },
     },
     code: `setup:{
-  \`clicks\`bg!(([] x:\`float$();y:\`float$();t0:\`long$());0x081028)
+  \`clicks\`bg!(([] p:();t0:\`long$());Color.DEEP)
 }
 
 draw:{[state;frameInfo;input;canvas]
   clicks:state\`clicks;
   if[(input\`mouseButtons)\`left;
     m:input\`mouse;
-    clicks,:([] x:enlist "f"$first m; y:enlist "f"$last m; t0:enlist frameInfo\`frameNum)
+    clicks,:([] p:enlist m; t0:enlist frameInfo\`frameNum)
   ];
   clicks:select from clicks where 150>(frameInfo[\`frameNum]-t0);
-  background[0x081028];
+  background[Color.DEEP];
   n:count clicks;
   if[n>0;
     age:"f"$frameInfo[\`frameNum]-clicks\`t0;
     primary:([]
-      p:flip(clicks\`x;clicks\`y);
+      p:clicks\`p;
       r:2+1.7*age;
-      stroke:n#0x7CA6FF;
+      stroke:n#Color.SKY;
       weight:n#2.4;
       alpha:(1-0.0068*age)|0
     );
     echo:([]
-      p:flip(clicks\`x;clicks\`y);
+      p:clicks\`p;
       r:2+1.0*age;
-      stroke:n#0xE4B7FF;
+      stroke:n#Color.LAVENDER;
       weight:n#1.6;
       alpha:(0.75-0.0055*age)|0
     );
@@ -643,45 +638,37 @@ draw:{[state;frameInfo;input;canvas]
     accent: '#4E9F92',
     description: 'A sea of dots breathes in concentric rings from wherever the mouse wanders — a living radar screen.',
     lesson: {
-      teaches: 'Distance fields — compute `d = sqrt(dx² + dy²)` across every tile to drive radius and alpha.',
-      intro: 'A distance field gives every cell a scalar distance to the pointer. Feed that into a `sin` with a phase and the grid ripples outward in concentric rings.',
+      teaches: 'Distance fields — compute `d = sqrt(sum delta*delta)` across every tile to drive radius and alpha.',
+      intro: 'A distance field gives every cell a scalar distance to the pointer. Keep each tile offset as a two-number array, then square-and-sum those arrays to get the field without splitting into `dx` and `dy` variables.',
       highlight: {
         caption: 'Distance plus phase equals outward-expanding rings.',
-        code: `dx:xs-mx;
-dy:ys-my;
-d:sqrt (dx*dx)+dy*dy;
+        code: `delta:p - count[idx]#enlist m;
+d:sqrt sum each delta*delta;
 wave:sin t-0.025*d;
 radii:2.5+4.5*1+wave`,
       },
     },
     code: `setup:{
-  \`size\`bg!(800 600;0x0A0E1F)
+  \`size\`bg!(800 600;Color.INK)
 }
 
 draw:{[state;frameInfo;input;canvas]
-  background[0x0A0E1F];
+  background[Color.INK];
   t:0.08*frameInfo\`frameNum;
-  nc:20;
-  nr:15;
-  w:first canvas\`size;
-  h:last canvas\`size;
-  cw:w%nc;
-  ch:h%nr;
-  idx:til nc*nr;
-  xs:cw*0.5+idx mod nc;
-  ys:ch*0.5+idx div nc;
-  mx:$[null~input\`mouse;0.5*w;first input\`mouse];
-  my:$[null~input\`mouse;0.5*h;last input\`mouse];
-  dx:xs-mx;
-  dy:ys-my;
-  d:sqrt (dx*dx)+dy*dy;
+  n:20 15;
+  cell:(canvas\`size)%n;
+  idx:til (*/) n;
+  p:flip cell*(0.5+idx mod first n;0.5+idx div first n);
+  m:$[null~input\`mouse;0.5*canvas\`size;input\`mouse];
+  delta:p-count[idx]#enlist m;
+  d:sqrt sum each delta*delta;
   wave:sin t-0.025*d;
   radii:2.5+4.5*1+wave;
   alphas:0.2+0.7*(1+wave)%2;
-  palette:(0x5B6FE8;0x7CA6FF;0x4E9F92;0xC4956E);
+  palette:(Color.BLUE;Color.SKY;Color.GREEN;Color.GOLD);
   clrs:palette (1+"j"$2+2*wave) mod count palette;
   circle[([]
-    p:flip(xs;ys);
+    p:p;
     r:radii;
     fill:clrs;
     alpha:alphas

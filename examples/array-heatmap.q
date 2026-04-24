@@ -5,7 +5,7 @@
 / No per-cell loops; q does the whole thing in parallel.
 
 setup:{
-  `size`bg`nc`nr!(720 540; 0x0D0D1F; 48; 36)
+  `size`bg`nc`nr!(720 540; Color.INK; 48; 36)
  }
 
 draw:{[state;frameInfo;input;canvas]
@@ -14,15 +14,13 @@ draw:{[state;frameInfo;input;canvas]
   tw:first[cs]%nc; th:last[cs]%nr;
 
   / centre point for each cell (vectorised)
-  xs:tw*0.5+til nc;
-  ys:th*0.5+til nr;
-  px:raze nr#enlist xs;
-  py:raze each ys,'\:til nc;
+  idx:til nc*nr;
+  p:flip (tw*0.5+tw*idx mod nc; th*0.5+th*idx div nc);
 
   / mouse → treat null as centre
   m:$[null~input`mouse; 0.5*cs; input`mouse];
-  dx:px-first m; dy:py-last m;
-  d:sqrt(dx*dx)+dy*dy;
+  delta:p-(count idx)#enlist m;
+  d:sqrt sum each delta*delta;
 
   / time-shifted hue field
   t:0.04*frameInfo`frameNum;
@@ -34,8 +32,8 @@ draw:{[state;frameInfo;input;canvas]
   rgb:(65536*r)+(256*g)+b;
 
   rect[([]
-    p:flip (px;py);
-    size:(count px)#enlist (tw;th);
+    p:p;
+    size:(count idx)#enlist (tw;th);
     fill:rgb
   )];
   state

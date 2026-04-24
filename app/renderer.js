@@ -209,7 +209,7 @@ function initMonaco() {
       lineHeight: 20,
       minimap: { enabled: false },
       scrollBeyondLastLine: false,
-      wordWrap: 'off',
+      wordWrap: 'on',
       padding: { top: 16, bottom: 16 },
       renderLineHighlight: 'line',
       cursorBlinking: 'smooth',

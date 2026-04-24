@@ -5,5 +5,5 @@
     "rootDir": "../..",
     "types": ["node", "vitest/globals"]
   },
-  "include": ["src/**/*", "tests/**/*", "../q-core/src/**/*"]
+  "include": ["src/**/*", "tests/**/*", "../q-core/src/**/*", "../../app/src/global.d.ts"]
 }

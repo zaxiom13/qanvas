@@ -34,7 +34,8 @@ import {
   type QTable,
   type QValue
 } from "@qpad/core";
-import { lexKdbLex, type KdbLexToken } from "../../q-language/src/index.js";
+export type { QValue } from "@qpad/core";
+import { KdbLexError, lexKdbLex, type KdbLexToken } from "../../q-language/src/index.js";
 
 import { parse as pegParse } from "./q-parser.js";
 
@@ -98,6 +99,19 @@ export type AstNode =
 interface Token {
   kind: string;
   value: string;
+  start: number;
+  end: number;
+}
+
+interface SourcePosition {
+  line: number;
+  column: number;
+  offset: number;
+}
+
+interface SourceRange {
+  start: SourcePosition;
+  end: SourcePosition;
 }
 
 const MONAD_KEYWORDS = new Set([
@@ -378,10 +392,12 @@ const createMemoryFileSystem = (): HostFileSystem => {
 
 export class QRuntimeError extends Error {
   readonly qName: string;
+  readonly location?: SourceRange;
 
-  constructor(qName: string, message: string) {
+  constructor(qName: string, message: string, location?: SourceRange) {
     super(message);
     this.qName = qName;
+    this.location = location;
   }
 }
 
@@ -645,7 +661,8 @@ export class Session {
           node.items.reduceRight<QValue[]>((items, item) => {
             items.unshift(this.eval(item));
             return items;
-          }, [])
+          }, []),
+          false
         );
       case "table":
         return buildTable(node.columns.map((column) => ({
@@ -1282,6 +1299,16 @@ export class Session {
         false
       );
     }
+    const primitiveDerivedAdverb = op.match(/^(.*)([\/\\])$/);
+    if (
+      primitiveDerivedAdverb?.[1] &&
+      PRIMITIVE_ADVERB_TYPECHECK_NAMES.has(primitiveDerivedAdverb[1])
+    ) {
+      const callable = this.get(primitiveDerivedAdverb[1]);
+      return primitiveDerivedAdverb[2] === "/"
+        ? reducePrimitiveAdverbValue(this, callable, right, left)
+        : scanPrimitiveAdverbValue(this, callable, right, left);
+    }
     switch (op) {
       case "+":
         return mapBinary(left, right, (a, b) => add(a, b));
@@ -1327,11 +1354,7 @@ export class Session {
       case "@'":
         return applyEachValue(this, left, right);
       case "\\":
-        return scanValue(this, left, right);
-      case "+/":
-        return reduceValueWithSeed(this, this.get("+"), left, right);
-      case "+\\":
-        return scanValueWithSeed(this, this.get("+"), left, right);
+        return scanPrimitiveAdverbValue(this, left, right);
       case ",/":
         return concatValues(left, right);
       case "in":
@@ -1622,6 +1645,10 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     for (const name of names) {
       register(name, 1, (session) => session.unsupported(name));
     }
+  };
+  const registerPrimitiveDerivedAdverb = (base: string) => {
+    register(`${base}/`, 1, (session, args) => primitiveDerivedAdverbValue(session, base, "/", args));
+    register(`${base}\\`, 1, (session, args) => primitiveDerivedAdverbValue(session, base, "\\", args));
   };
 
   register("abs", 1, (_, [arg]) => absValue(arg));
@@ -1992,26 +2019,7 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     const items = args.length === 2 && args[1]?.kind === "list" ? [args[0]!, ...args[1].items] : args;
     return items.slice(1).reduce((acc, item) => session.invoke(session.get(","), [acc, item]), items[0]!);
   });
-  register("+/", 1, (session, args) => {
-    const plus = session.get("+");
-    if (args.length === 1) {
-      return reduceValue(session, plus, args[0]!);
-    }
-    if (args.length === 2 && args[1]?.kind === "list") {
-      return reduceValue(session, plus, args[1], args[0]!);
-    }
-    return reduceValue(session, plus, qList(args, args.every((arg) => arg.kind === args[0]?.kind)));
-  });
-  register("+\\", 1, (session, args) => {
-    const plus = session.get("+");
-    if (args.length === 1) {
-      return scanValue(session, plus, args[0]!);
-    }
-    if (args.length === 2 && args[1]?.kind === "list") {
-      return scanValue(session, plus, args[1], args[0]!);
-    }
-    return scanValue(session, plus, qList(args, args.every((arg) => arg.kind === args[0]?.kind)));
-  });
+  registerPrimitiveDerivedAdverb("+");
 
   register("+", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => add(a, b)));
   register("-", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => subtract(a, b)));
@@ -2040,8 +2048,11 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   register("$", 2, (_, [left, right]) => castValue(left, right));
   register("|", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => maxPair(a, b)));
   register("&", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => minPair(a, b)));
-  register("/", 2, (session, [callable, arg, seed]) => reduceValue(session, callable, arg, seed));
-  register("\\", 2, (session, [callable, arg, seed]) => scanValue(session, callable, arg, seed));
+  ["-", "*", "%", "=", "<", ">", "<=", ">=", "!", "#", "_", "~", "^", "?", "$", "|", "&"].forEach(
+    registerPrimitiveDerivedAdverb
+  );
+  register("/", 2, (session, [callable, arg, seed]) => reducePrimitiveAdverbValue(session, callable, arg, seed));
+  register("\\", 2, (session, [callable, arg, seed]) => scanPrimitiveAdverbValue(session, callable, arg, seed));
 
   register("xasc", 2, (_, [left, right]) => xascValue(left, right, true));
   register("xdesc", 2, (_, [left, right]) => xascValue(left, right, false));
@@ -2381,19 +2392,41 @@ export const listBuiltins = () => ({
 
 const buildTokenTape = (tokens: Token[]) => "x".repeat(tokens.length);
 
+export const parsePeggyExpressionForTests = (source: string): AstNode => {
+  let tokens: Token[] = [];
+  try {
+    tokens = tokenize(source);
+    return pegParse(buildTokenTape(tokens), {
+      tokens,
+      Parser,
+      source,
+      startRule: "ExpressionStart"
+    } as Parameters<typeof pegParse>[1] & { startRule: string }) as AstNode;
+  } catch (error) {
+    throw enrichParseError(error, source, tokens);
+  }
+};
+
 export const parse = (source: string): AstNode => {
-  const tokens = tokenize(source);
-  return pegParse(buildTokenTape(tokens), { tokens, Parser, source }) as AstNode;
+  let tokens: Token[] = [];
+  try {
+    tokens = tokenize(source);
+    return pegParse(buildTokenTape(tokens), { tokens, Parser, source }) as AstNode;
+  } catch (error) {
+    throw enrichParseError(error, source, tokens);
+  }
 };
 
 export class Parser {
   index = 0;
   private readonly tokens: Token[];
+  private readonly source: string;
   private readonly stopIdentifiers: Set<string>[] = [];
   private readonly stopOperators: Set<string>[] = [];
 
-  constructor(tokens: Token[]) {
+  constructor(tokens: Token[], source = "") {
     this.tokens = tokens;
+    this.source = source;
   }
 
   parseProgram(source: string): AstNode {
@@ -2506,7 +2539,7 @@ export class Parser {
         this.withStopIdentifiers(["from"], () => this.parseAssignment())
       );
       if (update.kind !== "assign") {
-        throw new QRuntimeError("parse", "update expects assignment clauses");
+        this.parseError("update expects assignment clauses");
       }
       updates.push({ name: update.name, value: update.value });
       if (this.peek().kind === "operator" && this.peek().value === ",") {
@@ -2522,7 +2555,7 @@ export class Parser {
     const columns: string[] = [];
     while (!this.match("eof")) {
       if (this.peek().kind !== "identifier") {
-        throw new QRuntimeError("parse", "delete expects column names");
+        this.parseError("delete expects column names");
       }
       columns.push(this.consume("identifier").value);
       if (this.peek().kind === "operator" && this.peek().value === ",") {
@@ -2693,10 +2726,11 @@ export class Parser {
       !this.isStopIdentifier(this.peek()) &&
       !(this.peek().kind === "identifier" && WORD_DIAD_KEYWORDS.has(this.peek().value))
     ) {
+      const arg = this.parseAssignment();
       return {
         kind: "call",
         callee,
-        args: [this.parseAssignment()]
+        args: callee.kind === "group" && arg.kind === "list" ? arg.items : [arg]
       };
     }
 
@@ -2769,6 +2803,9 @@ export class Parser {
     }
 
     if (isCallableAst(callee)) {
+      if (callee.kind === "group" && adjacent.length === 1 && adjacent[0]?.kind === "list") {
+        return { kind: "call", callee, args: adjacent[0].items };
+      }
       if (
         adjacent.length > 1 &&
         !this.isStopIdentifier(this.peek()) &&
@@ -2841,7 +2878,7 @@ export class Parser {
 
   private buildIfExpression(args: AstNode[]): AstNode {
     if (args.length < 2) {
-      throw new QRuntimeError("parse", "if expects a condition and at least one body expression");
+      this.parseError("if expects a condition and at least one body expression");
     }
 
     return {
@@ -2853,7 +2890,7 @@ export class Parser {
 
   private buildWhileExpression(args: AstNode[]): AstNode {
     if (args.length < 2) {
-      throw new QRuntimeError("parse", "while expects a condition and at least one body expression");
+      this.parseError("while expects a condition and at least one body expression");
     }
     return {
       kind: "while",
@@ -2864,7 +2901,7 @@ export class Parser {
 
   private buildDoExpression(args: AstNode[]): AstNode {
     if (args.length < 2) {
-      throw new QRuntimeError("parse", "do expects a count and at least one body expression");
+      this.parseError("do expects a count and at least one body expression");
     }
     return {
       kind: "do",
@@ -2875,7 +2912,7 @@ export class Parser {
 
   private buildCondExpression(args: AstNode[]): AstNode {
     if (args.length < 2) {
-      throw new QRuntimeError("parse", "$ expects at least a condition and a result");
+      this.parseError("$ expects at least a condition and a result");
     }
 
     const elseValue = args.length % 2 === 1 ? args[args.length - 1]! : null;
@@ -2886,7 +2923,7 @@ export class Parser {
       const condition = branchArgs[index];
       const value = branchArgs[index + 1];
       if (!condition || !value) {
-        throw new QRuntimeError("parse", "$ expects condition/result pairs");
+        this.parseError("$ expects condition/result pairs");
       }
       branches.push({ condition, value });
     }
@@ -2901,7 +2938,7 @@ export class Parser {
   private parsePrimary(): AstNode {
     const token = this.peek();
     if (this.isStopIdentifier(token)) {
-      throw new QRuntimeError("parse", `Unexpected identifier ${token.value}`);
+      this.parseError(`Unexpected identifier ${token.value}`, token);
     }
     switch (token.kind) {
       case "number":
@@ -2965,7 +3002,7 @@ export class Parser {
       case "lbrace":
         return this.parseLambda();
       default:
-        throw new QRuntimeError("parse", `Unexpected token: ${token.kind} ${token.value}`);
+        this.parseError(`Unexpected token: ${token.kind} ${token.value}`, token);
     }
   }
 
@@ -2977,7 +3014,7 @@ export class Parser {
         this.peek().kind !== "lbracket" &&
         !(this.peek().kind === "operator" && this.peek().value === ":"))
     ) {
-      throw new QRuntimeError("parse", `Unexpected token: operator ${base}`);
+      this.parseError(`Unexpected token: operator ${base}`);
     }
 
     return { kind: "identifier", name: this.extendOperatorName(base) };
@@ -3049,7 +3086,7 @@ export class Parser {
           this.consume("separator");
           sourceTokens.push(";");
         } else {
-          throw new QRuntimeError("parse", "Invalid lambda parameter list");
+          this.parseError("Invalid lambda parameter list");
         }
       }
       this.consume("rbracket");
@@ -3137,7 +3174,7 @@ export class Parser {
   }
 
   private peek(offset = 0): Token {
-    return this.tokens[this.index + offset] ?? { kind: "eof", value: "" };
+    return this.tokens[this.index + offset] ?? { kind: "eof", value: "", start: 0, end: 0 };
   }
 
   private match(kind: string): boolean {
@@ -3147,13 +3184,14 @@ export class Parser {
   private consume(kind: string, value?: string): Token {
     const token = this.peek();
     if (token.kind !== kind || (value !== undefined && token.value !== value)) {
-      throw new QRuntimeError(
-        "parse",
-        `Expected ${kind}${value ? ` ${value}` : ""} but found ${token.kind} ${token.value}`
-      );
+      this.parseError(`Expected ${kind}${value ? ` ${value}` : ""} but found ${token.kind} ${token.value}`, token);
     }
     this.index += 1;
     return token;
+  }
+
+  private parseError(message: string, token = this.peek()): never {
+    throw new QRuntimeError("parse", message, tokenToRange(this.source, token));
   }
 
   private parseBinaryTail(left: AstNode): AstNode {
@@ -3220,29 +3258,29 @@ const adaptKdbLexToken = (token: KdbLexToken): Token[] => {
     case "directive":
       return [];
     case "newline":
-      return [{ kind: "newline", value: token.value }];
+      return [{ kind: "newline", value: token.value, start: token.start, end: token.end }];
     case "separator":
-      return [{ kind: "separator", value: token.value }];
+      return [{ kind: "separator", value: token.value, start: token.start, end: token.end }];
     case "identifier":
-      return [{ kind: "identifier", value: token.value }];
+      return [{ kind: "identifier", value: token.value, start: token.start, end: token.end }];
     case "symbol":
-      return [{ kind: "symbol", value: token.value.slice(1) }];
+      return [{ kind: "symbol", value: token.value.slice(1), start: token.start, end: token.end }];
     case "operator":
       if (
         token.value.length === 2 &&
         (token.value === "+/" || token.value === "+\\" || token.value === ",/" || token.value === ",\\")
       ) {
-        return [{ kind: "operator", value: token.value }];
+        return [{ kind: "operator", value: token.value, start: token.start, end: token.end }];
       }
-      return [{ kind: "operator", value: token.value }];
+      return [{ kind: "operator", value: token.value, start: token.start, end: token.end }];
     case "date":
-      return [{ kind: "date", value: token.value }];
+      return [{ kind: "date", value: token.value, start: token.start, end: token.end }];
     case "number":
-      return [{ kind: "number", value: token.value }];
+      return [{ kind: "number", value: token.value, start: token.start, end: token.end }];
     case "boolean":
-      return [{ kind: "boolean", value: token.value }];
+      return [{ kind: "boolean", value: token.value, start: token.start, end: token.end }];
     case "boolvector":
-      return [{ kind: "boolvector", value: token.value.replace(/[ \t]+/g, "") }];
+      return [{ kind: "boolvector", value: token.value.replace(/[ \t]+/g, ""), start: token.start, end: token.end }];
     case "string":
       return [
         {
@@ -3250,14 +3288,108 @@ const adaptKdbLexToken = (token: KdbLexToken): Token[] => {
           value:
             token.value.length >= 2 && token.value.startsWith("\"") && token.value.endsWith("\"")
               ? token.value.slice(1, -1).replace(/\\(.)/g, "$1")
-              : token.value.replace(/^"/, "").replace(/\\(.)/g, "$1")
+              : token.value.replace(/^"/, "").replace(/\\(.)/g, "$1"),
+          start: token.start,
+          end: token.end
         }
       ];
     case "bracket":
-      return [{ kind: bracketKind(token.value), value: token.value }];
+      return [{ kind: bracketKind(token.value), value: token.value, start: token.start, end: token.end }];
     case "eof":
-      return [{ kind: "eof", value: "" }];
+      return [{ kind: "eof", value: "", start: token.start, end: token.end }];
   }
+};
+
+const enrichParseError = (error: unknown, source: string, tokens: Token[]): Error => {
+  if (error instanceof KdbLexError) {
+    return buildLocatedError(error, source, createSourceRange(source, error.offset, error.offset + 1), "KDBLex");
+  }
+
+  if (hasSourceLocation(error)) {
+    return buildLocatedError(error, source, error.location);
+  }
+
+  if (error instanceof QRuntimeError && error.qName === "parse" && error.location) {
+    return buildLocatedError(error, source, error.location);
+  }
+
+  if (isPeggySyntaxError(error)) {
+    return buildLocatedError(error, source, tokenIndexRangeToSourceRange(source, tokens, error.location?.start?.offset ?? 0));
+  }
+
+  return error instanceof Error ? error : new Error(String(error));
+};
+
+const isPeggySyntaxError = (
+  error: unknown
+): error is Error & { location?: { start?: { offset?: number } } } => {
+  return error instanceof Error && error.name === "SyntaxError";
+};
+
+const hasSourceLocation = (error: unknown): error is Error & { location: SourceRange } => {
+  return error instanceof Error && typeof (error as { location?: unknown }).location === "object" && (error as { location?: unknown }).location !== null;
+};
+
+const buildLocatedError = (
+  error: Error,
+  source: string,
+  range: SourceRange,
+  prefix?: string
+): Error => {
+  const label = prefix ? `${prefix}: ${error.message}` : error.message;
+  const near = describeSourceSnippet(source, range.start.offset);
+  const message = `${label} at line ${range.start.line}, char ${range.start.column} (offset ${range.start.offset})${near ? ` near ${near}` : ""}`;
+  const next = new Error(message);
+  next.name = error.name;
+  next.stack = `${next.name}: ${message}`;
+  return next;
+};
+
+const tokenToRange = (source: string, token: Token): SourceRange => ({
+  start: offsetToPosition(token.start, source),
+  end: offsetToPosition(token.end, source)
+});
+
+const tokenIndexRangeToSourceRange = (source: string, tokens: Token[], tokenIndex: number): SourceRange => {
+  const token = tokens[Math.min(tokenIndex, Math.max(tokens.length - 1, 0))];
+  if (!token) {
+    return createSourceRange(source, source.length, source.length);
+  }
+  return createSourceRange(source, token.start, token.end);
+};
+
+const createSourceRange = (source: string, startOffset: number, endOffset: number): SourceRange => ({
+  start: offsetToPosition(Math.max(0, Math.min(startOffset, source.length)), source),
+  end: offsetToPosition(Math.max(0, Math.min(endOffset, source.length)), source)
+});
+
+const offsetToPosition = (offset: number, source = ""): SourcePosition => {
+  let line = 1;
+  let column = 1;
+  for (let index = 0; index < offset && index < source.length; index += 1) {
+    if (source[index] === "\n") {
+      line += 1;
+      column = 1;
+    } else {
+      column += 1;
+    }
+  }
+  return { line, column, offset };
+};
+
+const describeSourceSnippet = (source: string, offset: number) => {
+  if (!source) return "";
+  const lineStart = source.lastIndexOf("\n", Math.max(0, offset - 1)) + 1;
+  const rawLineEnd = source.indexOf("\n", offset);
+  const lineEnd = rawLineEnd === -1 ? source.length : rawLineEnd;
+  const line = source.slice(lineStart, lineEnd).trim();
+  if (!line) return "";
+
+  const relativeOffset = Math.max(0, offset - lineStart);
+  const snippetStart = Math.max(0, relativeOffset - 12);
+  const snippetEnd = Math.min(line.length, relativeOffset + 12);
+  const snippet = line.slice(snippetStart, snippetEnd).trim();
+  return snippet ? `\`${snippet}\`` : "";
 };
 
 const bracketKind = (value: string): Token["kind"] => {
@@ -5345,6 +5477,38 @@ const flattenRazeLeaves = (value: QValue): QValue[] => {
   return value.items.flatMap((item) => flattenRazeLeaves(item));
 };
 
+const PRIMITIVE_ADVERB_TYPECHECK_NAMES = new Set([
+  "+",
+  "-",
+  "*",
+  "%",
+  "=",
+  "<",
+  ">",
+  "<=",
+  ">=",
+  "!",
+  "#",
+  "_",
+  "~",
+  "^",
+  "?",
+  "$",
+  "|",
+  "&"
+]);
+
+const ensurePrimitiveAdverbInput = (callable: QValue, value: QValue) => {
+  if (
+    callable.kind === "builtin" &&
+    PRIMITIVE_ADVERB_TYPECHECK_NAMES.has(callable.name) &&
+    value.kind === "list" &&
+    !(value.homogeneous ?? false)
+  ) {
+    throw new QRuntimeError("type", "Primitive adverb expects a simple list");
+  }
+};
+
 const reduceValue = (session: Session, callable: QValue, value: QValue, seed?: QValue): QValue => {
   if (seed !== undefined) {
     if (callableArity(callable) === 1 && value.kind === "number") {
@@ -5399,6 +5563,37 @@ const scanValue = (session: Session, callable: QValue, value: QValue, seed?: QVa
     outputs.push(result);
   }
   return qList(outputs, false);
+};
+
+const reducePrimitiveAdverbValue = (session: Session, callable: QValue, value: QValue, seed?: QValue): QValue => {
+  ensurePrimitiveAdverbInput(callable, value);
+  return reduceValue(session, callable, value, seed);
+};
+
+const scanPrimitiveAdverbValue = (session: Session, callable: QValue, value: QValue, seed?: QValue): QValue => {
+  ensurePrimitiveAdverbInput(callable, value);
+  return scanValue(session, callable, value, seed);
+};
+
+const primitiveDerivedAdverbValue = (
+  session: Session,
+  base: string,
+  adverb: "/" | "\\",
+  args: QValue[]
+): QValue => {
+  const callable = session.get(base);
+  const applyAdverb = adverb === "/" ? reducePrimitiveAdverbValue : scanPrimitiveAdverbValue;
+  if (args.length === 1) {
+    return applyAdverb(session, callable, args[0]!);
+  }
+  if (args.length === 2 && args[1]?.kind === "list") {
+    return applyAdverb(session, callable, args[1], args[0]!);
+  }
+  return applyAdverb(
+    session,
+    callable,
+    qList(args, args.every((arg) => arg.kind === args[0]?.kind))
+  );
 };
 
 const priorValue = (session: Session, callable: QValue, value: QValue): QValue => {

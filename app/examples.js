@@ -77,7 +77,7 @@ draw:{[state;frameInfo;input;canvas]
 }
 
 draw:{[state;frameInfo;input;canvas]
-  / Emit particles, add gravity, draw circles with fading alpha
+  / Emit `p` + `v` arrays, add gravity with vector math, draw fading circles
   state
 }
 `,
@@ -111,7 +111,7 @@ draw:{[state;frameInfo;input;canvas]
 }
 
 draw:{[state;frameInfo;input;canvas]
-  / Append drag positions and decay older trail points
+  / Append point arrays into trail state and decay older entries
   state
 }
 `,

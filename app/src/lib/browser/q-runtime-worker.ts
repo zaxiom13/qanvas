@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import { createSession, type HostFileSystem } from '@qpad/engine';
+import { createCompiledRuntimeHelpers, isPlainObject, type CompiledRuntimeHelpers } from '../runtime/compiled-runtime-helpers';
 
 const FS_STORAGE_PREFIX = 'qanvas5:browser:fs:';
 
@@ -127,6 +128,7 @@ type InterpreterRuntimeSession = {
 type CompiledRuntimeSession = {
   mode: 'compiled-js';
   files: SketchFile[];
+  code: string;
   module: {
     setup: (rt: CompiledRuntimeHelpers) => unknown;
     draw: (state: unknown, frameInfo: Record<string, unknown>, input: Record<string, unknown>, canvas: Record<string, unknown>, rt: CompiledRuntimeHelpers) => unknown;
@@ -155,12 +157,26 @@ type RuntimeResponse =
   | { type: 'stdout'; value: string }
   | { id: number; ok: false; error: string };
 
-type CompiledRuntimeHelpers = ReturnType<typeof createCompiledRuntimeHelpers>;
-
 const BOOT_SOURCE = [
   '.qv.cmds:enlist 0N',
   '.qv.state:()',
   '.qv.config:()',
+  'Color.INK:855327',
+  'Color.NIGHT:329228',
+  'Color.MIDNIGHT:724250',
+  'Color.DEEP:528424',
+  'Color.BLUE:5992424',
+  'Color.SKY:8169215',
+  'Color.GOLD:12883310',
+  'Color.CORAL:14711378',
+  'Color.RED:13723982',
+  'Color.PURPLE:9202633',
+  'Color.GREEN:5152658',
+  'Color.CREAM:16051416',
+  'Color.YELLOW:16769696',
+  'Color.SOFT_YELLOW:16769720',
+  'Color.LAVENDER:14989311',
+  'Color.ORBIT:2500938',
   '',
   '.qv.append:{[cmd]',
   '  .qv.cmds,:enlist cmd;',
@@ -329,7 +345,12 @@ self.onmessage = (event: MessageEvent<RuntimeRequest>) => {
       } satisfies RuntimeResponse);
     }
   } catch (error) {
-    const messageText = error instanceof Error ? error.message : String(error);
+    const activeRuntime = runtime;
+    const messageText = activeRuntime?.mode === 'compiled-js'
+      ? formatCompiledRuntimeError(error, activeRuntime.code)
+      : error instanceof Error
+        ? error.message
+        : String(error);
     postMessage({
       id: message.id,
       ok: false,
@@ -360,7 +381,7 @@ function createRuntimeSession(payload: RuntimeStartPayload) {
         stdout: '',
       };
     } catch (error) {
-      const fallbackReason = error instanceof Error ? error.message : String(error);
+      const fallbackReason = formatCompiledRuntimeError(error, payload.compiled.code);
       const interpreted = createInterpreterRuntimeSession(payload.files);
       const initResult = interpreted.session.evaluate('.qv.result:.qv.init[]');
       return {
@@ -413,7 +434,8 @@ function createInterpreterRuntimeSession(files: SketchFile[]) {
 }
 
 function createCompiledRuntimeSession(files: SketchFile[], code: string): CompiledRuntimeSession {
-  const factory = new Function(`return ${code};`);
+  const wrappedCode = `return (\n${code}\n);\n//# sourceURL=qanvas-compiled-sketch.js`;
+  const factory = new Function(wrappedCode);
   const module = factory() as CompiledRuntimeSession['module'];
 
   if (!module || typeof module.setup !== 'function' || typeof module.draw !== 'function') {
@@ -429,6 +451,7 @@ function createCompiledRuntimeSession(files: SketchFile[], code: string): Compil
   return {
     mode: 'compiled-js',
     files: files.map((file) => ({ ...file })),
+    code,
     module,
     state,
     config,
@@ -455,6 +478,47 @@ function runCompiledFrame(session: CompiledRuntimeSession, payload: RuntimeFrame
   return session.helpers.takeCommands();
 }
 
+function formatCompiledRuntimeError(error: unknown, code: string) {
+  const baseMessage = error instanceof Error ? error.message : String(error);
+  const stack = error instanceof Error ? error.stack ?? '' : '';
+  const location = extractCompiledLocation(stack);
+
+  if (!location) {
+    return baseMessage;
+  }
+
+  const line = location.line - 1;
+  const column = location.column;
+  const snippet = getCompiledSnippet(code, line);
+  return `${baseMessage} at compiled JS line ${line}, char ${column}${snippet ? ` near \`${snippet}\`` : ''}`;
+}
+
+function extractCompiledLocation(stack: string) {
+  const sourceMatch = stack.match(/qanvas-compiled-sketch\.js:(\d+):(\d+)/);
+  if (sourceMatch) {
+    return {
+      line: Number.parseInt(sourceMatch[1] ?? '0', 10),
+      column: Number.parseInt(sourceMatch[2] ?? '0', 10),
+    };
+  }
+
+  const anonymousMatch = stack.match(/<anonymous>:(\d+):(\d+)/);
+  if (anonymousMatch) {
+    return {
+      line: Number.parseInt(anonymousMatch[1] ?? '0', 10),
+      column: Number.parseInt(anonymousMatch[2] ?? '0', 10),
+    };
+  }
+
+  return null;
+}
+
+function getCompiledSnippet(code: string, lineNumber: number) {
+  if (lineNumber < 1) return '';
+  const line = code.split('\n')[lineNumber - 1] ?? '';
+  return line.trim().slice(0, 120);
+}
+
 function loadSource(session: ReturnType<typeof createSession>, source: string, fileName?: string) {
   for (const statement of normalizeQScript(rewriteQanvasCompat(source))) {
     try {
@@ -477,181 +541,6 @@ function buildFrameExpression(payload: RuntimeFramePayload) {
   return `.qv.frame[${toQLiteral(payload.frameInfo)};${toQLiteral(payload.input)};${toQLiteral(payload.canvas)}]`;
 }
 
-function createCompiledRuntimeHelpers() {
-  let commands: Record<string, unknown>[] = [];
-
-  function mapBinary(left: unknown, right: unknown, fn: (leftValue: unknown, rightValue: unknown) => unknown): unknown {
-    if (Array.isArray(left) && Array.isArray(right)) {
-      return left.map((entry, index) => fn(entry, right[index]));
-    }
-    if (Array.isArray(left)) {
-      return left.map((entry) => fn(entry, right));
-    }
-    if (Array.isArray(right)) {
-      return right.map((entry) => fn(left, entry));
-    }
-    return fn(left, right);
-  }
-
-  const helpers = {
-    resetCommands() {
-      commands = [];
-    },
-    takeCommands() {
-      return commands.map((entry) => ({ ...entry }));
-    },
-    table(columns: Record<string, unknown>) {
-      const rowCount = Math.max(
-        1,
-        ...Object.values(columns).map((value) => (Array.isArray(value) ? value.length : 1))
-      );
-      return Array.from({ length: rowCount }, (_, rowIndex) => {
-        const row: Record<string, unknown> = {};
-        for (const [name, value] of Object.entries(columns)) {
-          row[name] = Array.isArray(value) ? value[Math.min(rowIndex, value.length - 1)] : value;
-        }
-        return row;
-      });
-    },
-    callBuiltin(name: string, args: unknown[]) {
-      switch (name) {
-        case 'background':
-          commands.push({ kind: 'background', fill: args[0] });
-          return args[0];
-        case 'circle':
-        case 'rect':
-        case 'line':
-        case 'text':
-        case 'image':
-          commands.push({ kind: name, data: args[0] });
-          return args[0];
-        case 'first':
-          return Array.isArray(args[0]) ? args[0][0] : null;
-        case 'last':
-          return Array.isArray(args[0]) ? args[0][args[0].length - 1] : null;
-        case 'count':
-          return Array.isArray(args[0]) ? args[0].length : isPlainObject(args[0]) ? Object.keys(args[0] as Record<string, unknown>).length : 0;
-        case 'til':
-          return Array.from({ length: Number(args[0] ?? 0) }, (_, index) => index);
-        case 'floor':
-          return vectorizeUnary(args[0], (value) => Math.floor(Number(value ?? 0)));
-        case 'ceiling':
-          return vectorizeUnary(args[0], (value) => Math.ceil(Number(value ?? 0)));
-        case 'enlist':
-          return [args[0]];
-        case 'flip':
-          return flipColumns(args[0]);
-        case 'raze':
-          return razeOnce(args[0]);
-        case 'reverse':
-          return Array.isArray(args[0]) ? [...(args[0] as unknown[])].reverse() : args[0];
-        case 'sum':
-          return reduceNumeric(args[0], (a, b) => a + b, 0);
-        case 'avg': {
-          const arr = toNumericArray(args[0]);
-          if (arr.length === 0) return null;
-          return arr.reduce((a, b) => a + b, 0) / arr.length;
-        }
-        case 'min':
-          return reduceNumeric(args[0], (a, b) => Math.min(a, b), Number.POSITIVE_INFINITY);
-        case 'max':
-          return reduceNumeric(args[0], (a, b) => Math.max(a, b), Number.NEGATIVE_INFINITY);
-        case 'sin':
-          return vectorizeUnary(args[0], (value) => Math.sin(Number(value ?? 0)));
-        case 'cos':
-          return vectorizeUnary(args[0], (value) => Math.cos(Number(value ?? 0)));
-        case 'tan':
-          return vectorizeUnary(args[0], (value) => Math.tan(Number(value ?? 0)));
-        case 'asin':
-          return vectorizeUnary(args[0], (value) => Math.asin(Number(value ?? 0)));
-        case 'acos':
-          return vectorizeUnary(args[0], (value) => Math.acos(Number(value ?? 0)));
-        case 'atan':
-          return vectorizeUnary(args[0], (value) => Math.atan(Number(value ?? 0)));
-        case 'sqrt':
-          return vectorizeUnary(args[0], (value) => Math.sqrt(Number(value ?? 0)));
-        case 'abs':
-          return vectorizeUnary(args[0], (value) => Math.abs(Number(value ?? 0)));
-        case 'exp':
-          return vectorizeUnary(args[0], (value) => Math.exp(Number(value ?? 0)));
-        case 'log':
-          return vectorizeUnary(args[0], (value) => Math.log(Number(value ?? 0)));
-        case 'neg':
-          return vectorizeUnary(args[0], (value) => -Number(value ?? 0));
-        case 'reciprocal':
-          return vectorizeUnary(args[0], (value) => 1 / Number(value ?? 0));
-        case 'signum':
-          return vectorizeUnary(args[0], (value) => {
-            const numeric = Number(value ?? 0);
-            return numeric > 0 ? 1 : numeric < 0 ? -1 : 0;
-          });
-        default:
-          throw new Error(`Unsupported builtin \`${name}\`.`);
-      }
-    },
-    call(callee: unknown, name: string | null, args: unknown[]) {
-      if (typeof callee === 'function') {
-        return callee(...args);
-      }
-
-      if (Array.isArray(callee) && args.length === 1) {
-        const indexValue = args[0];
-        if (Array.isArray(indexValue)) {
-          return indexValue.map((entry) => callee[normalizeIndex(entry, callee.length)]);
-        }
-        return callee[normalizeIndex(indexValue, callee.length)];
-      }
-
-      if (isPlainObject(callee) && args.length === 1 && typeof args[0] === 'string') {
-        return (callee as Record<string, unknown>)[args[0]];
-      }
-
-      throw new Error(name ? `Unsupported q call target \`${name}\`.` : 'Unsupported q call target.');
-    },
-    each(name: string, value: unknown) {
-      return vectorizeUnary(value, (entry) => helpers.callBuiltin(name, [entry]));
-    },
-    cond(branches: Array<{ condition: unknown; value: unknown }>, elseValue: unknown) {
-      for (const branch of branches) {
-        if (isTruthy(branch.condition)) {
-          return branch.value;
-        }
-      }
-      return elseValue;
-    },
-    op(op: string, left: unknown, right: unknown) {
-      switch (op) {
-        case '!':
-          return dictionaryFrom(left, right);
-        case '#':
-          return replicate(left, right);
-        case '~':
-          return deepEqual(left, right);
-        case '+':
-          return mapBinary(left, right, (a, b) => Number(a ?? 0) + Number(b ?? 0));
-        case '-':
-          return mapBinary(left, right, (a, b) => Number(a ?? 0) - Number(b ?? 0));
-        case '*':
-          return mapBinary(left, right, (a, b) => Number(a ?? 0) * Number(b ?? 0));
-        case '%':
-          return mapBinary(left, right, (a, b) => Number(a ?? 0) / Number(b ?? 1));
-        case 'div':
-          return mapBinary(left, right, (a, b) => Math.floor(Number(a ?? 0) / Number(b ?? 1)));
-        case 'mod':
-          return mapBinary(left, right, (a, b) => {
-            const divisor = Number(b ?? 1) || 1;
-            const dividend = Number(a ?? 0);
-            return ((dividend % divisor) + divisor) % divisor;
-          });
-        default:
-          throw new Error(`Unsupported q operator \`${op}\`.`);
-      }
-    },
-  };
-
-  return helpers;
-}
-
 function emitStdout(text: string) {
   const value = text.trimEnd();
   if (!value) return;
@@ -660,87 +549,6 @@ function emitStdout(text: string) {
     type: 'stdout',
     value,
   } satisfies RuntimeResponse);
-}
-
-function vectorizeUnary(value: unknown, fn: (entry: unknown) => unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map((entry) => fn(entry));
-  }
-  return fn(value);
-}
-
-function razeOnce(value: unknown): unknown {
-  if (!Array.isArray(value)) return value;
-  const result: unknown[] = [];
-  for (const entry of value) {
-    if (Array.isArray(entry)) {
-      result.push(...entry);
-    } else {
-      result.push(entry);
-    }
-  }
-  return result;
-}
-
-function toNumericArray(value: unknown): number[] {
-  if (Array.isArray(value)) {
-    return value.map((entry) => Number(entry ?? 0));
-  }
-  return value == null ? [] : [Number(value)];
-}
-
-function reduceNumeric(value: unknown, fn: (a: number, b: number) => number, seed: number) {
-  const arr = toNumericArray(value);
-  if (arr.length === 0) return seed === Number.POSITIVE_INFINITY || seed === Number.NEGATIVE_INFINITY ? null : seed;
-  return arr.reduce((acc, entry) => fn(acc, entry), seed);
-}
-
-function dictionaryFrom(left: unknown, right: unknown) {
-  const keys = Array.isArray(left) ? left : [left];
-  const values = Array.isArray(right) ? right : [right];
-  const entries = keys.map((key, index) => [String(key), values[index]]);
-  return Object.fromEntries(entries);
-}
-
-function replicate(left: unknown, right: unknown) {
-  const count = Math.max(0, Math.floor(Number(left ?? 0)));
-  if (Array.isArray(right)) {
-    if (right.length === 0) {
-      return [];
-    }
-    if (right.length === 1) {
-      return Array.from({ length: count }, () => right[0]);
-    }
-    return Array.from({ length: count }, (_, index) => right[index % right.length]);
-  }
-  return Array.from({ length: count }, () => right);
-}
-
-function flipColumns(value: unknown) {
-  const columns = Array.isArray(value) ? value : [];
-  const rowCount = columns.length > 0 && Array.isArray(columns[0]) ? columns[0].length : 0;
-  return Array.from({ length: rowCount }, (_, rowIndex) => columns.map((column) => Array.isArray(column) ? column[rowIndex] : column));
-}
-
-function normalizeIndex(value: unknown, length: number) {
-  const numeric = Math.floor(Number(value ?? 0));
-  if (!Number.isFinite(numeric) || length <= 0) return 0;
-  return ((numeric % length) + length) % length;
-}
-
-function deepEqual(left: unknown, right: unknown) {
-  return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function isTruthy(value: unknown) {
-  if (Array.isArray(value)) {
-    return value.length > 0;
-  }
-  return Boolean(value);
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
 function isExplicitShowStatement(statement: string) {

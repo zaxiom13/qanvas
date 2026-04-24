@@ -1,0 +1,34 @@
+{
+  "name": "qanvas5",
+  "short_name": "qanvas5",
+  "description": "A mobile-friendly q/kdb+ creative coding studio.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F2EB",
+  "theme_color": "#EDE6DA",
+  "categories": ["developer", "graphics", "productivity"],
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "New Sketch",
+      "short_name": "New",
+      "url": "/?action=new",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Examples",
+      "short_name": "Examples",
+      "url": "/?tab=examples",
+      "icons": [{ "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+    }
+  ]
+}

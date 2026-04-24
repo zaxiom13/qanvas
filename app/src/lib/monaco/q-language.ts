@@ -1,5 +1,6 @@
 import type * as Monaco from 'monaco-editor';
 import { KDBLex } from '@qpad/language';
+import { QANVAS_COLORS } from '$lib/runtime/compiled-runtime-helpers';
 
 const registeredMonacoInstances = new WeakSet<object>();
 
@@ -239,7 +240,7 @@ const Q_CANVAS_FUNCTIONS = [
     label: 'background',
     detail: 'Qanvas draw helper',
     documentation: 'Fills the canvas background for the current frame.',
-    insertText: 'background[${1:0xF4ECD8}];',
+    insertText: 'background[${1:Color.CREAM}];',
   },
   {
     label: 'circle',
@@ -320,14 +321,14 @@ const Q_CONTEXT_SYMBOLS = [
     label: 'setup',
     detail: 'Sketch lifecycle',
     documentation: 'Runs once when the sketch starts and returns the initial config/state.',
-    insertText: 'setup:{\n  `size`bg!(${1:800 600};${2:0xF4ECD8})\n}',
+    insertText: 'setup:{\n  `size`bg!(${1:800 600};${2:Color.CREAM})\n}',
   },
   {
     label: 'draw',
     detail: 'Sketch lifecycle',
     documentation: 'Runs every frame and must return the next state.',
     insertText:
-      'draw:{[state;frameInfo;input;canvas]\n  ${1:background[0xF4ECD8];}\n  ${2:state}\n}',
+      'draw:{[state;frameInfo;input;canvas]\n  ${1:background[Color.CREAM];}\n  ${2:state}\n}',
   },
   {
     label: 'state',
@@ -415,8 +416,16 @@ const Q_CONTEXT_SYMBOLS = [
   },
 ];
 
+const Q_COLOR_SYMBOLS = Object.entries(QANVAS_COLORS).map(([name, value]) => ({
+  label: `Color.${name}`,
+  detail: 'Qanvas color',
+  documentation: `Built-in color constant, equivalent to 0x${value.toString(16).toUpperCase().padStart(6, '0')}.`,
+  insertText: `Color.${name}`,
+}));
+
 const Q_QANVAS_IDENTIFIERS = [
   ...Q_CANVAS_FUNCTIONS.map((item) => item.label),
+  ...Q_COLOR_SYMBOLS.map((item) => item.label),
   ...Q_CONTEXT_SYMBOLS.map((item) => item.label).filter((label) => /^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(label)),
 ];
 
@@ -426,20 +435,20 @@ const Q_SLASH_SNIPPETS = [
     detail: 'Snippet',
     documentation: 'Creates a complete setup/draw sketch scaffold.',
     insertText:
-      'setup:{\n  `size`bg!(${1:800 600};${2:0xF4ECD8})\n}\n\ndraw:{[state;frameInfo;input;canvas]\n  background[${2:0xF4ECD8}];\n  ${3:state}\n}\n',
+      'setup:{\n  `size`bg!(${1:800 600};${2:Color.CREAM})\n}\n\ndraw:{[state;frameInfo;input;canvas]\n  background[${2:Color.CREAM}];\n  ${3:state}\n}\n',
   },
   {
     label: '/setup',
     detail: 'Snippet',
     documentation: 'Creates a setup function scaffold.',
-    insertText: 'setup:{\n  `size`bg!(${1:800 600};${2:0xF4ECD8})\n}',
+    insertText: 'setup:{\n  `size`bg!(${1:800 600};${2:Color.CREAM})\n}',
   },
   {
     label: '/draw',
     detail: 'Snippet',
     documentation: 'Creates a draw function scaffold.',
     insertText:
-      'draw:{[state;frameInfo;input;canvas]\n  ${1:background[0xF4ECD8];}\n  ${2:state}\n}',
+      'draw:{[state;frameInfo;input;canvas]\n  ${1:background[Color.CREAM];}\n  ${2:state}\n}',
   },
   {
     label: '/function',
@@ -451,42 +460,42 @@ const Q_SLASH_SNIPPETS = [
     label: '/background',
     detail: 'Snippet',
     documentation: 'Inserts a background command.',
-    insertText: 'background[${1:0xF4ECD8}];',
+    insertText: 'background[${1:Color.CREAM}];',
   },
   {
     label: '/circle',
     detail: 'Snippet',
     documentation: 'Inserts a circle command scaffold.',
     insertText:
-      'circle[([]\n  p:enlist ${1:0.5*canvas`size};\n  r:enlist ${2:44};\n  fill:enlist ${3:0x5B6FE8};\n  alpha:enlist ${4:0.92}\n)];',
+      'circle[([]\n  p:enlist ${1:0.5*canvas`size};\n  r:enlist ${2:44};\n  fill:enlist ${3:Color.BLUE};\n  alpha:enlist ${4:0.92}\n)];',
   },
   {
     label: '/rect',
     detail: 'Snippet',
     documentation: 'Inserts a rectangle command scaffold.',
     insertText:
-      'rect[([]\n  p:enlist ${1:0 0};\n  s:enlist ${2:120 80};\n  fill:enlist ${3:0xC4956E};\n  alpha:enlist ${4:1}\n)];',
+      'rect[([]\n  p:enlist ${1:0 0};\n  s:enlist ${2:120 80};\n  fill:enlist ${3:Color.GOLD};\n  alpha:enlist ${4:1}\n)];',
   },
   {
     label: '/pixel',
     detail: 'Snippet',
     documentation: 'Inserts a pixel command scaffold.',
     insertText:
-      'pixel[([]\n  p:enlist ${1:0 0};\n  fill:enlist ${2:0x5B6FE8};\n  alpha:enlist ${3:1}\n)];',
+      'pixel[([]\n  p:enlist ${1:0 0};\n  fill:enlist ${2:Color.BLUE};\n  alpha:enlist ${3:1}\n)];',
   },
   {
     label: '/line',
     detail: 'Snippet',
     documentation: 'Inserts a line command scaffold.',
     insertText:
-      'line[([]\n  p:enlist ${1:0 0};\n  p2:enlist ${2:100 100};\n  stroke:enlist ${3:0x2C2520};\n  width:enlist ${4:2}\n)];',
+      'line[([]\n  p:enlist ${1:0 0};\n  p2:enlist ${2:100 100};\n  stroke:enlist ${3:Color.INK};\n  width:enlist ${4:2}\n)];',
   },
   {
     label: '/text',
     detail: 'Snippet',
     documentation: 'Inserts a text command scaffold.',
     insertText:
-      'text[([]\n  p:enlist ${1:40 40};\n  text:enlist ${2:"hello"};\n  fill:enlist ${3:0x2C2520};\n  alpha:enlist ${4:1}\n)];',
+      'text[([]\n  p:enlist ${1:40 40};\n  text:enlist ${2:"hello"};\n  fill:enlist ${3:Color.INK};\n  alpha:enlist ${4:1}\n)];',
   },
   {
     label: '/image',
@@ -604,6 +613,13 @@ function getSlashSnippetRange(monaco: typeof Monaco, model: Monaco.editor.ITextM
   return new monaco.Range(position.lineNumber, position.column - match[0].length, position.lineNumber, position.column);
 }
 
+function getColorCompletionRange(monaco: typeof Monaco, model: Monaco.editor.ITextModel, position: Monaco.Position, fallback: Monaco.Range) {
+  const lineContent = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
+  const match = lineContent.match(/Color\.[A-Z_]*$/);
+  if (!match) return fallback;
+  return new monaco.Range(position.lineNumber, position.column - match[0].length, position.lineNumber, position.column);
+}
+
 export function registerQLanguage(monaco: typeof Monaco) {
   if (registeredMonacoInstances.has(monaco)) return;
   registeredMonacoInstances.add(monaco);
@@ -640,6 +656,7 @@ export function registerQLanguage(monaco: typeof Monaco) {
       const word = model.getWordUntilPosition(position);
       const wordRange = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
       const slashRange = getSlashSnippetRange(monaco, model, position);
+      const colorRange = getColorCompletionRange(monaco, model, position, wordRange);
 
       const suggestions = dedupeSuggestions([
         ...Q_SLASH_SNIPPETS.map((item) => ({
@@ -674,6 +691,15 @@ export function registerQLanguage(monaco: typeof Monaco) {
             : undefined,
           range: wordRange,
           sortText: `2_${item.label}`,
+        })),
+        ...Q_COLOR_SYMBOLS.map((item) => ({
+          label: item.label,
+          kind: monaco.languages.CompletionItemKind.Color,
+          detail: item.detail,
+          documentation: { value: item.documentation },
+          insertText: item.insertText,
+          range: colorRange,
+          sortText: `2_color_${item.label}`,
         })),
         ...Q_BUILTIN_FUNCTIONS.map((label) => ({
           label,

@@ -16,52 +16,282 @@
     );
   }
 
-  function parseWithParserMethod(options, start, methodName, stopIdentifiers, stopOperators) {
-    const P = options.Parser;
-    const pr = new P(options.tokens);
-    pr.index = start;
-
-    const run = () => pr[methodName]();
-    const withStops = stopIdentifiers?.length
-      ? () => pr.withStopIdentifiers(stopIdentifiers, runWithOperatorStops)
-      : runWithOperatorStops;
-
-    function runWithOperatorStops() {
-      return stopOperators?.length ? pr.withStopOperators(stopOperators, run) : run();
-    }
-
-    const node = withStops();
-    options._pendingParse = { start, end: pr.index, node };
-    return true;
-  }
-
-  function pendingParseNeedsMore(options, index) {
-    const pending = options._pendingParse;
-    return !!pending && index < pending.end;
-  }
-
-  function finishPendingParse(options, start, end) {
-    const pending = options._pendingParse;
-    if (!pending) {
-      throw new Error("Missing pending parse");
-    }
-    if (pending.start !== start || pending.end !== end) {
-      throw new Error(`Pending parse range mismatch: expected ${pending.start}-${pending.end}, got ${start}-${end}`);
-    }
-    options._pendingParse = null;
-    return pending.node;
-  }
-
   function toSelectColumn(value) {
     return value.kind === "assign" ? { name: value.name, value: value.value } : { name: null, value };
   }
 
-  function toUpdateClause(value) {
+  function offsetToPosition(source, offset) {
+    let line = 1;
+    let column = 1;
+    for (let index = 0; index < offset && index < source.length; index += 1) {
+      if (source[index] === "\n") {
+        line += 1;
+        column = 1;
+      } else {
+        column += 1;
+      }
+    }
+    return { line, column, offset };
+  }
+
+  function buildParseLocationError(options, tokenIndex, message) {
+    const source = options.source ?? "";
+    const token = tokenAt(options, tokenIndex);
+    const start = Math.min(token.start ?? source.length, source.length);
+    const end = Math.min(token.end ?? start, source.length);
+    const error = new Error(message);
+    error.location = {
+      start: offsetToPosition(source, start),
+      end: offsetToPosition(source, end)
+    };
+    return error;
+  }
+
+  function toUpdateClause(value, options, tokenIndex) {
     if (value.kind !== "assign") {
-      throw new Error("update expects assignment clauses");
+      throw buildParseLocationError(options, tokenIndex, "update expects assignment clauses");
     }
     return { name: value.name, value: value.value };
   }
+
+  function isCallableAst(node) {
+    return (
+      node.kind === "identifier" ||
+      node.kind === "lambda" ||
+      node.kind === "call" ||
+      node.kind === "group" ||
+      node.kind === "list" ||
+      node.kind === "table" ||
+      node.kind === "keyedTable"
+    );
+  }
+
+  function isMonadCallee(node) {
+    if (node.kind === "identifier" && MONAD_NAMES.has(node.name)) return true;
+    return node.kind === "group" &&
+      node.value?.kind === "identifier" &&
+      (MONAD_NAMES.has(node.value.name) || isDerivedAdverbName(node.value.name));
+  }
+
+  function isDerivedAdverbName(name) {
+    return /^[^a-zA-Z_\s]+[/\\]$/.test(name) && name.length >= 2;
+  }
+
+  function isWordDiad(value) {
+    return [
+      "and", "cross", "cut", "div", "mavg", "mcount", "mdev", "msum", "in",
+      "except", "inter", "like", "mod", "or", "over", "prior", "rotate",
+      "scan", "ss", "sublist", "sv", "union", "vs", "within", "xbar", "xcol",
+      "xexp", "xlog", "xasc", "xdesc", "xkey", "xgroup", "lj", "ljf", "ij",
+      "uj", "pj", "asof", "mmu", "wsum", "wavg", "bin", "binr", "xcols",
+      "insert", "upsert", "peach", "set"
+    ].includes(value);
+  }
+
+  function isAssignmentOperator(value) {
+    return value.length > 1 && value.endsWith(":") && value !== "::";
+  }
+
+  const MONAD_NAMES = new Set([
+    "abs", "all", "any", "avgs", "til", "ceiling", "cols", "count", "desc",
+    "differ", "exp", "fills", "first", "last", "log", "min", "mins", "max",
+    "maxs", "med", "asc", "iasc", "idesc", "asin", "atan", "sum", "avg",
+    "acos", "sin", "cos", "tan", "floor", "null", "reciprocal", "reverse",
+    "signum", "sqrt", "neg", "not", "enlist", "distinct", "attr", "flip",
+    "group", "key", "keys", "lower", "ltrim", "next", "upper", "prd", "prds",
+    "prev", "raze", "ratios", "rtrim", "var", "svar", "dev", "sdev", "deltas",
+    "trim", "sums", "string", "type", "where", "value", "show", "+/", "+\\",
+    "system", "hopen", "hclose", "hcount", "hdel", "read0", "read1", "inv",
+    "rank", "rand", "hsym", "get", "getenv", "gtime", "ltime", "parse", "eval",
+    "tables", "views"
+  ]);
+
+  function isTerminator(options, index) {
+    const token = tokenAt(options, index);
+    return token.kind === "eof" ||
+      token.kind === "separator" ||
+      token.kind === "newline" ||
+      token.kind === "rparen" ||
+      token.kind === "rbracket" ||
+      token.kind === "rbrace";
+  }
+
+  function pushClauseStops(options, identifiers, operators) {
+    options._clauseStopIdentifiers ??= [];
+    options._clauseStopOperators ??= [];
+    options._clauseStopIdentifiers.push(new Set(identifiers));
+    options._clauseStopOperators.push(new Set(operators));
+    return true;
+  }
+
+  function popClauseStops(options) {
+    options._clauseStopIdentifiers?.pop();
+    options._clauseStopOperators?.pop();
+    return true;
+  }
+
+  function isClauseStop(options, index) {
+    const token = tokenAt(options, index);
+    if (
+      token.kind === "operator" &&
+      options._clauseStopOperators?.some((stops) => stops.has(token.value))
+    ) {
+      return true;
+    }
+    return token.kind === "identifier" &&
+      options._clauseStopIdentifiers?.some((stops) => stops.has(token.value));
+  }
+
+  function buildControlOrCall(callee, args) {
+    if (callee.kind === "identifier") {
+      if (callee.name === "if") {
+        if (args.length < 2) throw new Error("if expects a condition and at least one body expression");
+        return { kind: "if", condition: args[0], body: args.slice(1) };
+      }
+      if (callee.name === "while") {
+        if (args.length < 2) throw new Error("while expects a condition and at least one body expression");
+        return { kind: "while", condition: args[0], body: args.slice(1) };
+      }
+      if (callee.name === "do") {
+        if (args.length < 2) throw new Error("do expects a count and at least one body expression");
+        return { kind: "do", count: args[0], body: args.slice(1) };
+      }
+      if (callee.name === "$") {
+        if (args.length < 2) throw new Error("$ expects at least a condition and a result");
+        const elseValue = args.length % 2 === 1 ? args[args.length - 1] : null;
+        const branchArgs = elseValue ? args.slice(0, -1) : args;
+        const branches = [];
+        for (let index = 0; index < branchArgs.length; index += 2) {
+          if (!branchArgs[index] || !branchArgs[index + 1]) throw new Error("$ expects condition/result pairs");
+          branches.push({ condition: branchArgs[index], value: branchArgs[index + 1] });
+        }
+        return { kind: "cond", branches, elseValue };
+      }
+    }
+    return { kind: "call", callee, args };
+  }
+
+  function applySuffix(callee, suffix) {
+    if (suffix.kind === "bracket") return buildControlOrCall(callee, suffix.args);
+    if (suffix.kind === "eachBracket") return { kind: "eachCall", callee, args: suffix.args };
+    if (suffix.kind === "adverbBracket") {
+      return {
+        kind: "call",
+        callee: { kind: "identifier", name: suffix.adverb },
+        args: [callee, ...suffix.args]
+      };
+    }
+    return callee;
+  }
+
+  function collapseAdjacentCallChain(items) {
+    if (items.length < 2 || !isCallableAst(items[0])) return null;
+    const [head, ...rest] = items;
+    const nested = collapseAdjacentCallChain(rest);
+    const arg = nested ?? (rest.length === 1 ? rest[0] : { kind: "vector", items: rest });
+    return { kind: "call", callee: head, implicit: true, args: [arg] };
+  }
+
+  function buildAdjacent(callee, adjacent) {
+    if (adjacent.length === 0) return callee;
+    if (callee.kind === "string") {
+      return {
+        kind: "call",
+        callee,
+        implicit: true,
+        args: [adjacent.length === 1 ? adjacent[0] : { kind: "vector", items: adjacent }]
+      };
+    }
+    if (isCallableAst(callee)) {
+      if (callee.kind === "identifier" && MONAD_NAMES.has(callee.name)) {
+        return {
+          kind: "call",
+          callee,
+          implicit: true,
+          args: [adjacent.length === 1 ? adjacent[0] : { kind: "vector", items: adjacent }]
+        };
+      }
+      if (callee.kind === "group" && adjacent.length === 1 && adjacent[0]?.kind === "list") {
+        return { kind: "call", callee, implicit: true, args: adjacent[0].items };
+      }
+      const chained =
+        callee.kind === "identifier" || callee.kind === "lambda" || callee.kind === "group"
+          ? collapseAdjacentCallChain(adjacent)
+          : null;
+      if (chained) return { kind: "call", callee, implicit: true, args: [chained] };
+      return { kind: "call", callee, implicit: true, args: adjacent };
+    }
+    return { kind: "vector", items: [callee, ...adjacent] };
+  }
+
+  function pushBinaryIntoImplicitCall(node, op, right) {
+    if (node.kind !== "call" || !node.implicit || node.args.length === 0) {
+      return { kind: "binary", op, left: node, right };
+    }
+    if (node.args.length > 1) {
+      return {
+        ...node,
+        args: [
+          {
+            kind: "binary",
+            op,
+            left: { kind: "vector", items: node.args },
+            right
+          }
+        ]
+      };
+    }
+    const args = node.args.slice();
+    args[args.length - 1] = pushBinaryIntoImplicitCall(args[args.length - 1], op, right);
+    return { ...node, args };
+  }
+
+  function extendOperatorName(options, start, base) {
+    let index = start;
+    let name = base;
+    while (tokenMatches(options, index, "operator")) {
+      const suffix = tokenAt(options, index).value;
+      if (suffix === "':" && !name.endsWith(":")) {
+        name += suffix; index += 1; continue;
+      }
+      if (suffix === "'" && !name.endsWith("'") && !name.endsWith(":")) {
+        name += suffix; index += 1; continue;
+      }
+      if ((suffix === "/" || suffix === "\\") && !name.endsWith("/") && !name.endsWith("\\")) {
+        name += suffix; index += 1; continue;
+      }
+      if (suffix === "/:" || suffix === "\\:") {
+        name += suffix; index += 1; continue;
+      }
+      break;
+    }
+    options._operatorParse = { end: index, name };
+    return true;
+  }
+
+  function renderPegAst(node) {
+    switch (node.kind) {
+      case "return": return `:${renderPegAst(node.value)}`;
+      case "assign": return `${node.name}:${renderPegAst(node.value)}`;
+      case "assignGlobal": return `${node.name}::${renderPegAst(node.value)}`;
+      case "identifier": return node.name;
+      case "number":
+      case "date":
+      case "string":
+      case "symbol": return node.value;
+      case "boolean": return node.value ? "1b" : "0b";
+      case "null": return "0N";
+      case "placeholder": return "";
+      case "vector": return node.items.map(renderPegAst).join(" ");
+      case "list": return `(${node.items.map(renderPegAst).join(";")})`;
+      case "group": return `(${renderPegAst(node.value)})`;
+      case "binary": return `${renderPegAst(node.left)}${node.op}${renderPegAst(node.right)}`;
+      case "call": return `${renderPegAst(node.callee)}[${node.args.map(renderPegAst).join(";")}]`;
+      case "each": return `${renderPegAst(node.callee)} each ${renderPegAst(node.arg)}`;
+      default: return "";
+    }
+  }
+
 }
 
 start
@@ -74,6 +304,10 @@ start
         source: options.source
       };
     }
+
+ExpressionStart
+  = value:Expression EOFToken
+    { return value; }
 
 Program
   = Gap statements:(NonEof list:StatementList { return list; })? Gap
@@ -94,7 +328,7 @@ Statement
 ReturnStatement
   = &{ return isReturnStart(options, location().start.offset); }
     OperatorColon
-    value:ParsedExpression
+    value:Expression
     {
       return { kind: "return", value };
     }
@@ -104,7 +338,7 @@ SelectStatement
     columns:SelectColumns?
     by:ByClause?
     KeywordFrom
-    source:ParsedAssignmentStopWhere
+    source:ExpressionStopWhere
     where:WhereClause?
     {
       return { kind: "select", columns: columns ?? null, by: by ?? null, source, where: where ?? null };
@@ -112,10 +346,10 @@ SelectStatement
 
 ExecStatement
   = KeywordExec
-    value:ParsedAssignmentStopByFrom
+    value:ExpressionStopByFrom
     by:ByClause?
     KeywordFrom
-    source:ParsedAssignmentStopWhere
+    source:ExpressionStopWhere
     where:WhereClause?
     {
       return { kind: "exec", value, by: by ?? null, source, where: where ?? null };
@@ -125,7 +359,7 @@ UpdateStatement
   = KeywordUpdate
     updates:UpdateClauses
     KeywordFrom
-    source:ParsedAssignmentStopWhere
+    source:ExpressionStopWhere
     where:WhereClause?
     {
       return { kind: "update", updates, source, where: where ?? null };
@@ -135,14 +369,269 @@ DeleteStatement
   = KeywordDelete
     columns:DeleteColumns?
     KeywordFrom
-    source:ParsedAssignmentStopWhere
+    source:ExpressionStopWhere
     where:WhereClause?
     {
       return { kind: "delete", columns: columns ?? null, source, where: where ?? null };
     }
 
 GenericStatement
-  = value:ParsedStatement { return value; }
+  = value:Expression { return value; }
+
+Expression
+  = QsqlExpression
+  / Assignment
+
+QsqlExpression
+  = SelectStatement
+  / ExecStatement
+  / UpdateStatement
+  / DeleteStatement
+
+Assignment
+  = name:IdentifierToken OperatorDoubleColon value:Expression
+    { return { kind: "assignGlobal", name, value }; }
+  / name:IdentifierToken op:AssignmentOperator value:Expression
+    {
+      if (op === ":") return { kind: "assign", name, value };
+      return {
+        kind: "assign",
+        name,
+        value: {
+          kind: "binary",
+          op: op.slice(0, -1),
+          left: { kind: "identifier", name },
+          right: value
+        }
+      };
+    }
+  / Binary
+
+Binary
+  = left:Application !ClauseStop DiadicOperator bad:OperatorExpressionTerminator
+    { throw buildParseLocationError(options, bad, "Expected expression after operator"); }
+  / left:Application tail:(
+      !ClauseStop op:DiadicOperator &{ return isTerminator(options, location().start.offset); }
+        { return { op, postfix: true }; }
+    / !ClauseStop op:DiadicOperator right:Expression
+        { return { op, right }; }
+    )?
+    {
+      if (!tail) return left;
+      if (tail.postfix) return { kind: "call", callee: { kind: "identifier", name: tail.op }, args: [left] };
+      return pushBinaryIntoImplicitCall(left, tail.op, tail.right);
+    }
+
+OperatorExpressionTerminator
+  = &{
+      const token = tokenAt(options, location().start.offset);
+      return token.kind === "newline" || token.kind === "eof";
+    }
+    "" { return location().start.offset; }
+
+Application
+  = callee:PostfixPrimary tail:(
+      EachKeyword arg:Assignment
+        { return { kind: "each", arg }; }
+    / &{ return isMonadCallee(callee) && !(tokenMatches(options, location().start.offset, "identifier") && isWordDiad(tokenAt(options, location().start.offset).value)); } arg:Assignment
+        { return { kind: "monad", arg }; }
+    / adjacent:AdjacentPrimary*
+        { return { kind: "adjacent", adjacent }; }
+    )
+    {
+      if (tail.kind === "each") return { kind: "each", callee, arg: tail.arg };
+      if (tail.kind === "monad") {
+        return { kind: "call", callee, implicit: true, args: [callee.kind === "group" && tail.arg.kind === "list" ? tail.arg.items : tail.arg].flat() };
+      }
+      return buildAdjacent(callee, tail.adjacent);
+    }
+
+PostfixPrimary
+  = base:Primary suffixes:CallSuffix*
+    {
+      return suffixes.reduce((node, suffix) => applySuffix(node, suffix), base);
+    }
+
+CallSuffix
+  = args:BracketArgs
+    { return { kind: "bracket", args }; }
+  / OperatorEach args:BracketArgs
+    { return { kind: "eachBracket", args }; }
+  / adverb:AdverbOperator args:BracketArgs
+    { return { kind: "adverbBracket", adverb, args }; }
+
+AdjacentPrimary
+  = !ClauseStop
+    !{ return tokenMatches(options, location().start.offset, "operator"); }
+    !{ return tokenMatches(options, location().start.offset, "identifier") && isWordDiad(tokenAt(options, location().start.offset).value); }
+    value:MonadicAdjacent { return value; }
+  / !ClauseStop
+    !{ return tokenMatches(options, location().start.offset, "operator"); }
+    !{ return tokenMatches(options, location().start.offset, "identifier") && isWordDiad(tokenAt(options, location().start.offset).value); }
+    value:PostfixPrimary { return value; }
+
+MonadicAdjacent
+  = name:IdentifierToken
+    &{ return MONAD_NAMES.has(name); }
+    arg:Assignment
+    { return { kind: "call", callee: { kind: "identifier", name }, implicit: true, args: [arg] }; }
+
+Primary
+  = NumberLiteral
+  / DateLiteral
+  / StringLiteral
+  / SymbolLiteral
+  / BooleanLiteral
+  / BoolVectorLiteral
+  / NullLiteral
+  / Lambda
+  / TableOrGroup
+  / OperatorValue
+  / name:IdentifierToken { return { kind: "identifier", name }; }
+
+TableOrGroup
+  = TokenLParen TokenRParen
+    { return { kind: "list", items: [] }; }
+  / TokenLParen TokenLBracket TokenRBracket AutoColumnReset columns:ColumnDefinitions TokenRParen
+    { return { kind: "table", columns }; }
+  / TokenLParen TokenLBracket AutoColumnReset keys:ColumnDefinitions TokenRBracket Separator? AutoColumnReset values:ColumnDefinitions TokenRParen
+    { return { kind: "keyedTable", keys, values }; }
+  / TokenLParen first:Expression tail:(Separator item:Expression { return item; })+ Separator? TokenRParen
+    { return { kind: "list", items: [first, ...tail] }; }
+  / TokenLParen value:Expression TokenRParen
+    { return { kind: "group", value }; }
+
+ColumnDefinitions
+  = head:ColumnDefinition? tail:(Separator column:ColumnDefinition? { return column; })*
+    { return [head, ...tail].filter(Boolean); }
+
+AutoColumnReset
+  = "" { options._autoColumnCount = 0; return null; }
+
+ColumnDefinition
+  = name:IdentifierToken OperatorColon value:Expression
+    { return { name, value }; }
+  / name:IdentifierToken
+    { return { name, value: { kind: "identifier", name } }; }
+  / value:Expression
+    {
+      const count = options._autoColumnCount ?? 0;
+      options._autoColumnCount = count + 1;
+      return { name: count === 0 ? "x" : `x${count}`, value };
+    }
+
+Lambda
+  = TokenLBrace params:LambdaParams? body:LambdaBody? &{ return tokenMatches(options, location().start.offset, "rbrace"); } .
+    {
+      const bodyNodes = body ?? [];
+      return {
+        kind: "lambda",
+        params: params ?? null,
+        body: bodyNodes,
+        source: "{" + (params ? "[" + params.join(";") + "]" : "") + bodyNodes.map(renderPegAst).join("") + "}"
+      };
+    }
+
+LambdaParams
+  = TokenLBracket TokenRBracket
+    { return []; }
+  / TokenLBracket head:IdentifierToken tail:(Separator name:IdentifierToken { return name; })* TokenRBracket
+    { return [head, ...tail]; }
+
+LambdaBody
+  = Gap head:LambdaStatement tail:(StatementBreak NonEof stmt:LambdaStatement { return stmt; })* Gap
+    { return [head, ...tail]; }
+
+LambdaStatement
+  = ReturnStatement
+  / Expression
+
+BracketArgs
+  = TokenLBracket args:BracketArgList? TokenRBracket
+    { return args ?? []; }
+
+BracketArgList
+  = head:BracketArg tail:(Separator arg:BracketArg { return arg; })* trailing:Separator?
+    {
+      const args = [head, ...tail];
+      if (trailing) args.push({ kind: "placeholder" });
+      return args;
+    }
+
+BracketArg
+  = left:Application op:DiadicOperator &{ return tokenMatches(options, location().start.offset, "separator") || tokenMatches(options, location().start.offset, "rbracket"); }
+    { return { kind: "call", callee: { kind: "identifier", name: op }, args: [left] }; }
+  / &Separator { return { kind: "placeholder" }; }
+  / Expression
+
+NumberLiteral
+  = value:TokenNumber { return { kind: "number", value }; }
+
+DateLiteral
+  = value:TokenDate { return { kind: "date", value }; }
+
+StringLiteral
+  = value:TokenString { return { kind: "string", value }; }
+
+SymbolLiteral
+  = value:TokenSymbol { return { kind: "symbol", value }; }
+
+BooleanLiteral
+  = value:TokenBoolean { return { kind: "boolean", value: value === "1b" }; }
+
+BoolVectorLiteral
+  = value:TokenBoolVector
+    {
+      return {
+        kind: "vector",
+        items: [...value.slice(0, -1)].map((digit) => ({ kind: "boolean", value: digit === "1" }))
+      };
+    }
+
+NullLiteral
+  = &{ return tokenMatches(options, location().start.offset, "null"); }
+    .
+    { return { kind: "null" }; }
+
+OperatorValue
+  = op:ExtendedOperator
+    { return { kind: "identifier", name: op }; }
+
+DiadicOperator
+  = WordDiadOperator
+  / ExtendedOperator
+
+AssignmentOperator
+  = op:TokenOperator
+    &{ return tokenAt(options, location().start.offset - 1).value === ":" || isAssignmentOperator(op); }
+    { return op; }
+
+ExtendedOperator
+  = base:TokenOperator
+    &{ return base !== ";" && !(base === ":" && !tokenMatches(options, location().start.offset, "lbracket") && !tokenMatches(options, location().start.offset, "operator", ":")); }
+    &{ return extendOperatorName(options, location().start.offset, base); }
+    ConsumedOperatorExtension
+    { return options._operatorParse.name; }
+
+ConsumedOperatorExtension
+  = &{ return location().start.offset < options._operatorParse.end; } . ConsumedOperatorExtension
+  / &{ return location().start.offset >= options._operatorParse.end; } ""
+
+AdverbOperator
+  = op:TokenOperator
+    &{ return op === "/" || op === "\\"; }
+    { return op; }
+
+OperatorEach = &{ return tokenMatches(options, location().start.offset, "operator", "'"); } . { return "'"; }
+EachKeyword = &{ return tokenMatches(options, location().start.offset, "identifier", "each"); } . { return "each"; }
+
+WordDiadOperator
+  = value:TokenIdentifierAny
+    &{ return isWordDiad(value); }
+    { return value; }
+
+ClauseStop
+  = &{ return isClauseStop(options, location().start.offset); } ""
 
 SelectColumns
   = &{
@@ -161,12 +650,12 @@ ByClause
     }
 
 WhereClause
-  = KeywordWhere value:ParsedExpression
+  = KeywordWhere value:WhereExpressions
     { return value; }
 
 UpdateClauses
   = values:CommaSeparatedAssignmentsStopFrom
-    { return values.map(toUpdateClause); }
+    { return values.map((value) => toUpdateClause(value, options, location().start.offset)); }
 
 DeleteColumns
   = &{ return !tokenMatches(options, location().start.offset, "identifier", "from"); }
@@ -177,102 +666,52 @@ DeleteColumns
     }
 
 CommaSeparatedAssignmentsStopByFrom
-  = head:ParsedAssignmentStopCommaByFrom
-    tail:(OperatorComma value:ParsedAssignmentStopCommaByFrom { return value; })*
+  = head:ExpressionStopCommaByFrom
+    tail:(OperatorComma value:ExpressionStopCommaByFrom { return value; })*
     {
       return [head, ...tail];
     }
 
 CommaSeparatedAssignmentsStopFrom
-  = head:ParsedAssignmentStopCommaFrom
-    tail:(OperatorComma value:ParsedAssignmentStopCommaFrom { return value; })*
+  = head:ExpressionStopCommaFrom
+    tail:(OperatorComma value:ExpressionStopCommaFrom { return value; })*
     {
       return [head, ...tail];
     }
 
-ParsedStatement
-  = &{ return parseWithParserMethod(options, location().start.offset, "parseStatement"); }
-    ConsumedPendingParse
-    {
-      return finishPendingParse(options, location().start.offset, location().end.offset);
-    }
+ExpressionStopWhere
+  = &{ return pushClauseStops(options, ["where"], []); }
+    value:Assignment
+    &{ return popClauseStops(options); }
+    { return value; }
 
-ParsedExpression
-  = &{
-      return parseWithParserMethod(
-        options,
-        location().start.offset,
-        "parseExpression"
-      );
-    }
-    ConsumedPendingParse
-    {
-      return finishPendingParse(options, location().start.offset, location().end.offset);
-    }
+ExpressionStopByFrom
+  = &{ return pushClauseStops(options, ["by", "from"], []); }
+    value:Assignment
+    &{ return popClauseStops(options); }
+    { return value; }
 
-ParsedAssignmentStopWhere
-  = &{
-      return parseWithParserMethod(
-        options,
-        location().start.offset,
-        "parseAssignment",
-        ["where"]
-      );
-    }
-    ConsumedPendingParse
-    {
-      return finishPendingParse(options, location().start.offset, location().end.offset);
-    }
+ExpressionStopCommaByFrom
+  = &{ return pushClauseStops(options, ["by", "from"], [","]); }
+    value:Assignment
+    &{ return popClauseStops(options); }
+    { return value; }
 
-ParsedAssignmentStopByFrom
-  = &{
-      return parseWithParserMethod(
-        options,
-        location().start.offset,
-        "parseAssignment",
-        ["by", "from"]
-      );
-    }
-    ConsumedPendingParse
-    {
-      return finishPendingParse(options, location().start.offset, location().end.offset);
-    }
+ExpressionStopCommaFrom
+  = &{ return pushClauseStops(options, ["from"], [","]); }
+    value:Assignment
+    &{ return popClauseStops(options); }
+    { return value; }
 
-ParsedAssignmentStopCommaByFrom
-  = &{
-      return parseWithParserMethod(
-        options,
-        location().start.offset,
-        "parseAssignment",
-        ["by", "from"],
-        [","]
-      );
-    }
-    ConsumedPendingParse
-    {
-      return finishPendingParse(options, location().start.offset, location().end.offset);
-    }
+WhereExpressions
+  = head:WhereExpression tail:(OperatorComma value:WhereExpression { return value; })*
+    { return tail.length === 0 ? head : { kind: "list", items: [head, ...tail] }; }
 
-ParsedAssignmentStopCommaFrom
-  = &{
-      return parseWithParserMethod(
-        options,
-        location().start.offset,
-        "parseAssignment",
-        ["from"],
-        [","]
-      );
-    }
-    ConsumedPendingParse
-    {
-      return finishPendingParse(options, location().start.offset, location().end.offset);
-    }
-
-ConsumedPendingParse
-  = &{ return pendingParseNeedsMore(options, location().start.offset); }
-    .
-    ConsumedPendingParse
-  / &{ return !pendingParseNeedsMore(options, location().start.offset); } ""
+WhereExpression
+  = &{ return pushClauseStops(options, [], [","]); }
+    value:Assignment
+    &{ return popClauseStops(options); }
+    { return value; }
 
 StatementBreak
   = Separator+
@@ -327,9 +766,54 @@ TokenIdentifierValueWhere = &{ return tokenMatches(options, location().start.off
 
 TokenOperatorValueColon = &{ return tokenMatches(options, location().start.offset, "operator", ":"); } . { return ":"; }
 TokenOperatorValueComma = &{ return tokenMatches(options, location().start.offset, "operator", ","); } . { return ","; }
+TokenOperatorValueDoubleColon = &{ return tokenMatches(options, location().start.offset, "operator", "::"); } . { return "::"; }
 
 TokenSeparator = &{ return tokenMatches(options, location().start.offset, "separator"); } . { return ";"; }
 TokenNewline = &{ return tokenMatches(options, location().start.offset, "newline"); } . { return "\n"; }
+
+OperatorDoubleColon = TokenOperatorValueDoubleColon
+
+TokenOperator
+  = &{ return tokenMatches(options, location().start.offset, "operator"); }
+    .
+    { return tokenAt(options, location().start.offset).value; }
+
+TokenNumber
+  = &{ return tokenMatches(options, location().start.offset, "number"); }
+    .
+    { return tokenAt(options, location().start.offset).value; }
+
+TokenDate
+  = &{ return tokenMatches(options, location().start.offset, "date"); }
+    .
+    { return tokenAt(options, location().start.offset).value; }
+
+TokenString
+  = &{ return tokenMatches(options, location().start.offset, "string"); }
+    .
+    { return tokenAt(options, location().start.offset).value; }
+
+TokenSymbol
+  = &{ return tokenMatches(options, location().start.offset, "symbol"); }
+    .
+    { return tokenAt(options, location().start.offset).value; }
+
+TokenBoolean
+  = &{ return tokenMatches(options, location().start.offset, "boolean"); }
+    .
+    { return tokenAt(options, location().start.offset).value; }
+
+TokenBoolVector
+  = &{ return tokenMatches(options, location().start.offset, "boolvector"); }
+    .
+    { return tokenAt(options, location().start.offset).value; }
+
+TokenLParen = &{ return tokenMatches(options, location().start.offset, "lparen"); } . { return "("; }
+TokenRParen = &{ return tokenMatches(options, location().start.offset, "rparen"); } . { return ")"; }
+TokenLBracket = &{ return tokenMatches(options, location().start.offset, "lbracket"); } . { return "["; }
+TokenRBracket = &{ return tokenMatches(options, location().start.offset, "rbracket"); } . { return "]"; }
+TokenLBrace = &{ return tokenMatches(options, location().start.offset, "lbrace"); } . { return String.fromCharCode(123); }
+TokenRBrace = &{ return tokenMatches(options, location().start.offset, "rbrace"); } . { return String.fromCharCode(125); }
 
 EOFToken
   = &{ return tokenMatches(options, location().start.offset, "eof"); }

@@ -169,7 +169,7 @@ export type ParserTracerEvent
       readonly result: unknown;
     };
 
-export type StartRuleNames = "start";
+export type StartRuleNames = "start" | "ExpressionStart";
 export interface ParseOptions<T extends StartRuleNames = "start"> {
   /**
    * String or object that will be attached to the each `LocationRange` object
@@ -198,6 +198,11 @@ export declare const parse: typeof ParseFunction;
 // Overload of ParseFunction for each allowedStartRule
 
 declare function ParseFunction<Options extends ParseOptions<"start">>(
+  input: string,
+  options?: Options,
+): any;
+
+declare function ParseFunction<Options extends ParseOptions<"ExpressionStart">>(
   input: string,
   options?: Options,
 ): any;

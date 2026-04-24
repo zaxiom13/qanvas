@@ -99,6 +99,21 @@ describe("q engine smoke tests", () => {
     expect(formatValue(session.evaluate(".qv.v:41;.qv.v+:1;.qv.v").value)).toBe("42\n");
   });
 
+  it("reports syntax errors with line and char details", () => {
+    expect(() => parse("1+\n)")).toThrowError(/line 1, char 3 \(offset 2\)/);
+  });
+
+  it("reports parser errors with line and char details", () => {
+    expect(() => parse("update x from t")).toThrowError(/update expects assignment clauses at line 1, char \d+ \(offset \d+\)/);
+  });
+
+  it("matches q primitive adverb behavior on general lists", () => {
+    const session = createSession();
+    expect(() => session.evaluate("n:(10;30);*/ n")).toThrowError(/Primitive adverb expects a simple list/);
+    expect(formatValue(session.evaluate("n:(10;30);,/ n").value)).toBe("10 30\n");
+    expect(formatValue(session.evaluate("n:(10;30);over[*;n]").value)).toBe("300\n");
+  });
+
   it("preserves dotted namespace members across lambda execution", () => {
     const session = createSession();
     const program = [
@@ -440,11 +455,26 @@ describe("q engine smoke tests", () => {
     expect(session.evaluate("f:{show x; x+1}; f 42").formatted).toBe("42\n43\n");
     expect(session.evaluate("f:{show abs(120; -20 30); x}; f 99").formatted).toBe("120\n20 30\n99\n");
     expect(session.evaluate("show 1 2 3               / values").formatted).toBe("1 2 3\n");
+    expect(session.evaluate("show (+/) (3;5)").formatted).toBe("8\n");
     expect(session.evaluate("r:({x+y}/) each (1 2 3;4 5 6); r").formatted).toBe("6 15\n");
     expect(session.evaluate("r:({x+y} /) each (1 2 3;4 5 6); r").formatted).toBe("6 15\n");
     expect(session.evaluate("\"abcdef\" 1 0 3").formatted).toBe("\"bad\"\n");
     expect(session.evaluate("enlist 3").formatted).toBe(",3\n");
     expect(session.evaluate("/Oh what a lovely day").formatted).toBe("");
+  });
+
+  it("spreads parenthesized argument lists for grouped callables", () => {
+    const session = createSession();
+    expect(formatValue(session.evaluate("(+) (3;5)").value)).toBe("8\n");
+    expect(formatValue(session.evaluate("(+/) (3;5)").value)).toBe("8\n");
+    expect(formatValue(session.evaluate("(*/) (3;5)").value)).toBe("15\n");
+    expect(formatValue(session.evaluate("(-/) (3;5)").value)).toBe("-2\n");
+    expect(formatValue(session.evaluate("(%/) (3;5)").value)).toBe("0.6\n");
+    expect(formatValue(session.evaluate("(*\\) (3;5;7)").value)).toBe("3 15 105\n");
+    expect(formatValue(session.evaluate("*/ 3 5").value)).toBe("15\n");
+    expect(formatValue(session.evaluate("2 */ 3 4").value)).toBe("24\n");
+    expect(formatValue(session.evaluate("({x+y}) (3;5)").value)).toBe("8\n");
+    expect(formatValue(session.evaluate("({x+y+z}) (3;5;7)").value)).toBe("15\n");
   });
 
   it("supports derived over and scan forms from the reference-card syntax page", () => {

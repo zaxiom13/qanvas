@@ -9,6 +9,23 @@ state:()
 config:()
 files:()
 
+Color.INK:855327
+Color.NIGHT:329228
+Color.MIDNIGHT:724250
+Color.DEEP:528424
+Color.BLUE:5992424
+Color.SKY:8169215
+Color.GOLD:12883310
+Color.CORAL:14711378
+Color.RED:13723982
+Color.PURPLE:9202633
+Color.GREEN:5152658
+Color.CREAM:16051416
+Color.YELLOW:16769696
+Color.SOFT_YELLOW:16769720
+Color.LAVENDER:14989311
+Color.ORBIT:2500938
+
 append:{[cmd] cmds,:enlist cmd; :cmd}
 
 background:{[fill]    append `kind`fill!(`background;fill)}
@@ -34,6 +51,23 @@ reply:{[h;id;ok;val]
 emit:{[h;kind;v] neg[h] .j.j `evt`value!(kind;v)}
 
 \d .
+
+Color.INK:855327
+Color.NIGHT:329228
+Color.MIDNIGHT:724250
+Color.DEEP:528424
+Color.BLUE:5992424
+Color.SKY:8169215
+Color.GOLD:12883310
+Color.CORAL:14711378
+Color.RED:13723982
+Color.PURPLE:9202633
+Color.GREEN:5152658
+Color.CREAM:16051416
+Color.YELLOW:16769696
+Color.SOFT_YELLOW:16769720
+Color.LAVENDER:14989311
+Color.ORBIT:2500938
 
 / NOTE: init/frame live at ROOT namespace so unqualified `setup` and `draw`
 / references resolve to the user's functions, which are also defined at root.

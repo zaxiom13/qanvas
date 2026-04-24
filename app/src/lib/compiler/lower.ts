@@ -33,7 +33,7 @@ export type LoweringResult = {
   unsupported: string[];
 };
 
-const SUPPORTED_BINOPS = new Set(['!', '#', '*', '+', '-', '%', 'div', 'mod', '~']);
+const SUPPORTED_BINOPS = new Set(['!', '#', '*', '+', '-', '%', 'div', 'mod', '~', ',']);
 
 export function lowerProgram(program: ParserNode): LoweringResult {
   const diagnostics: CompileDiagnostic[] = [];
