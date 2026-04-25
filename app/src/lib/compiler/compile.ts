@@ -128,6 +128,16 @@ function emitExpression(expression: LoweredExpression): string {
 }
 
 function emitCallExpression(expression: Extract<LoweredExpression, { kind: 'call' }>) {
+  // Parser can surface dyadic `~` (match) as an implicit call with callee identifier `~`.
+  if (expression.callee.kind === 'identifier' && expression.callee.name === '~') {
+    if (expression.args.length === 1) {
+      return `rt.op("~", null, ${emitExpression(expression.args[0]!)})`;
+    }
+    if (expression.args.length === 2) {
+      return `rt.op("~", ${emitExpression(expression.args[0]!)}, ${emitExpression(expression.args[1]!)})`;
+    }
+  }
+
   const builtinName = expression.callee.kind === 'identifier' ? expression.callee.name : null;
   const args = `[${expression.args.map((entry) => emitExpression(entry)).join(', ')}]`;
 

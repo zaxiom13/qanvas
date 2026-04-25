@@ -119,6 +119,11 @@ describe("compiled example runtime", () => {
     expect(rectCommand!.data[20]!.p).toEqual([0, 40]);
   });
 
+  it("draws hello-circle with compiled null-match against mouse", () => {
+    const commands = runCompiledExample("hello-circle");
+    expect(commands.some((c) => c.kind === "circle")).toBe(true);
+  });
+
   it("supports compiled reduction families and derived primitive over/scan forms", () => {
     const source = `setup:{\`size\`bg!(800 600;0)}
 draw:{[state;frameInfo;input;canvas]
