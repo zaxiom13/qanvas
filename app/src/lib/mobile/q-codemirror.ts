@@ -1,128 +1,15 @@
 import { StreamLanguage, type StringStream } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
+import { lexKdbLex, type KdbLexToken } from '@qpad/language';
+import { classifyMobileQIdent } from '$lib/monaco/q-language';
 
-const KEYWORDS = new Set([
-  'abs',
-  'acos',
-  'aj',
-  'all',
-  'and',
-  'any',
-  'asc',
-  'asin',
-  'atan',
-  'attr',
-  'avg',
-  'avgs',
-  'bin',
-  'binr',
-  'ceiling',
-  'cols',
-  'count',
-  'cross',
-  'cut',
-  'deltas',
-  'desc',
-  'dev',
-  'differ',
-  'distinct',
-  'div',
-  'each',
-  'ej',
-  'enlist',
-  'eval',
-  'except',
-  'exec',
-  'exit',
-  'exp',
-  'fills',
-  'first',
-  'flip',
-  'floor',
-  'get',
-  'group',
-  'iasc',
-  'idesc',
-  'if',
-  'ij',
-  'in',
-  'insert',
-  'inter',
-  'inv',
-  'key',
-  'keys',
-  'last',
-  'like',
-  'lj',
-  'log',
-  'lower',
-  'max',
-  'maxs',
-  'min',
-  'mins',
-  'mod',
-  'neg',
-  'next',
-  'not',
-  'null',
-  'or',
-  'over',
-  'parse',
-  'peach',
-  'pj',
-  'prd',
-  'prds',
-  'prev',
-  'prior',
-  'rand',
-  'rank',
-  'ratios',
-  'raze',
-  'read0',
-  'read1',
-  'reciprocal',
-  'reverse',
-  'rotate',
-  'scan',
-  'select',
-  'set',
-  'show',
-  'sin',
-  'sqrt',
-  'string',
-  'sublist',
-  'sum',
-  'sums',
-  'sv',
-  'system',
-  'tables',
-  'tan',
-  'til',
-  'trim',
-  'type',
-  'uj',
-  'union',
-  'update',
-  'upper',
-  'upsert',
-  'value',
-  'var',
-  'views',
-  'vs',
-  'where',
-  'while',
-  'within',
-  'xbar',
-  'xcol',
-  'xcols',
-  'xkey',
-  'xlog',
-]);
-
+/** Maps CodeMirror stream token names → Lezer highlight tags (via tokenTable). */
 export const qHighlightStyle = {
   keyword: t.keyword,
-  atom: t.atom,
-  variableName: t.variableName,
+  builtin: t.standard(t.variableName),
+  qanvas: t.special(t.variableName),
+  identifier: t.variableName,
+  symbol: t.atom,
   number: t.number,
   string: t.string,
   comment: t.comment,
@@ -130,20 +17,80 @@ export const qHighlightStyle = {
   bracket: t.bracket,
 };
 
-type QState = {
-  string: boolean;
+type QStreamState = {
+  /** Multi-line string: opened on a previous line without a closing `"` yet. */
+  inString: boolean;
 };
 
-export const qLanguage = StreamLanguage.define<QState>({
+function mapLexToken(kind: KdbLexToken['kind'], value: string): string | null {
+  switch (kind) {
+    case 'whitespace':
+    case 'newline':
+    case 'eof':
+      return null;
+    case 'separator':
+      return 'operator';
+    case 'identifier':
+      return classifyMobileQIdent(value);
+    case 'symbol':
+      return 'symbol';
+    case 'bracket':
+      return 'bracket';
+    case 'operator':
+      return 'operator';
+    case 'date':
+      return 'number';
+    case 'number':
+    case 'boolean':
+    case 'boolvector':
+      return 'number';
+    case 'string':
+      return 'string';
+    case 'comment':
+    case 'directive':
+      return 'comment';
+    default:
+      return null;
+  }
+}
+
+function stringLiteralStillOpen(value: string) {
+  if (!value.length || value[0] !== '"') return false;
+  let escaped = false;
+  for (let i = 1; i < value.length; i += 1) {
+    const ch = value[i]!;
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === '\\') {
+      escaped = true;
+      continue;
+    }
+    if (ch === '"') return false;
+  }
+  return true;
+}
+
+export const qLanguage = StreamLanguage.define<QStreamState>({
   name: 'q',
-  startState: () => ({ string: false }),
-  token(stream: StringStream, state: QState) {
-    if (state.string) {
+  startState: () => ({ inString: false }),
+  copyState: (s) => ({ ...s }),
+  tokenTable: qHighlightStyle,
+  token(stream: StringStream, state: QStreamState) {
+    const line = stream.string;
+
+    if (state.inString) {
+      stream.start = stream.pos;
+      if (stream.eol()) {
+        stream.skipToEnd();
+        return 'string';
+      }
       let escaped = false;
       while (!stream.eol()) {
         const ch = stream.next();
         if (ch === '"' && !escaped) {
-          state.string = false;
+          state.inString = false;
           break;
         }
         escaped = ch === '\\' && !escaped;
@@ -154,35 +101,54 @@ export const qLanguage = StreamLanguage.define<QState>({
 
     if (stream.eatSpace()) return null;
 
-    if (stream.peek() === '/') {
-      const prev = stream.pos === 0 ? '' : stream.string[stream.pos - 1];
-      const next = stream.string[stream.pos + 1] ?? '';
-      if (stream.pos === 0 || prev === ';' || /\s/.test(prev)) {
-        if (next !== ':') {
-          stream.skipToEnd();
-          return 'comment';
-        }
-      }
-    }
+    const slice = line.slice(stream.pos);
+    if (!slice.length) return null;
 
-    if (stream.peek() === '"') {
-      stream.next();
-      state.string = true;
+    if (slice[0] === '"') {
+      stream.start = stream.pos;
+      let escaped = false;
+      while (!stream.eol()) {
+        const ch = stream.next();
+        if (ch === '"' && !escaped) break;
+        escaped = ch === '\\' && !escaped;
+        if (ch !== '\\') escaped = false;
+      }
+      const raw = line.slice(stream.start, stream.pos);
+      if (stringLiteralStillOpen(raw)) state.inString = true;
       return 'string';
     }
 
-    if (stream.match(/`[A-Za-z0-9_.]*/)) return 'atom';
-    if (stream.match(/\d{4}\.\d{2}\.\d{2}/)) return 'number';
-    if (stream.match(/\d{2}:\d{2}:\d{2}(\.\d{1,9})?/)) return 'number';
-    if (stream.match(/0[NWwn]|-0[Ww]|\d+(\.\d+)?([eE][-+]?\d+)?[fij]?/)) return 'number';
+    let tokens: KdbLexToken[];
+    try {
+      tokens = lexKdbLex(slice);
+    } catch {
+      stream.next();
+      return null;
+    }
 
-    if (stream.match(/[{}()[\]]/)) return 'bracket';
-    if (stream.match(/[_=><!~?:&|+\-*\/^%@,;'\\.]+/)) return 'operator';
+    let i = 0;
+    while (i < tokens.length) {
+      const tok = tokens[i]!;
+      i += 1;
+      if (tok.kind === 'eof') break;
+      if (tok.kind === 'whitespace' || tok.kind === 'newline') continue;
 
-    const word = stream.match(/[A-Za-z_.][A-Za-z0-9_.]*/);
-    if (word && word !== true) return KEYWORDS.has(word[0]) ? 'keyword' : 'variableName';
+      const absStart = stream.pos + tok.start;
+      const absEnd = stream.pos + tok.end;
+      if (absEnd <= stream.pos) continue;
 
-    stream.next();
+      stream.start = absStart;
+      stream.pos = absEnd;
+
+      if (tok.kind === 'string') {
+        if (stringLiteralStillOpen(tok.value)) state.inString = true;
+        return 'string';
+      }
+
+      return mapLexToken(tok.kind, tok.value);
+    }
+
+    stream.skipToEnd();
     return null;
   },
 });

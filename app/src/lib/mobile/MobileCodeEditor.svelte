@@ -20,8 +20,8 @@
   const mobileTheme = EditorView.theme({
     '&': {
       height: '100%',
-      background: '#FBF8F2',
-      color: '#2C2924',
+      background: '#FFFDF9',
+      color: '#2C2520',
       fontSize: '13px',
     },
     '.cm-scroller': {
@@ -29,35 +29,34 @@
       overflow: 'auto',
       fontFamily: 'var(--font-mono)',
       lineHeight: '1.65',
-      background:
-        'linear-gradient(90deg, rgba(76, 99, 214, 0.06) 1px, transparent 1px) 0 0 / 56px 56px, #FBF8F2',
+      background: '#FFFDF9',
     },
     '.cm-content': {
       minHeight: '100%',
       padding: '18px 16px 18px 0',
-      caretColor: '#4C63D6',
+      caretColor: '#5B6FE8',
     },
     '.cm-line': {
       padding: '0 8px',
     },
     '.cm-gutters': {
-      background: 'rgba(239, 234, 224, 0.78)',
-      color: '#9A8E80',
-      borderRight: '1px solid #D9D0BF',
+      background: '#F7F1E9',
+      color: '#B5A799',
+      borderRight: '1px solid #E0D8CC',
     },
     '.cm-lineNumbers .cm-gutterElement': {
       minWidth: '34px',
       padding: '0 8px 0 10px',
     },
     '.cm-activeLine': {
-      background: 'rgba(76, 99, 214, 0.06)',
+      background: '#F7F1E9',
     },
     '.cm-activeLineGutter': {
-      background: 'rgba(76, 99, 214, 0.08)',
-      color: '#23201C',
+      background: '#EDE6DC',
+      color: '#7A6E62',
     },
     '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
-      background: 'rgba(76, 99, 214, 0.22)',
+      background: '#DDE2FF',
     },
     '&.cm-focused': {
       outline: 'none',

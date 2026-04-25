@@ -2988,40 +2988,47 @@ textarea:focus-visible {
   font-size: inherit;
 }
 
-/* q token colors (shared: mobile CodeMirror + guided-tour snippet HTML) */
+/* q token colors — align mobile CodeMirror + tour snippets with desktop Monaco `qanvas-warm` */
 .mobile-code-editor .cm-content .q-token-keyword,
 .tour-lesson-highlight-code .q-token-keyword {
-  color: #4c63d6;
-  font-weight: 700;
+  color: #7d4e2d;
 }
-.mobile-code-editor .cm-content .q-token-symbol,
-.tour-lesson-highlight-code .q-token-symbol {
-  color: #b38256;
+.mobile-code-editor .cm-content .q-token-builtin,
+.tour-lesson-highlight-code .q-token-builtin {
+  color: #2f7a6d;
+}
+.mobile-code-editor .cm-content .q-token-qanvas,
+.tour-lesson-highlight-code .q-token-qanvas {
+  color: #c06b2c;
 }
 .mobile-code-editor .cm-content .q-token-variable,
 .tour-lesson-highlight-code .q-token-variable {
-  color: #2c2924;
+  color: #2c2520;
+}
+.mobile-code-editor .cm-content .q-token-symbol,
+.tour-lesson-highlight-code .q-token-symbol {
+  color: #8b674b;
 }
 .mobile-code-editor .cm-content .q-token-number,
 .tour-lesson-highlight-code .q-token-number {
-  color: #3b8f51;
+  color: #5b6fe8;
 }
 .mobile-code-editor .cm-content .q-token-string,
 .tour-lesson-highlight-code .q-token-string {
-  color: #8b5e34;
+  color: #b35b3f;
 }
 .mobile-code-editor .cm-content .q-token-comment,
 .tour-lesson-highlight-code .q-token-comment {
-  color: #9a8e80;
+  color: #a89b8e;
   font-style: italic;
 }
 .mobile-code-editor .cm-content .q-token-operator,
 .tour-lesson-highlight-code .q-token-operator {
-  color: #c94834;
+  color: #5c534c;
 }
 .mobile-code-editor .cm-content .q-token-bracket,
 .tour-lesson-highlight-code .q-token-bracket {
-  color: #6b6258;
+  color: #5c534c;
 }
 
 .tour-lesson-panel-shortcuts {
