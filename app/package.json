@@ -10,6 +10,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
+    "test:browser": "playwright test",
     "mobile:sync": "npm run build && cap sync",
     "mobile:ios": "npm run mobile:sync && cap open ios",
     "mobile:android": "npm run mobile:sync && cap open android"

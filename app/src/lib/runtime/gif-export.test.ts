@@ -27,4 +27,14 @@ describe('encodeRgbaFramesToGif', () => {
     const bad = new Uint8ClampedArray(10);
     expect(() => encodeRgbaFramesToGif([bad], 2, 2, 50)).toThrow(/size mismatch/);
   });
+
+  it('encoded GIF has image blocks and a sensible payload size', () => {
+    const w = 32;
+    const h = 24;
+    const frames = [solidFrame(w, h, 10, 180, 90), solidFrame(w, h, 10, 180, 90)];
+    const bytes = encodeRgbaFramesToGif(frames, w, h, 80);
+    expect(bytes[bytes.length - 1]).toBe(0x3b);
+    expect(bytes.includes(0x2c)).toBe(true);
+    expect(bytes.length).toBeGreaterThan(100);
+  });
 });

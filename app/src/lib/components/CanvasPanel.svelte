@@ -165,13 +165,17 @@
     if (gifExportNonce !== expectedNonce) return;
 
     const captured = gifFrames;
-    const size = surface.getSize();
-    const [width, height] = size;
+    const [width, height] = surface.getBackingStoreSize();
 
     stopGifRecordingAndDiscard();
 
     if (captured.length === 0) {
       appState.appendConsole('stderr', 'GIF export failed: no frames were captured.');
+      return;
+    }
+
+    if (width < 1 || height < 1) {
+      appState.appendConsole('stderr', 'GIF export failed: canvas has no backing store pixels.');
       return;
     }
 
