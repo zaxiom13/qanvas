@@ -2,6 +2,7 @@ import type { BrowserGateway } from '$lib/browser';
 
 export const DEFAULT_PROJECT_NAME = 'untitled';
 const DEFAULT_ENTRY_FILE = 'sketch.q';
+const DEFAULT_HELPER_EXTENSION = '.cue';
 
 type ProjectHost = {
   projectPath: string | null;
@@ -65,7 +66,7 @@ export class ProjectSessionController {
     const rawName = host.newFileName.trim();
     if (!rawName) return false;
 
-    const nextName = rawName.includes('.') ? rawName : `${rawName}.q`;
+    const nextName = rawName.includes('.') ? rawName : `${rawName}${DEFAULT_HELPER_EXTENSION}`;
     if (host.files.some((file) => file.name === nextName)) {
       return false;
     }
@@ -79,7 +80,7 @@ export class ProjectSessionController {
 
   renameFile(host: ProjectHost, oldName: string, newName: string) {
     const rawName = newName.trim();
-    const trimmed = rawName.includes('.') ? rawName : `${rawName}.q`;
+    const trimmed = rawName.includes('.') ? rawName : `${rawName}${DEFAULT_HELPER_EXTENSION}`;
     if (!trimmed || trimmed === oldName || host.files.some((file) => file.name === trimmed)) {
       return false;
     }

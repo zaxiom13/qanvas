@@ -37,12 +37,14 @@ const STORAGE_KEYS = {
   consoleHeight: 'qanvas5:consoleHeight',
   consoleCollapsed: 'qanvas5:consoleCollapsed',
   mobileConsoleCollapsed: 'qanvas5:mobileConsoleCollapsed',
+  mobileCanvasControlsCollapsed: 'qanvas5:mobileCanvasControlsCollapsed',
   editorPanelWidth: 'qanvas5:editorPanelWidth',
   lastExampleId: 'qanvas5:lastExampleId',
   tourCompleted: 'qanvas5:tourCompleted',
 };
 
 const PRACTICE_FILE_NAME = 'practice.q';
+const RUNTIME_SOURCE_EXTENSIONS = ['.q', '.cue'];
 
 export const DEFAULT_SKETCH = `setup:{
   \`size\`bg!(800 600;Color.CREAM)
@@ -155,6 +157,7 @@ class AppState {
   consoleHeight = $state(readStoredNumber(STORAGE_KEYS.consoleHeight, 160));
   consoleCollapsed = $state(readStored(STORAGE_KEYS.consoleCollapsed) === '1');
   mobileConsoleCollapsed = $state(readStored(STORAGE_KEYS.mobileConsoleCollapsed) === '1');
+  mobileCanvasControlsCollapsed = $state(readStored(STORAGE_KEYS.mobileCanvasControlsCollapsed) === '1');
   editorPanelWidth = $state(readStoredNumber(STORAGE_KEYS.editorPanelWidth, 520));
   consoleFilter = $state<'all' | 'stdout' | 'stderr' | 'info'>('all');
   consoleEntries = $state<ConsoleEntry[]>([]);
@@ -283,6 +286,10 @@ class AppState {
     return getCompiledOutputView(this.activeEditorValue);
   }
 
+  get runtimeSourceFiles() {
+    return this.files.filter((file) => isRuntimeSourceFile(file.name));
+  }
+
   initialize() {
     if (this.booted) return;
     this.booted = true;
@@ -345,12 +352,16 @@ class AppState {
     writeStored(STORAGE_KEYS.mobileConsoleCollapsed, this.mobileConsoleCollapsed ? '1' : '0');
   }
 
+  toggleMobileCanvasControlsCollapsed() {
+    this.mobileCanvasControlsCollapsed = !this.mobileCanvasControlsCollapsed;
+    writeStored(STORAGE_KEYS.mobileCanvasControlsCollapsed, this.mobileCanvasControlsCollapsed ? '1' : '0');
+  }
+
   setEditorPanelWidth(width: number) {
     const workspaceEl = typeof document !== 'undefined' ? document.getElementById('workspace') : null;
     const workspaceW = workspaceEl?.getBoundingClientRect().width ?? (typeof window !== 'undefined' ? window.innerWidth : 1200);
-    const sidebarReserve = this.sidebarCollapsed ? 24 : 212;
     const minOther = 220;
-    const rawMax = Math.max(0, Math.floor(workspaceW - sidebarReserve - minOther));
+    const rawMax = Math.max(0, Math.floor(workspaceW - minOther));
     const minPx = 280;
     const lo = Math.min(minPx, rawMax);
     const hi = rawMax;
@@ -381,6 +392,10 @@ class AppState {
     this.canvasPanelTab = tab;
   }
 
+  showCanvasOutput() {
+    this.canvasPanelTab = 'compiled';
+  }
+
   toggleFps() {
     this.runtimeCoordinator.toggleFps(this);
   }
@@ -404,7 +419,10 @@ class AppState {
     this.practiceVerification = null;
 
     if (mode === 'practice') {
+      this.showCanvasOutput();
       this.applyPracticeStarter();
+    } else {
+      this.setCanvasPanelTab('canvas');
     }
 
     this.syncTourExampleWithCurrentSketch();
@@ -740,7 +758,7 @@ class AppState {
 
       const runtimeFiles = this.workspaceMode === 'practice'
         ? [{ name: PRACTICE_FILE_NAME, content: this.practiceSource }]
-        : this.files.filter((file) => file.name.endsWith('.q'));
+        : this.runtimeSourceFiles;
       const result = await browserGateway.runtime.query({
         runtimePath: this.runtimePath,
         files: runtimeFiles.map((file) => ({ ...file })),
@@ -982,7 +1000,7 @@ class AppState {
     return {
       projectPath: this.projectPath,
       activeFileName: this.activeFileName,
-      files: this.files.filter((file) => file.name.endsWith('.q')),
+      files: this.runtimeSourceFiles,
     };
   }
 
@@ -1043,4 +1061,8 @@ function stableValue(value: unknown) {
     }
     return entry;
   });
+}
+
+function isRuntimeSourceFile(name: string) {
+  return RUNTIME_SOURCE_EXTENSIONS.some((extension) => name.endsWith(extension));
 }
