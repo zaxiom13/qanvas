@@ -79,14 +79,15 @@ test('exposes working controls in the mobile settings tab', async ({ page }) => 
 
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Practice' }).click();
-  await expect(page.getByLabel('q sketch editor')).toHaveValue(/Fill in the expression/);
+  await page.getByRole('button', { name: 'Editor' }).click();
+  await expect(page.getByLabel('q sketch editor')).toHaveValue(/answer:\(\[\] city:`symbol\$\(\); totalRevenue:`long\$\(\)\);/);
 
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: /FPS overlay/i }).click();
   await expect(page.locator('.mobile-toggle').filter({ hasText: 'On' }).first()).toBeVisible();
 
   await page.getByRole('button', { name: 'Local q ws:// listener' }).click();
-  await page.getByLabel('Local q WebSocket').fill('ws://127.0.0.1:5042');
+  await page.locator('#mobile-local-q-url').fill('ws://127.0.0.1:5042');
   await page.getByRole('button', { name: 'Apply backend' }).click();
-  await expect(page.getByText(/Active backend:/)).toBeVisible();
+  await expect(page.locator('.mobile-settings').getByText(/Active backend:/)).toBeVisible();
 });
