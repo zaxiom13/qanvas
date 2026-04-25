@@ -40,10 +40,11 @@ test('uses the real sketch canvas on the mobile canvas tab', async ({ page }) =>
   await expect(page.locator('.mobile-artboard')).toHaveCount(0);
 });
 
-test('runs the sketch from the mobile header', async ({ page }) => {
+test('runs the sketch from the mobile canvas playbar', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('button', { name: 'Run sketch' }).first().click();
+  await page.getByRole('button', { name: 'Canvas' }).click();
+  await page.getByRole('button', { name: 'Run sketch' }).click();
 
   await expect(page.getByRole('button', { name: 'Canvas' })).toHaveClass(/active/);
   await expect(page.getByLabel('Sketch canvas')).toBeVisible();
