@@ -40,10 +40,11 @@ test('uses the real sketch canvas on the mobile canvas tab', async ({ page }) =>
   await expect(page.locator('.mobile-artboard')).toHaveCount(0);
 });
 
-test('runs the sketch from the mobile canvas playbar', async ({ page }) => {
+test('runs the sketch from the mobile canvas controls sheet', async ({ page }) => {
   await page.goto('/');
 
   await page.getByRole('button', { name: 'Canvas' }).click();
+  await expect(page.locator('.mobile-playbar')).toHaveCount(0);
   await page.getByRole('button', { name: 'Run sketch' }).click();
 
   await expect(page.getByRole('button', { name: 'Canvas' })).toHaveClass(/active/);
@@ -67,7 +68,25 @@ test('loads an example from the mobile examples tab', async ({ page }) => {
   await page.goto('/');
 
   await page.getByRole('button', { name: 'Examples' }).click();
+  await expect(page.locator('.example-thumb').first()).toHaveAttribute('src', /^data:image\/svg\+xml/);
   await page.getByRole('button', { name: /hello circle/i }).click();
 
   await expect(page.getByLabel('q sketch editor')).toHaveValue(/circle/);
+});
+
+test('exposes working controls in the mobile settings tab', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Practice' }).click();
+  await expect(page.getByLabel('q sketch editor')).toHaveValue(/Fill in the expression/);
+
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: /FPS overlay/i }).click();
+  await expect(page.locator('.mobile-toggle').filter({ hasText: 'On' }).first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Local q ws:// listener' }).click();
+  await page.getByLabel('Local q WebSocket').fill('ws://127.0.0.1:5042');
+  await page.getByRole('button', { name: 'Apply backend' }).click();
+  await expect(page.getByText(/Active backend:/)).toBeVisible();
 });
