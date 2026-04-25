@@ -1,9 +1,9 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
-  import type { ExampleSketch } from '$lib/examples';
   import { captureExampleStillDataUrl } from '$lib/mobile/example-preview-still';
   import { appState } from '$lib/state/app-state.svelte';
+  import { backendState } from '$lib/state/backend-state.svelte';
 
   type MobileTab = 'editor' | 'canvas' | 'examples' | 'files' | 'settings';
   type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
@@ -111,6 +111,14 @@
     setActiveTab('canvas');
     await tick();
     await appState.runSketch();
+  }
+
+  function chooseBackend(kind: 'browser' | 'local-q' | 'cloud-q') {
+    backendState.setDraftKind(kind);
+  }
+
+  function applyBackendSettings() {
+    backendState.apply();
   }
 </script>
 
@@ -249,20 +257,6 @@
       </section>
     {:else if activeTab === 'canvas'}
       <section class="mobile-canvas">
-        <div class="mobile-playbar">
-          <button class="mobile-playbar-btn mobile-playbar-btn--hot" type="button" aria-label="Run sketch" onclick={runOrStop}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5v14l11-7z" fill="currentColor"></path></svg>
-          </button>
-          <button class="mobile-playbar-btn" type="button" aria-label="Stop sketch" onclick={() => void appState.stopSketch()}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="8" height="8" rx="1.5" fill="currentColor"></rect></svg>
-          </button>
-          <button class="mobile-playbar-btn" type="button" aria-label="Reset sketch" onclick={() => void resetSketch()}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-          </button>
-          <button class="mobile-playbar-btn" type="button" aria-label="Snapshot" onclick={() => appState.exportPng()}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h2l1.5-2h3L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="13" r="3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-          </button>
-        </div>
         <div class="mobile-canvas-stage">
           <CanvasPanel />
         </div>
@@ -270,6 +264,34 @@
           <span><span class="status-dot"></span>{Math.round(appState.fps || 60)} FPS</span>
           <span>{appState.currentCanvasSize[0] || 800} x {appState.currentCanvasSize[1] || 600}</span>
           <span>t: 359</span>
+        </div>
+        <div class="mobile-tools-sheet">
+          <div class="sheet-handle"></div>
+          <h2>Canvas controls</h2>
+          <div class="quick-tools-grid">
+            <button class="quick-tool quick-tool--primary" type="button" aria-label={appState.running ? 'Stop sketch' : 'Run sketch'} onclick={runOrStop}>
+              <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+                {#if appState.running}
+                  <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"></rect>
+                {:else}
+                  <path d="M8 5v14l11-7z" fill="currentColor"></path>
+                {/if}
+              </svg>
+              <span>{appState.running ? 'Stop' : 'Run'}</span>
+            </button>
+            <button class="quick-tool" type="button" aria-label="Reset sketch" onclick={() => void resetSketch()}>
+              <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <span>Reset</span>
+            </button>
+            <button class="quick-tool" type="button" aria-label="Export PNG" onclick={() => appState.exportPng()}>
+              <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h2l1.5-2h3L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="13" r="3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+              <span>PNG</span>
+            </button>
+            <button class="quick-tool" type="button" aria-label="Export GIF" onclick={() => appState.openGifModal()}>
+              <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M8 4v3M12 4v3M16 4v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+              <span>GIF</span>
+            </button>
+          </div>
         </div>
       </section>
     {:else if activeTab === 'examples'}
@@ -366,9 +388,105 @@
         </div>
       </section>
     {:else}
-      <section class="mobile-empty-panel">
+      <section class="mobile-settings">
         <h1>Settings</h1>
-        <p>Runtime, canvas, exports, sync, and display preferences can live behind large native-feeling rows.</p>
+
+        <div class="mobile-settings-section">
+          <h2>Workspace</h2>
+          <div class="mobile-segmented" role="group" aria-label="Workspace mode">
+            <button type="button" class:active={appState.workspaceMode === 'studio'} onclick={() => void appState.setWorkspaceMode('studio')}>Studio</button>
+            <button type="button" class:active={appState.workspaceMode === 'practice'} onclick={() => void appState.setWorkspaceMode('practice')}>Practice</button>
+          </div>
+        </div>
+
+        <div class="mobile-settings-section">
+          <h2>Backend</h2>
+          <div class="mobile-backend-grid">
+            <button class:selected={backendState.draft.kind === 'browser'} type="button" onclick={() => chooseBackend('browser')}>
+              <strong>Browser</strong>
+              <span>jqport · offline</span>
+            </button>
+            <button class:selected={backendState.draft.kind === 'local-q'} type="button" onclick={() => chooseBackend('local-q')}>
+              <strong>Local q</strong>
+              <span>ws:// listener</span>
+            </button>
+            <button class:selected={backendState.draft.kind === 'cloud-q'} type="button" onclick={() => chooseBackend('cloud-q')}>
+              <strong>Cloud q</strong>
+              <span>wss:// backend</span>
+            </button>
+          </div>
+
+          {#if backendState.draft.kind === 'local-q'}
+            <label class="mobile-settings-label" for="mobile-local-q-url">Local q WebSocket</label>
+            <input
+              id="mobile-local-q-url"
+              class="mobile-settings-input"
+              type="text"
+              spellcheck="false"
+              placeholder="ws://127.0.0.1:5042"
+              value={backendState.draft.localUrl}
+              oninput={(event) => backendState.setDraftLocal(event.currentTarget.value)}
+            />
+          {:else if backendState.draft.kind === 'cloud-q'}
+            <label class="mobile-settings-label" for="mobile-cloud-q-url">Cloud q WebSocket</label>
+            <input
+              id="mobile-cloud-q-url"
+              class="mobile-settings-input"
+              type="text"
+              spellcheck="false"
+              placeholder="wss://qanvas.example.com/ws"
+              value={backendState.draft.cloudUrl}
+              oninput={(event) => backendState.setDraftCloud(event.currentTarget.value)}
+            />
+          {/if}
+
+          {#if backendState.statusMessage}
+            <p class:error={backendState.status === 'error'} class:ok={backendState.status === 'ok'} class="mobile-settings-status">{backendState.statusMessage}</p>
+          {/if}
+
+          <div class="mobile-settings-actions">
+            {#if backendState.draft.kind !== 'browser'}
+              <button type="button" onclick={() => void backendState.testConnection()} disabled={backendState.status === 'testing'}>Test</button>
+            {/if}
+            <button class="primary" type="button" onclick={applyBackendSettings}>Apply backend</button>
+          </div>
+          <p class="mobile-settings-current">Current: <strong>{backendState.activeLabel}</strong></p>
+        </div>
+
+        <div class="mobile-settings-section">
+          <h2>Canvas & console</h2>
+          <button class="mobile-setting-row" type="button" onclick={() => appState.toggleFps()}>
+            <span>
+              <strong>FPS overlay</strong>
+              <small>Show frame rate on the sketch canvas.</small>
+            </span>
+            <span class:active={appState.showFps} class="mobile-toggle">{appState.showFps ? 'On' : 'Off'}</span>
+          </button>
+          <button class="mobile-setting-row" type="button" onclick={() => appState.toggleDebugConsole()}>
+            <span>
+              <strong>Debug console</strong>
+              <small>Emit runtime debug output while queries run.</small>
+            </span>
+            <span class:active={appState.debugConsole} class="mobile-toggle">{appState.debugConsole ? 'On' : 'Off'}</span>
+          </button>
+          <button class="mobile-setting-row" type="button" onclick={() => appState.setCanvasPanelTab(appState.canvasPanelTab === 'canvas' ? 'compiled' : 'canvas')}>
+            <span>
+              <strong>Canvas panel</strong>
+              <small>Switch between rendered canvas and compiled output.</small>
+            </span>
+            <span class="mobile-toggle active">{appState.canvasPanelTab}</span>
+          </button>
+        </div>
+
+        <div class="mobile-settings-section">
+          <h2>Project actions</h2>
+          <div class="mobile-settings-actions mobile-settings-actions--grid">
+            <button type="button" onclick={() => void appState.createNewSketch()}>New sketch</button>
+            <button type="button" onclick={() => void appState.saveProject(false)}>Save</button>
+            <button type="button" onclick={() => appState.clearConsole(false)}>Clear console</button>
+            <button type="button" onclick={() => appState.openProjectsModal()}>Projects</button>
+          </div>
+        </div>
       </section>
     {/if}
   </main>
@@ -450,14 +568,7 @@
     font-size: 12px;
   }
 
-  .mobile-playbar {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .mobile-action,
-  .mobile-playbar-btn {
+  .mobile-action {
     display: inline-grid;
     place-items: center;
     width: 48px;
@@ -469,16 +580,9 @@
     box-shadow: var(--shadow-sm);
   }
 
-  .mobile-action svg,
-  .mobile-playbar-btn svg {
+  .mobile-action svg {
     width: 24px;
     height: 24px;
-  }
-
-  .mobile-playbar-btn--hot {
-    border-color: color-mix(in srgb, var(--mobile-hot), white 28%);
-    background: var(--mobile-hot);
-    color: white;
   }
 
   .mobile-main {
@@ -504,6 +608,7 @@
   .mobile-canvas,
   .mobile-examples,
   .mobile-empty-panel,
+  .mobile-settings,
   .mobile-files-panel {
     overflow-y: auto;
     overscroll-behavior: contain;
@@ -516,6 +621,7 @@
 
   .mobile-examples,
   .mobile-empty-panel,
+  .mobile-settings,
   .mobile-files-panel {
     height: 100%;
     min-height: 0;
@@ -691,20 +797,6 @@
     line-height: 1.45;
   }
 
-  .mobile-playbar {
-    position: static;
-    z-index: 2;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    padding: 10px;
-    background: var(--bg-toolbar);
-    border-bottom: 1px solid var(--mobile-border);
-  }
-
-  .mobile-playbar-btn {
-    width: 100%;
-  }
-
   .mobile-canvas-stage {
     flex: 1 1 auto;
     min-height: 200px;
@@ -747,12 +839,36 @@
     gap: 7px;
   }
 
-  .mobile-search-row h1,
-  .mobile-empty-panel h1 {
+  .mobile-search-row h1 {
     margin: 0 0 18px;
     font-size: 18px;
   }
 
+  .quick-tools-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .quick-tool {
+    display: grid;
+    place-items: center;
+    gap: 8px;
+    min-height: 84px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 8px;
+    background: var(--bg-editor);
+    color: var(--mobile-ink);
+    font-size: 12px;
+  }
+
+  .quick-tool--primary {
+    border-color: color-mix(in srgb, var(--mobile-hot), white 28%);
+    background: var(--mobile-hot);
+    color: white;
+  }
+
+  .quick-tool-icon,
   .nav-icon {
     width: 26px;
     height: 26px;
@@ -955,11 +1071,163 @@
     background: var(--mobile-panel);
   }
 
-  .mobile-empty-panel p {
-    max-width: 34ch;
+  .mobile-settings {
+    display: grid;
+    align-content: start;
+    gap: 14px;
+    padding: 18px 14px 24px;
+    background: var(--mobile-panel);
+  }
+
+  .mobile-settings h1 {
+    margin: 0 0 4px;
+    font-size: 20px;
+  }
+
+  .mobile-settings-section {
+    display: grid;
+    gap: 12px;
+    padding: 14px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 12px;
+    background: color-mix(in srgb, var(--bg-chrome), white 8%);
+  }
+
+  .mobile-settings-section h2 {
+    margin: 0;
+    font-size: 14px;
+  }
+
+  .mobile-segmented,
+  .mobile-backend-grid,
+  .mobile-settings-actions {
+    display: grid;
+    gap: 8px;
+  }
+
+  .mobile-segmented {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-backend-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .mobile-segmented button,
+  .mobile-backend-grid button,
+  .mobile-settings-actions button {
+    min-height: 44px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 9px;
+    background: var(--bg-editor);
+    color: var(--mobile-ink);
+  }
+
+  .mobile-segmented button.active,
+  .mobile-backend-grid button.selected,
+  .mobile-settings-actions button.primary {
+    border-color: var(--mobile-hot);
+    background: var(--mobile-hot);
+    color: white;
+  }
+
+  .mobile-backend-grid button {
+    display: grid;
+    gap: 4px;
+    padding: 10px 6px;
+    text-align: left;
+  }
+
+  .mobile-backend-grid strong {
+    font-size: 12px;
+  }
+
+  .mobile-backend-grid span,
+  .mobile-setting-row small,
+  .mobile-settings-current {
     color: var(--mobile-muted);
-    font-size: 15px;
-    line-height: 1.5;
+    font-size: 11px;
+  }
+
+  .mobile-settings-label {
+    color: var(--mobile-muted);
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .mobile-settings-input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0 12px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 9px;
+    background: var(--bg-editor);
+    color: var(--mobile-ink);
+    font-family: var(--font-mono);
+    font-size: 12px;
+  }
+
+  .mobile-settings-status {
+    margin: 0;
+    color: var(--mobile-muted);
+    font-size: 12px;
+  }
+
+  .mobile-settings-status.ok {
+    color: var(--green);
+  }
+
+  .mobile-settings-status.error {
+    color: var(--red);
+  }
+
+  .mobile-settings-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-settings-actions--grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-settings-current {
+    margin: 0;
+  }
+
+  .mobile-setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 64px;
+    padding: 12px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 9px;
+    background: var(--bg-editor);
+    color: var(--mobile-ink);
+    text-align: left;
+  }
+
+  .mobile-setting-row span:first-child {
+    display: grid;
+    gap: 4px;
+  }
+
+  .mobile-toggle {
+    flex: 0 0 auto;
+    min-width: 54px;
+    padding: 6px 9px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--mobile-muted), transparent 72%);
+    color: var(--mobile-muted);
+    text-align: center;
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: capitalize;
+  }
+
+  .mobile-toggle.active {
+    background: color-mix(in srgb, var(--green), white 80%);
+    color: var(--green);
   }
 
   .mobile-bottom-nav {
@@ -1002,8 +1270,7 @@
       padding-left: 14px;
     }
 
-    .mobile-action,
-    .mobile-playbar-btn {
+    .mobile-action {
       height: 44px;
       width: 44px;
     }
