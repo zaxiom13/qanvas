@@ -1,37 +1,75 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { tick, untrack } from 'svelte';
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
+  import type { ExampleSketch } from '$lib/examples';
+  import { captureExampleStillDataUrl } from '$lib/mobile/example-preview-still';
   import { appState } from '$lib/state/app-state.svelte';
 
-  type MobileTab = 'editor' | 'canvas' | 'examples' | 'data' | 'settings';
+  type MobileTab = 'editor' | 'canvas' | 'examples' | 'files' | 'settings';
+  type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
 
   let activeTab = $state<MobileTab>('editor');
   let mobileCode = $state(appState.activeEditorValue);
-
-  const quickTools = [
-    { label: 'Clear', icon: 'clear' },
-    { label: 'Background', icon: 'dropper' },
-    { label: 'Stroke', icon: 'waves' },
-    { label: 'Fill', icon: 'fill' },
-    { label: 'Shape', icon: 'shape' },
-    { label: 'Grid', icon: 'grid' },
-    { label: 'Mirror', icon: 'mirror' },
-    { label: 'Export', icon: 'export' },
-  ];
 
   const bottomTabs: { id: MobileTab; label: string; icon: string }[] = [
     { id: 'editor', label: 'Editor', icon: 'code' },
     { id: 'canvas', label: 'Canvas', icon: 'palette' },
     { id: 'examples', label: 'Examples', icon: 'cube' },
-    { id: 'data', label: 'Data', icon: 'table' },
+    { id: 'files', label: 'Files', icon: 'file' },
     { id: 'settings', label: 'Settings', icon: 'sliders' },
   ];
 
   let examples = $derived(appState.filteredExamples.slice(0, 9));
-  let consoleEntries = $derived(appState.filteredConsole.slice(-7));
+  let filteredConsoleEntries = $derived(appState.filteredConsole);
+  let examplePreviewUrls = $state<Record<string, string>>({});
+
+  function formatTimestamp(ts: number) {
+    const date = new Date(ts);
+    const pad = (value: number, width = 2) => String(value).padStart(width, '0');
+    return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
+  }
+
+  function setMobileConsoleFilter(filter: MobileConsoleFilter) {
+    appState.consoleFilter = filter;
+  }
 
   $effect(() => {
     mobileCode = appState.activeEditorValue;
+  });
+
+  $effect(() => {
+    if (activeTab !== 'examples' || typeof window === 'undefined') return;
+    // Track tab + category only — avoid subscribing to unrelated appState churn.
+    void appState.exampleCategory;
+
+    const list = untrack(() => appState.filteredExamples.slice(0, 9));
+    const existing = untrack(() => examplePreviewUrls);
+    if (!list.length) return;
+    if (list.every((ex) => Boolean(existing[ex.id]))) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      const out: Record<string, string> = { ...existing };
+      for (const ex of list) {
+        if (cancelled) return;
+        if (out[ex.id]) continue;
+        await new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        });
+        if (cancelled) return;
+        const url = await captureExampleStillDataUrl(ex.code);
+        if (url) out[ex.id] = url;
+      }
+      if (!cancelled) {
+        examplePreviewUrls = out;
+      }
+    };
+
+    void run();
+    return () => {
+      cancelled = true;
+    };
   });
 
   function updateCode(value: string) {
@@ -43,6 +81,17 @@
     activeTab = tab;
     if (tab === 'canvas') {
       appState.setCanvasPanelTab('canvas');
+    }
+  }
+
+  function renameMobileFile(name: string) {
+    const next = window.prompt('Rename file', name);
+    if (next) appState.renameFile(name, next);
+  }
+
+  function deleteMobileFile(name: string) {
+    if (window.confirm(`Delete "${name}"?`)) {
+      appState.deleteFile(name);
     }
   }
 
@@ -97,17 +146,105 @@
           oninput={(event) => updateCode(event.currentTarget.value)}
           aria-label="q sketch editor"
         ></textarea>
-        <div class="mobile-console">
-          <div class="sheet-handle"></div>
-          <div class="mobile-console-tabs">
-            <strong>Console</strong>
-            <span>Data</span>
-            <span>Errors</span>
+        <div
+          class="mobile-console"
+          class:mobile-console--collapsed={appState.mobileConsoleCollapsed}
+          aria-label="Console output"
+        >
+          {#if !appState.mobileConsoleCollapsed}
+            <div class="sheet-handle"></div>
+          {/if}
+          <div class="mobile-console-toolbar">
+            <span class="mobile-console-title">Console</span>
+            <div class="mobile-console-filters" role="tablist" aria-label="Console filter">
+              <button
+                type="button"
+                class="mobile-console-filter-btn"
+                class:mobile-console-filter-btn--active={appState.consoleFilter === 'all'}
+                onclick={() => setMobileConsoleFilter('all')}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                class="mobile-console-filter-btn"
+                class:mobile-console-filter-btn--active={appState.consoleFilter === 'stdout'}
+                onclick={() => setMobileConsoleFilter('stdout')}
+              >
+                Data
+              </button>
+              <button
+                type="button"
+                class="mobile-console-filter-btn"
+                class:mobile-console-filter-btn--active={appState.consoleFilter === 'stderr'}
+                onclick={() => setMobileConsoleFilter('stderr')}
+              >
+                Errors
+              </button>
+              <button
+                type="button"
+                class="mobile-console-filter-btn"
+                class:mobile-console-filter-btn--active={appState.consoleFilter === 'info'}
+                onclick={() => setMobileConsoleFilter('info')}
+              >
+                Info
+              </button>
+            </div>
+            <button
+              class="btn-icon-only mobile-console-collapse-btn"
+              type="button"
+              aria-expanded={!appState.mobileConsoleCollapsed}
+              title={appState.mobileConsoleCollapsed ? 'Expand console' : 'Collapse console'}
+              aria-label={appState.mobileConsoleCollapsed ? 'Expand console' : 'Collapse console'}
+              onclick={() => appState.toggleMobileConsoleCollapsed()}
+            >
+              <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                {#if appState.mobileConsoleCollapsed}
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                {:else}
+                  <path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                {/if}
+              </svg>
+            </button>
+            <button
+              class="btn-icon-only mobile-console-clear-btn"
+              type="button"
+              title="Clear console"
+              aria-label="Clear console"
+              onclick={() => appState.clearConsole(false)}
+            >
+              <svg class="icon" viewBox="0 0 16 16" fill="none">
+                <path d="M3 4h10M5 4V3h6v1M6 7v5M10 7v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M4 4l1 9h6l1-9" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+              </svg>
+            </button>
           </div>
-          <pre>{#if consoleEntries.length}{#each consoleEntries as entry}{entry.type === 'stderr' ? 'err' : entry.type === 'info' ? 'info' : 'q'}&#41; {entry.text}
-{/each}{:else}q) qanvas5
-Qanvas5 ready.
-q){/if}</pre>
+          {#if !appState.mobileConsoleCollapsed}
+            <div class="mobile-console-output">
+              {#each filteredConsoleEntries as entry (entry.id)}
+                <div class={`console-line console-line--${entry.type}`}>
+                  <span class="console-prefix">{entry.type === 'stdout' ? '›' : entry.type === 'stderr' ? '✕' : '—'}</span>
+                  {#if appState.debugConsole}
+                    <span class="console-timestamp">{formatTimestamp(entry.ts)}</span>
+                  {/if}
+                  <span class="console-text">{entry.text}</span>
+                  <button
+                    type="button"
+                    class="console-line-delete"
+                    title="Delete line"
+                    aria-label="Delete line"
+                    onclick={() => appState.removeConsoleEntry(entry.id)}
+                  >
+                    <svg viewBox="0 0 12 12" width="10" height="10" fill="none" aria-hidden="true">
+                      <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                    </svg>
+                  </button>
+                </div>
+              {:else}
+                <p class="mobile-console-empty">No lines for this filter. Run a sketch or switch tabs.</p>
+              {/each}
+            </div>
+          {/if}
         </div>
       </section>
     {:else if activeTab === 'canvas'}
@@ -134,36 +271,6 @@ q){/if}</pre>
           <span>{appState.currentCanvasSize[0] || 800} x {appState.currentCanvasSize[1] || 600}</span>
           <span>t: 359</span>
         </div>
-        <div class="mobile-tools-sheet">
-          <div class="sheet-handle"></div>
-          <h2>Quick Tools</h2>
-          <div class="quick-tools-grid">
-            {#each quickTools as tool}
-              <button class="quick-tool" type="button">
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  {#if tool.icon === 'clear'}
-                    <path d="M5 12a7 7 0 0 1 12.2-4.7M19 12a7 7 0 0 1-12.2 4.7M17 5v4h-4M7 19v-4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  {:else if tool.icon === 'dropper'}
-                    <path d="m14 5 5 5M11 8l5 5-7 7H4v-5zM13 6l5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  {:else if tool.icon === 'waves'}
-                    <path d="M4 8c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2M4 16c2 0 2-2 4-2s2 2 4 2 2-2 4-2 2 2 4 2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-                  {:else if tool.icon === 'fill'}
-                    <path d="m5 14 7-7 6 6-7 7H5zM14 4l6 6M19 17c0 1.5-1 3-2.5 3S14 18.5 14 17c0-1 .9-2.4 2.5-4 1.6 1.6 2.5 3 2.5 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-                  {:else if tool.icon === 'shape'}
-                    <circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2" />
-                  {:else if tool.icon === 'grid'}
-                    <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-                  {:else if tool.icon === 'mirror'}
-                    <path d="M5 4h5v16H5zM14 4h5v16h-5zM12 3v18" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-                  {:else}
-                    <path d="M12 4v11M8 8l4-4 4 4M5 14v5h14v-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                  {/if}
-                </svg>
-                <span>{tool.label}</span>
-              </button>
-            {/each}
-          </div>
-        </div>
       </section>
     {:else if activeTab === 'examples'}
       <section class="mobile-examples">
@@ -189,28 +296,74 @@ q){/if}</pre>
                 setActiveTab('editor');
               }}
             >
-              <span class="example-thumb"></span>
+              <span class="example-thumb">
+                {#if examplePreviewUrls[example.id]}
+                  <img src={examplePreviewUrls[example.id]} alt="" loading="lazy" decoding="async" />
+                {/if}
+              </span>
               <strong>{example.name}</strong>
               <small>by qanvas5</small>
             </button>
           {/each}
         </div>
       </section>
-    {:else if activeTab === 'data'}
-      <section class="mobile-empty-panel">
-        <h1>Data</h1>
-        {#if consoleEntries.length}
-          <div class="mobile-data-list">
-            {#each consoleEntries as entry}
-              <article>
-                <strong>{entry.type}</strong>
-                <p>{entry.text}</p>
-              </article>
-            {/each}
+    {:else if activeTab === 'files'}
+      <section class="mobile-files-panel" aria-labelledby="mobile-files-heading">
+        <div class="mobile-files-panel-header">
+          <h1 id="mobile-files-heading">Files</h1>
+          <div class="mobile-files-panel-actions">
+            <button class="mobile-action" type="button" aria-label="New file" title="New file" onclick={() => appState.openNewFileModal()}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
+            <button class="mobile-action" type="button" aria-label="Import asset" title="Import asset" onclick={() => void appState.importAssets()}>
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M12 4v10M8 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                <path d="M5 18h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+              </svg>
+            </button>
           </div>
-        {:else}
-          <p>Run a sketch to inspect tables, arrays, runtime output, and errors here.</p>
-        {/if}
+        </div>
+        <p class="mobile-files-panel-hint">Tap a file to open it in the editor. Runtime output stays in the console (Data filter).</p>
+        <div class="mobile-file-list" role="list">
+          {#each appState.files as file (file.name)}
+            <div class="mobile-file-row" class:mobile-file-row--active={file.name === appState.activeFileName} role="listitem">
+              <button
+                class="mobile-file-row-main"
+                type="button"
+                onclick={() => {
+                  appState.selectFile(file.name);
+                  setActiveTab('editor');
+                }}
+              >
+                <svg class="mobile-file-row-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" stroke-width="1" fill="none" />
+                  <path d="M10 2v3h3" stroke="currentColor" stroke-width="1" fill="none" />
+                </svg>
+                <span class="mobile-file-row-name">{file.name}</span>
+                {#if file.name === appState.activeFileName && appState.unsaved}
+                  <span class="unsaved-dot" aria-hidden="true"></span>
+                {/if}
+              </button>
+              {#if file.name !== 'sketch.q'}
+                <div class="mobile-file-row-actions">
+                  <button class="mobile-file-action-btn" type="button" title="Rename" aria-label="Rename {file.name}" onclick={() => renameMobileFile(file.name)}>
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M3 13h10M8 3l-4 4v2h2l4-4-2-2zM10 5l2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+                    </svg>
+                  </button>
+                  <button class="mobile-file-action-btn" type="button" title="Delete" aria-label="Delete {file.name}" onclick={() => deleteMobileFile(file.name)}>
+                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                      <path d="M3 4h10M5 4V3h6v1M6 7v5M10 7v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none" />
+                      <path d="M4 4l1 9h6l1-9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none" />
+                    </svg>
+                  </button>
+                </div>
+              {/if}
+            </div>
+          {/each}
+        </div>
       </section>
     {:else}
       <section class="mobile-empty-panel">
@@ -231,8 +384,8 @@ q){/if}</pre>
             <path d="M8.5 10h.01M11 7.8h.01M14 8.3h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
           {:else if tab.icon === 'cube'}
             <path d="m12 3 7 4v10l-7 4-7-4V7zM12 11l7-4M12 11v10M12 11 5 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
-          {:else if tab.icon === 'table'}
-            <path d="M4 5h16v14H4zM4 10h16M9 5v14M15 5v14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+          {:else if tab.icon === 'file'}
+            <path d="M6 3h6l3 3v12H6zM12 3v3h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
           {:else}
             <path d="M5 7h14M5 17h14M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM16 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           {/if}
@@ -350,13 +503,20 @@ q){/if}</pre>
 
   .mobile-canvas,
   .mobile-examples,
-  .mobile-empty-panel {
+  .mobile-empty-panel,
+  .mobile-files-panel {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
 
+  .mobile-canvas {
+    display: flex;
+    flex-direction: column;
+  }
+
   .mobile-examples,
-  .mobile-empty-panel {
+  .mobile-empty-panel,
+  .mobile-files-panel {
     height: 100%;
     min-height: 0;
   }
@@ -426,42 +586,109 @@ q){/if}</pre>
     outline: none;
   }
 
-  .mobile-console,
-  .mobile-tools-sheet {
+  .mobile-console {
+    flex: 0 0 auto;
+    display: flex;
+    flex-direction: column;
+    max-height: min(42dvh, 360px);
+    min-height: 140px;
     margin: 0;
-    padding: 10px 18px 20px;
+    padding: 8px 12px 12px;
     border-top: 1px solid var(--mobile-border);
-    background: color-mix(in srgb, var(--mobile-panel-2), white 12%);
+    background: var(--bg-console);
     box-shadow: 0 -12px 26px rgba(70, 50, 34, 0.12);
+  }
+
+  .mobile-console--collapsed {
+    max-height: none;
+    min-height: 0;
+    padding-top: 6px;
+    padding-bottom: 8px;
   }
 
   .sheet-handle {
     width: 48px;
     height: 5px;
-    margin: 0 auto 12px;
+    margin: 0 auto 8px;
     border-radius: 999px;
     background: rgba(120, 104, 84, 0.32);
+    flex-shrink: 0;
   }
 
-  .mobile-console-tabs {
+  .mobile-console-toolbar {
     display: flex;
-    gap: 28px;
-    margin-bottom: 12px;
-    color: var(--mobile-muted);
+    align-items: center;
+    gap: 6px;
+    flex-wrap: wrap;
+    min-height: 40px;
+    padding: 0 4px 6px;
+    background: var(--bg-chrome);
+    border-radius: 6px;
+    border: 1px solid var(--mobile-border);
   }
 
-  .mobile-console-tabs strong {
+  .mobile-console-title {
+    flex-shrink: 0;
+    padding: 0 4px 0 6px;
+    font-size: 12px;
+    font-weight: 700;
     color: var(--mobile-ink);
   }
 
-  .mobile-console pre {
-    max-height: 118px;
-    overflow: auto;
-    margin: 0;
-    color: var(--green);
+  .mobile-console-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px;
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-console-filter-btn {
+    border: 1px solid transparent;
+    border-radius: 6px;
+    padding: 6px 10px;
+    color: var(--mobile-muted);
+    font-size: 11px;
     font-family: var(--font-mono);
-    font-size: 13px;
-    line-height: 1.7;
+    background: transparent;
+  }
+
+  .mobile-console-filter-btn--active {
+    border-color: var(--mobile-border);
+    background: #fff;
+    color: var(--mobile-ink);
+  }
+
+  .mobile-console-collapse-btn {
+    flex-shrink: 0;
+  }
+
+  .mobile-console-clear-btn {
+    flex-shrink: 0;
+    margin-left: auto;
+  }
+
+  .mobile-console-output {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 6px;
+    padding: 2px 0;
+    border-radius: 4px;
+    background: color-mix(in srgb, var(--mobile-panel-2), transparent 8%);
+  }
+
+  .mobile-console-output :global(.console-line) {
+    padding-left: 8px;
+    padding-right: 8px;
+  }
+
+  .mobile-console-empty {
+    margin: 12px 10px;
+    color: var(--mobile-muted);
+    font-size: 12px;
+    line-height: 1.45;
   }
 
   .mobile-playbar {
@@ -479,8 +706,8 @@ q){/if}</pre>
   }
 
   .mobile-canvas-stage {
-    height: clamp(280px, 48dvh, 460px);
-    min-height: 0;
+    flex: 1 1 auto;
+    min-height: 200px;
     border-bottom: 1px solid var(--mobile-border);
     background: var(--bg-canvas);
   }
@@ -520,40 +747,125 @@ q){/if}</pre>
     gap: 7px;
   }
 
-  .mobile-tools-sheet {
-    margin-top: 0;
-    border-radius: 0;
-  }
-
-  .mobile-tools-sheet h2,
   .mobile-search-row h1,
   .mobile-empty-panel h1 {
     margin: 0 0 18px;
     font-size: 18px;
   }
 
-  .quick-tools-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 12px;
-  }
-
-  .quick-tool {
-    display: grid;
-    place-items: center;
-    gap: 8px;
-    min-height: 84px;
-    border: 1px solid var(--mobile-border);
-    border-radius: 8px;
-    background: var(--bg-editor);
-    color: var(--mobile-ink);
-    font-size: 12px;
-  }
-
-  .quick-tool-icon,
   .nav-icon {
     width: 26px;
     height: 26px;
+  }
+
+  .mobile-files-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 18px 14px 24px;
+    background: var(--mobile-panel);
+  }
+
+  .mobile-files-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .mobile-files-panel-header h1 {
+    margin: 0;
+    font-size: 18px;
+  }
+
+  .mobile-files-panel-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .mobile-files-panel-hint {
+    margin: 0;
+    max-width: 52ch;
+    color: var(--mobile-muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .mobile-file-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    flex: 1 1 auto;
+    min-height: 0;
+    margin-top: 4px;
+  }
+
+  .mobile-file-row {
+    display: flex;
+    align-items: stretch;
+    gap: 0;
+    border: 1px solid var(--mobile-border);
+    border-radius: 8px;
+    background: var(--bg-chrome);
+    overflow: hidden;
+  }
+
+  .mobile-file-row--active {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent), transparent 55%);
+  }
+
+  .mobile-file-row-main {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 12px 14px;
+    text-align: left;
+    color: var(--mobile-ink);
+    font-weight: 600;
+    font-size: 14px;
+  }
+
+  .mobile-file-row-icon {
+    flex-shrink: 0;
+    width: 20px;
+    height: 20px;
+    color: var(--mobile-muted);
+  }
+
+  .mobile-file-row-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-file-row-actions {
+    display: flex;
+    align-items: center;
+    border-left: 1px solid var(--mobile-border);
+    background: color-mix(in srgb, var(--bg-editor), transparent 40%);
+  }
+
+  .mobile-file-action-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 48px;
+    min-height: 100%;
+    padding: 0;
+    color: var(--mobile-muted);
+  }
+
+  .mobile-file-action-btn:active {
+    color: var(--mobile-ink);
+    background: var(--surface-hover, rgba(127, 127, 127, 0.12));
+  }
+
+  .mobile-file-action-btn svg {
+    width: 18px;
+    height: 18px;
   }
 
   .mobile-examples {
@@ -607,12 +919,23 @@ q){/if}</pre>
   }
 
   .example-thumb {
+    position: relative;
     aspect-ratio: 1;
     border-radius: 5px;
+    overflow: hidden;
     background:
       radial-gradient(circle at 50% 50%, var(--example-accent), transparent 42%),
       repeating-conic-gradient(from 0deg, var(--example-accent) 0 8deg, transparent 8deg 18deg),
       #171613;
+  }
+
+  .example-thumb img {
+    position: absolute;
+    inset: 0;
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
   }
 
   .mobile-example-card strong {
@@ -637,34 +960,6 @@ q){/if}</pre>
     color: var(--mobile-muted);
     font-size: 15px;
     line-height: 1.5;
-  }
-
-  .mobile-data-list {
-    display: grid;
-    gap: 10px;
-  }
-
-  .mobile-data-list article {
-    padding: 12px;
-    border: 1px solid var(--mobile-border);
-    border-radius: 8px;
-    background: var(--bg-chrome);
-  }
-
-  .mobile-data-list strong {
-    display: block;
-    margin-bottom: 6px;
-    color: var(--accent);
-    text-transform: uppercase;
-    font-size: 11px;
-  }
-
-  .mobile-data-list p {
-    max-width: none;
-    margin: 0;
-    font-family: var(--font-mono);
-    font-size: 12px;
-    white-space: pre-wrap;
   }
 
   .mobile-bottom-nav {

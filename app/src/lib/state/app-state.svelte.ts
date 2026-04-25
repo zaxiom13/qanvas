@@ -35,6 +35,8 @@ const STORAGE_KEYS = {
   practiceStepsExpanded: 'qanvas5:practiceStepsExpanded',
   debugConsole: 'qanvas5:debugConsole',
   consoleHeight: 'qanvas5:consoleHeight',
+  consoleCollapsed: 'qanvas5:consoleCollapsed',
+  mobileConsoleCollapsed: 'qanvas5:mobileConsoleCollapsed',
   editorPanelWidth: 'qanvas5:editorPanelWidth',
   lastExampleId: 'qanvas5:lastExampleId',
   tourCompleted: 'qanvas5:tourCompleted',
@@ -151,8 +153,10 @@ class AppState {
 
   sidebarCollapsed = $state(readStored(STORAGE_KEYS.sidebarCollapsed) === '1');
   consoleHeight = $state(readStoredNumber(STORAGE_KEYS.consoleHeight, 160));
+  consoleCollapsed = $state(readStored(STORAGE_KEYS.consoleCollapsed) === '1');
+  mobileConsoleCollapsed = $state(readStored(STORAGE_KEYS.mobileConsoleCollapsed) === '1');
   editorPanelWidth = $state(readStoredNumber(STORAGE_KEYS.editorPanelWidth, 520));
-  consoleFilter = $state<'all' | 'stdout' | 'stderr'>('all');
+  consoleFilter = $state<'all' | 'stdout' | 'stderr' | 'info'>('all');
   consoleEntries = $state<ConsoleEntry[]>([]);
   activeModal = $state<ModalName>(null);
   newFileName = $state('');
@@ -188,9 +192,8 @@ class AppState {
   }
 
   get filteredConsole() {
-    return this.consoleFilter === 'all'
-      ? this.consoleEntries
-      : this.consoleEntries.filter((entry) => entry.type === this.consoleFilter);
+    if (this.consoleFilter === 'all') return this.consoleEntries;
+    return this.consoleEntries.filter((entry) => entry.type === this.consoleFilter);
   }
 
   get running() {
@@ -323,12 +326,23 @@ class AppState {
   }
 
   setConsoleHeight(height: number) {
+    if (this.consoleCollapsed) return;
     const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
     const minH = 96;
     const maxH = Math.min(560, Math.max(minH + 40, Math.floor(vh * 0.58)));
     const clamped = Math.max(minH, Math.min(Math.round(height), maxH));
     this.consoleHeight = clamped;
     writeStored(STORAGE_KEYS.consoleHeight, String(clamped));
+  }
+
+  toggleConsoleCollapsed() {
+    this.consoleCollapsed = !this.consoleCollapsed;
+    writeStored(STORAGE_KEYS.consoleCollapsed, this.consoleCollapsed ? '1' : '0');
+  }
+
+  toggleMobileConsoleCollapsed() {
+    this.mobileConsoleCollapsed = !this.mobileConsoleCollapsed;
+    writeStored(STORAGE_KEYS.mobileConsoleCollapsed, this.mobileConsoleCollapsed ? '1' : '0');
   }
 
   setEditorPanelWidth(width: number) {

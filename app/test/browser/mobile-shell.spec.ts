@@ -13,6 +13,7 @@ test('shows the mobile workspace with bottom navigation', async ({ page }) => {
   await expect(page.getByRole('button', { name: 'Editor' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Canvas' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Examples' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Files' })).toBeVisible();
   await expect(page.getByLabel('q sketch editor')).toBeVisible();
 });
 
@@ -44,7 +45,7 @@ test('runs the sketch from the mobile canvas playbar', async ({ page }) => {
   await page.goto('/');
 
   await page.getByRole('button', { name: 'Canvas' }).click();
-  await page.getByRole('button', { name: 'Run sketch' }).click();
+  await page.locator('.mobile-playbar').getByRole('button', { name: 'Run sketch' }).click();
 
   await expect(page.getByRole('button', { name: 'Canvas' })).toHaveClass(/active/);
   await expect(page.getByLabel('Sketch canvas')).toBeVisible();
@@ -70,4 +71,55 @@ test('loads an example from the mobile examples tab', async ({ page }) => {
   await page.getByRole('button', { name: /hello circle/i }).click();
 
   await expect(page.getByLabel('q sketch editor')).toHaveValue(/circle/);
+});
+
+test('renders a canvas still on mobile example thumbnails', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Examples' }).click();
+  const helloCard = page.getByRole('button', { name: /hello circle/i });
+  await expect(helloCard.locator('.example-thumb img')).toBeVisible({ timeout: 20_000 });
+  await expect(helloCard.locator('.example-thumb img')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
+});
+
+test('does not show Quick Tools on the mobile canvas tab', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Canvas' }).click();
+  await expect(page.getByRole('heading', { name: 'Quick Tools' })).toHaveCount(0);
+});
+
+test('filters the mobile editor console by Data, Errors, and Info', async ({ page }) => {
+  await page.goto('/');
+
+  const consoleFilters = page.getByRole('tablist', { name: 'Console filter' });
+
+  await consoleFilters.getByRole('button', { name: 'Info' }).click();
+  await expect(page.getByText(/Qanvas5 ready/)).toBeVisible();
+
+  await consoleFilters.getByRole('button', { name: 'Data' }).click();
+  await expect(page.getByText('No lines for this filter.')).toBeVisible();
+
+  await consoleFilters.getByRole('button', { name: 'Errors' }).click();
+  await expect(page.getByText('No lines for this filter.')).toBeVisible();
+});
+
+test('collapses the mobile editor console output', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.locator('.mobile-console-output')).toBeVisible();
+  await page.getByLabel('Console output').getByRole('button', { name: 'Collapse console' }).click();
+  await expect(page.locator('.mobile-console-output')).toHaveCount(0);
+  await page.getByLabel('Console output').getByRole('button', { name: 'Expand console' }).click();
+  await expect(page.locator('.mobile-console-output')).toBeVisible();
+});
+
+test('opens a sketch file from the Files tab', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Files' }).click();
+  await expect(page.getByRole('heading', { name: 'Files' })).toBeVisible();
+  await page.getByRole('button', { name: /^sketch\.q/ }).click();
+  await expect(page.getByRole('button', { name: 'Editor' })).toHaveClass(/active/);
+  await expect(page.getByLabel('q sketch editor')).toBeVisible();
 });

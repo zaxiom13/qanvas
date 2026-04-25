@@ -159,12 +159,34 @@ function lowerExpression(node: ParserNode, diagnostics: CompileDiagnostic[], uns
             }))
           : [],
       };
-    case 'call':
+    case 'call': {
+      // Parser models dyadic `a~b` as implicit juxtaposition: `call(a, [call(~, [b])])`.
+      // Lower that to a binary `~` so the emitter can use `rt.op("~", ...)`.
+      const firstArg = node.args?.[0] as ParserNode | undefined;
+      if (
+        node.implicit &&
+        Array.isArray(node.args) &&
+        node.args.length === 1 &&
+        firstArg?.kind === 'call' &&
+        firstArg.implicit &&
+        firstArg.callee?.kind === 'identifier' &&
+        firstArg.callee.name === '~' &&
+        Array.isArray(firstArg.args) &&
+        firstArg.args.length === 1
+      ) {
+        return {
+          kind: 'binary',
+          op: '~',
+          left: lowerExpression(node.callee, diagnostics, unsupported),
+          right: lowerExpression(firstArg.args[0], diagnostics, unsupported),
+        };
+      }
       return {
         kind: 'call',
         callee: lowerExpression(node.callee, diagnostics, unsupported),
         args: Array.isArray(node.args) ? node.args.map((entry: ParserNode) => lowerExpression(entry, diagnostics, unsupported)) : [],
       };
+    }
     case 'each':
       if (node.callee?.kind !== 'identifier') {
         pushUnsupported(diagnostics, unsupported, node.kind, 'Only identifier-based each calls are supported.');

@@ -15,6 +15,19 @@ export class CanvasSurface {
     this.clear();
   }
 
+  /** Set backing store from logical CSS pixels (for off-screen / headless thumbnails). */
+  resizeToLogicalSize(width: number, height: number) {
+    if (!this.canvas || !this.ctx) return;
+    const ratio = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(width));
+    const h = Math.max(1, Math.round(height));
+    this.canvas.style.width = `${w}px`;
+    this.canvas.style.height = `${h}px`;
+    this.canvas.width = Math.max(1, Math.round(w * ratio));
+    this.canvas.height = Math.max(1, Math.round(h * ratio));
+    this.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  }
+
   resize() {
     if (!this.canvas || !this.ctx) return;
     const rect = this.canvas.getBoundingClientRect();

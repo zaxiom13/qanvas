@@ -370,6 +370,9 @@ function deepEqual(left: unknown, right: unknown) {
 }
 
 function isTruthy(value: unknown) {
+  if (value === null || value === undefined) {
+    return false;
+  }
   if (Array.isArray(value)) {
     return value.length > 0;
   }
