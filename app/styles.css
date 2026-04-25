@@ -2988,6 +2988,42 @@ textarea:focus-visible {
   font-size: inherit;
 }
 
+/* q token colors (shared: mobile CodeMirror + guided-tour snippet HTML) */
+.mobile-code-editor .cm-content .q-token-keyword,
+.tour-lesson-highlight-code .q-token-keyword {
+  color: #4c63d6;
+  font-weight: 700;
+}
+.mobile-code-editor .cm-content .q-token-symbol,
+.tour-lesson-highlight-code .q-token-symbol {
+  color: #b38256;
+}
+.mobile-code-editor .cm-content .q-token-variable,
+.tour-lesson-highlight-code .q-token-variable {
+  color: #2c2924;
+}
+.mobile-code-editor .cm-content .q-token-number,
+.tour-lesson-highlight-code .q-token-number {
+  color: #3b8f51;
+}
+.mobile-code-editor .cm-content .q-token-string,
+.tour-lesson-highlight-code .q-token-string {
+  color: #8b5e34;
+}
+.mobile-code-editor .cm-content .q-token-comment,
+.tour-lesson-highlight-code .q-token-comment {
+  color: #9a8e80;
+  font-style: italic;
+}
+.mobile-code-editor .cm-content .q-token-operator,
+.tour-lesson-highlight-code .q-token-operator {
+  color: #c94834;
+}
+.mobile-code-editor .cm-content .q-token-bracket,
+.tour-lesson-highlight-code .q-token-bracket {
+  color: #6b6258;
+}
+
 .tour-lesson-panel-shortcuts {
   margin: 0;
   padding-top: 4px;

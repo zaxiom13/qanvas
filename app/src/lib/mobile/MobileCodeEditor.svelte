@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from 'svelte';
   import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
-  import { bracketMatching, HighlightStyle, indentOnInput, syntaxHighlighting } from '@codemirror/language';
+  import { bracketMatching, indentOnInput, syntaxHighlighting } from '@codemirror/language';
   import { EditorState } from '@codemirror/state';
   import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-  import { tags as t } from '@lezer/highlight';
+  import { qMobileEditorHighlightStyle } from './q-highlight-html';
   import { qLanguage } from './q-codemirror';
 
   type Props = {
@@ -64,17 +64,6 @@
     },
   });
 
-  const qHighlightTheme = HighlightStyle.define([
-    { tag: t.keyword, class: 'q-token-keyword', color: '#4C63D6', fontWeight: '700' },
-    { tag: t.atom, class: 'q-token-symbol', color: '#B38256' },
-    { tag: t.variableName, class: 'q-token-variable', color: '#2C2924' },
-    { tag: t.number, class: 'q-token-number', color: '#3B8F51' },
-    { tag: t.string, class: 'q-token-string', color: '#8B5E34' },
-    { tag: t.comment, class: 'q-token-comment', color: '#9A8E80', fontStyle: 'italic' },
-    { tag: t.operator, class: 'q-token-operator', color: '#C94834' },
-    { tag: t.bracket, class: 'q-token-bracket', color: '#6B6258' },
-  ]);
-
   onMount(() => {
     if (!host) return;
 
@@ -86,7 +75,7 @@
           lineNumbers(),
           history(),
           qLanguage,
-          syntaxHighlighting(qHighlightTheme),
+          syntaxHighlighting(qMobileEditorHighlightStyle),
           mobileTheme,
           bracketMatching(),
           indentOnInput(),
