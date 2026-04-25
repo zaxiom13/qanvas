@@ -122,23 +122,6 @@
       </div>
       <p>kdb+/q creative coding</p>
     </div>
-
-    <div class="mobile-header-actions">
-      <button class="mobile-action mobile-action--primary" type="button" aria-label="Run sketch" onclick={runOrStop}>
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          {#if appState.running}
-            <rect x="7" y="6" width="10" height="12" rx="2" fill="currentColor"></rect>
-          {:else}
-            <path d="M8 5v14l11-7z" fill="currentColor"></path>
-          {/if}
-        </svg>
-      </button>
-      <button class="mobile-action" type="button" aria-label="More actions">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 5v2M12 17v2M5 12h2M17 12h2M7.76 7.76l1.42 1.42M14.82 14.82l1.42 1.42M16.24 7.76l-1.42 1.42M9.18 14.82l-1.42 1.42" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg>
-      </button>
-    </div>
   </header>
 
   <main class="mobile-main">
@@ -440,7 +423,7 @@
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: space-between;
+    justify-content: flex-start;
     gap: 16px;
     padding: calc(env(safe-area-inset-top) + 14px) 18px 12px;
     background: var(--bg-toolbar);
@@ -467,7 +450,6 @@
     font-size: 12px;
   }
 
-  .mobile-header-actions,
   .mobile-playbar {
     display: flex;
     align-items: center;
@@ -493,7 +475,6 @@
     height: 24px;
   }
 
-  .mobile-action--primary,
   .mobile-playbar-btn--hot {
     border-color: color-mix(in srgb, var(--mobile-hot), white 28%);
     background: var(--mobile-hot);
