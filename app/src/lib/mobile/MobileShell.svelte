@@ -4,6 +4,7 @@
   import { captureExampleStillDataUrl } from '$lib/mobile/example-preview-still';
   import { appState } from '$lib/state/app-state.svelte';
   import { backendState } from '$lib/state/backend-state.svelte';
+  import MobileCodeEditor from './MobileCodeEditor.svelte';
 
   type MobileTab = 'editor' | 'canvas' | 'examples' | 'files' | 'settings';
   type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
@@ -145,15 +146,9 @@
             <span>{Math.round(appState.fps || 60)} FPS</span>
           </div>
         </div>
-        <textarea
-          class="mobile-code"
-          spellcheck="false"
-          autocapitalize="off"
-          autocomplete="off"
-          value={mobileCode}
-          oninput={(event) => updateCode(event.currentTarget.value)}
-          aria-label="q sketch editor"
-        ></textarea>
+        <div class="mobile-code">
+          <MobileCodeEditor value={mobileCode} onChange={updateCode} />
+        </div>
         <div
           class="mobile-console"
           class:mobile-console--collapsed={appState.mobileConsoleCollapsed}
@@ -674,22 +669,9 @@
     width: 100%;
     flex: 1 1 auto;
     min-height: 0;
-    border: 0;
-    border-radius: 0;
     margin: 0;
-    padding: 18px 20px;
-    overflow: auto;
-    background:
-      linear-gradient(90deg, rgba(76, 99, 214, 0.06) 1px, transparent 1px) 0 0 / 56px 56px,
-      var(--mobile-panel);
-    color: var(--text-code);
-    font-family: var(--font-mono);
-    font-size: 13px;
-    line-height: 1.65;
-    user-select: text;
-    white-space: pre-wrap;
-    resize: none;
-    outline: none;
+    overflow: hidden;
+    background: var(--mobile-panel);
   }
 
   .mobile-console {

@@ -57,12 +57,22 @@ test('edits the active sketch from the mobile editor', async ({ page }) => {
   await page.goto('/');
 
   const editor = page.getByLabel('q sketch editor');
-  await editor.fill('setup:{`size`bg!(320 320;Color.CREAM)}\n');
+  await editor.click();
+  await page.keyboard.press('Meta+A');
+  await page.keyboard.type('setup:{`size`bg!(320 320;Color.CREAM)}\n');
 
   await page.getByRole('button', { name: 'Canvas' }).click();
   await page.getByRole('button', { name: 'Editor' }).click();
 
-  await expect(editor).toHaveValue(/320 320/);
+  await expect(editor).toContainText(/320 320/);
+});
+
+test('highlights q syntax in the mobile editor', async ({ page }) => {
+  await page.goto('/');
+
+  await expect(page.locator('.mobile-code-editor .q-token-keyword').filter({ hasText: 'enlist' }).first()).toBeVisible();
+  await expect(page.locator('.mobile-code-editor .q-token-number').filter({ hasText: '800' }).first()).toBeVisible();
+  await expect(page.locator('.mobile-code-editor .q-token-symbol').filter({ hasText: '`size' }).first()).toBeVisible();
 });
 
 test('loads an example from the mobile examples tab', async ({ page }) => {
@@ -71,7 +81,7 @@ test('loads an example from the mobile examples tab', async ({ page }) => {
   await page.getByRole('button', { name: 'Examples' }).click();
   await page.getByRole('button', { name: /hello circle/i }).click();
 
-  await expect(page.getByLabel('q sketch editor')).toHaveValue(/circle/);
+  await expect(page.getByLabel('q sketch editor')).toContainText(/circle/);
 });
 
 test('exposes working controls in the mobile settings tab', async ({ page }) => {
@@ -80,7 +90,7 @@ test('exposes working controls in the mobile settings tab', async ({ page }) => 
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Practice' }).click();
   await page.getByRole('button', { name: 'Editor' }).click();
-  await expect(page.getByLabel('q sketch editor')).toHaveValue(/answer:\(\[\] city:`symbol\$\(\); totalRevenue:`long\$\(\)\);/);
+  await expect(page.getByLabel('q sketch editor')).toContainText(/answer:\(\[\] city:`symbol\$\(\); totalRevenue:`long\$\(\)\);/);
 
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: /FPS overlay/i }).click();
