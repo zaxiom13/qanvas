@@ -77,6 +77,15 @@ export class CanvasSurface {
     link.click();
   }
 
+  /** Logical-size RGBA snapshot (copy) for GIF frames; null if the surface is not ready. */
+  captureRgbaSnapshot(): Uint8ClampedArray | null {
+    if (!this.ctx) return null;
+    const [width, height] = this.getSize();
+    if (width < 1 || height < 1) return null;
+    const imageData = this.ctx.getImageData(0, 0, width, height);
+    return new Uint8ClampedArray(imageData.data);
+  }
+
   private execute(command: DrawCommand) {
     if (!this.ctx) return;
     const kind = String(command.kind ?? '');

@@ -9,6 +9,7 @@
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "test": "vitest run",
     "mobile:sync": "npm run build && cap sync",
     "mobile:ios": "npm run mobile:sync && cap open ios",
     "mobile:android": "npm run mobile:sync && cap open android"
@@ -27,6 +28,7 @@
     "@qpad/engine": "*",
     "@qpad/language": "*",
     "@simonwep/pickr": "^1.9.1",
+    "gifenc": "^1.0.3",
     "monaco-editor": "^0.52.2",
     "nouislider": "^15.8.1",
     "svelte": "^5.38.6"
@@ -39,6 +41,7 @@
     "svelte-check": "^4.3.1",
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
-    "vite": "^7.1.5"
+    "vite": "^7.1.5",
+    "vitest": "^4.1.4"
   }
 }
