@@ -1,12 +1,13 @@
 <script lang="ts">
   import { tick, untrack } from 'svelte';
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
+  import FileTabs from '$lib/components/FileTabs.svelte';
+  import { formatDisplayValue } from '$lib/formatting/value-format';
   import { captureExampleStillDataUrl } from '$lib/mobile/example-preview-still';
   import { appState } from '$lib/state/app-state.svelte';
-  import { backendState } from '$lib/state/backend-state.svelte';
   import MobileCodeEditor from './MobileCodeEditor.svelte';
 
-  type MobileTab = 'editor' | 'canvas' | 'examples' | 'files' | 'settings';
+  type MobileTab = 'editor' | 'canvas' | 'examples' | 'settings';
   type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
 
   let activeTab = $state<MobileTab>('editor');
@@ -16,7 +17,6 @@
     { id: 'editor', label: 'Editor', icon: 'code' },
     { id: 'canvas', label: 'Canvas', icon: 'palette' },
     { id: 'examples', label: 'Examples', icon: 'cube' },
-    { id: 'files', label: 'Files', icon: 'file' },
     { id: 'settings', label: 'Settings', icon: 'sliders' },
   ];
 
@@ -81,18 +81,7 @@
   function setActiveTab(tab: MobileTab) {
     activeTab = tab;
     if (tab === 'canvas') {
-      appState.setCanvasPanelTab('canvas');
-    }
-  }
-
-  function renameMobileFile(name: string) {
-    const next = window.prompt('Rename file', name);
-    if (next) appState.renameFile(name, next);
-  }
-
-  function deleteMobileFile(name: string) {
-    if (window.confirm(`Delete "${name}"?`)) {
-      appState.deleteFile(name);
+      appState.setCanvasPanelTab(appState.workspaceMode === 'practice' ? 'compiled' : 'canvas');
     }
   }
 
@@ -114,12 +103,11 @@
     await appState.runSketch();
   }
 
-  function chooseBackend(kind: 'browser' | 'local-q' | 'cloud-q') {
-    backendState.setDraftKind(kind);
-  }
-
-  function applyBackendSettings() {
-    backendState.apply();
+  async function chooseWorkspaceMode(mode: 'studio' | 'practice') {
+    await appState.setWorkspaceMode(mode);
+    if (mode === 'practice') {
+      setActiveTab('canvas');
+    }
   }
 </script>
 
@@ -137,14 +125,7 @@
     {#if activeTab === 'editor'}
       <section class="mobile-editor">
         <div class="mobile-filebar">
-          <button class="mobile-filetab" type="button">
-            <span>{appState.activeFileName}</span>
-            <span class="unsaved-dot" hidden={!appState.unsaved}></span>
-          </button>
-          <div class="mobile-canvas-status">
-            <span class="status-dot"></span>
-            <span>{Math.round(appState.fps || 60)} FPS</span>
-          </div>
+          <FileTabs mobile />
         </div>
         <div class="mobile-code">
           <MobileCodeEditor value={mobileCode} onChange={updateCode} />
@@ -154,9 +135,6 @@
           class:mobile-console--collapsed={appState.mobileConsoleCollapsed}
           aria-label="Console output"
         >
-          {#if !appState.mobileConsoleCollapsed}
-            <div class="sheet-handle"></div>
-          {/if}
           <div class="mobile-console-toolbar">
             <span class="mobile-console-title">Console</span>
             <div class="mobile-console-filters" role="tablist" aria-label="Console filter">
@@ -253,40 +231,114 @@
     {:else if activeTab === 'canvas'}
       <section class="mobile-canvas">
         <div class="mobile-canvas-stage">
-          <CanvasPanel />
+          {#if appState.workspaceMode === 'practice'}
+            <div class="mobile-practice-output" aria-label="Practice output">
+              <div class="mobile-practice-output-header">
+                <div>
+                  <p class="mobile-practice-eyebrow">Output</p>
+                  <h2>{appState.activePracticeChallenge.title}</h2>
+                </div>
+                <button class="mobile-practice-check" type="button" onclick={() => void appState.runSketch()}>
+                  Check answer
+                </button>
+              </div>
+              {#if appState.practiceVerification}
+                <article class="mobile-practice-result mobile-practice-result--{appState.practiceVerification.status}">
+                  <div class="mobile-practice-result-heading">
+                    <strong>{appState.practiceVerification.status === 'match' ? 'Correct' : appState.practiceVerification.status === 'mismatch' ? 'Not yet' : 'Error'}</strong>
+                    <span>{appState.practiceVerification.status}</span>
+                  </div>
+                  <p>{appState.practiceVerification.message}</p>
+                  <div class="mobile-practice-compare">
+                    <div>
+                      <small>Your output</small>
+                      <pre>{formatDisplayValue(appState.practiceVerification.actual)}</pre>
+                    </div>
+                    <div>
+                      <small>{appState.activePracticeChallenge.answerLabel}</small>
+                      <pre>{formatDisplayValue(appState.practiceVerification.expected)}</pre>
+                    </div>
+                  </div>
+                </article>
+              {:else}
+                <div class="mobile-practice-empty">
+                  <p>Edit your answer, then tap <strong>Check answer</strong>. The result appears here.</p>
+                </div>
+              {/if}
+            </div>
+          {:else}
+            <CanvasPanel />
+          {/if}
         </div>
         <div class="mobile-canvas-meta">
-          <span><span class="status-dot"></span>{Math.round(appState.fps || 60)} FPS</span>
           <span>{appState.currentCanvasSize[0] || 800} x {appState.currentCanvasSize[1] || 600}</span>
           <span>t: 359</span>
         </div>
-        <div class="mobile-tools-sheet">
-          <div class="sheet-handle"></div>
-          <h2>Canvas controls</h2>
-          <div class="quick-tools-grid">
-            <button class="quick-tool quick-tool--primary" type="button" aria-label={appState.running ? 'Stop sketch' : 'Run sketch'} onclick={runOrStop}>
-              <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true">
-                {#if appState.running}
-                  <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"></rect>
+        <div class="mobile-tools-sheet" class:mobile-tools-sheet--collapsed={appState.mobileCanvasControlsCollapsed}>
+          <div class="mobile-tools-sheet-header">
+            <h2>{appState.workspaceMode === 'practice' ? 'Practice controls' : 'Canvas controls'}</h2>
+            <button
+              class="btn-icon-only mobile-tools-collapse-btn"
+              type="button"
+              aria-expanded={!appState.mobileCanvasControlsCollapsed}
+              aria-label={appState.mobileCanvasControlsCollapsed ? 'Expand canvas controls' : 'Collapse canvas controls'}
+              title={appState.mobileCanvasControlsCollapsed ? 'Expand canvas controls' : 'Collapse canvas controls'}
+              onclick={() => appState.toggleMobileCanvasControlsCollapsed()}
+            >
+              <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                {#if appState.mobileCanvasControlsCollapsed}
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                 {:else}
-                  <path d="M8 5v14l11-7z" fill="currentColor"></path>
+                  <path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
                 {/if}
               </svg>
-              <span>{appState.running ? 'Stop' : 'Run'}</span>
-            </button>
-            <button class="quick-tool" type="button" aria-label="Reset sketch" onclick={() => void resetSketch()}>
-              <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-              <span>Reset</span>
-            </button>
-            <button class="quick-tool" type="button" aria-label="Export PNG" onclick={() => appState.exportPng()}>
-              <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h2l1.5-2h3L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="13" r="3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-              <span>PNG</span>
-            </button>
-            <button class="quick-tool" type="button" aria-label="Export GIF" onclick={() => appState.openGifModal()}>
-              <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M8 4v3M12 4v3M16 4v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
-              <span>GIF</span>
             </button>
           </div>
+          {#if !appState.mobileCanvasControlsCollapsed}
+          <div class="quick-tools-grid">
+            {#if appState.workspaceMode === 'practice'}
+              <button class="quick-tool quick-tool--primary" type="button" aria-label="Check answer" onclick={() => void appState.runSketch()}>
+                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                <span>Check</span>
+              </button>
+              <button class="quick-tool" type="button" aria-label="Back to editor" onclick={() => setActiveTab('editor')}>
+                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8-4 4 4 4M15 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                <span>Edit</span>
+              </button>
+              <button class="quick-tool" type="button" aria-label="Show answer" onclick={() => appState.revealPracticeAnswer()}>
+                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5 0 8 7 8 7s-3 7-8 7-8-7-8-7 3-7 8-7Z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                <span>Answer</span>
+              </button>
+              <button class="quick-tool" type="button" aria-label="Reset starter" onclick={() => appState.resetPracticeStarter()}>
+                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                <span>Reset</span>
+              </button>
+            {:else}
+              <button class="quick-tool quick-tool--primary" type="button" aria-label={appState.running ? 'Stop sketch' : 'Run sketch'} onclick={runOrStop}>
+                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+                  {#if appState.running}
+                    <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"></rect>
+                  {:else}
+                    <path d="M8 5v14l11-7z" fill="currentColor"></path>
+                  {/if}
+                </svg>
+                <span>{appState.running ? 'Stop' : 'Run'}</span>
+              </button>
+              <button class="quick-tool" type="button" aria-label="Reset sketch" onclick={() => void resetSketch()}>
+                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                <span>Reset</span>
+              </button>
+              <button class="quick-tool" type="button" aria-label="Export PNG" onclick={() => appState.exportPng()}>
+                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h2l1.5-2h3L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="13" r="3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                <span>PNG</span>
+              </button>
+              <button class="quick-tool" type="button" aria-label="Export GIF" onclick={() => appState.openGifModal()}>
+                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M8 4v3M12 4v3M16 4v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                <span>GIF</span>
+              </button>
+            {/if}
+          </div>
+          {/if}
         </div>
       </section>
     {:else if activeTab === 'examples'}
@@ -324,64 +376,6 @@
           {/each}
         </div>
       </section>
-    {:else if activeTab === 'files'}
-      <section class="mobile-files-panel" aria-labelledby="mobile-files-heading">
-        <div class="mobile-files-panel-header">
-          <h1 id="mobile-files-heading">Files</h1>
-          <div class="mobile-files-panel-actions">
-            <button class="mobile-action" type="button" aria-label="New file" title="New file" onclick={() => appState.openNewFileModal()}>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 5v14M5 12h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-              </svg>
-            </button>
-            <button class="mobile-action" type="button" aria-label="Import asset" title="Import asset" onclick={() => void appState.importAssets()}>
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 4v10M8 10l4 4 4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M5 18h14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-              </svg>
-            </button>
-          </div>
-        </div>
-        <p class="mobile-files-panel-hint">Tap a file to open it in the editor. Runtime output stays in the console (Data filter).</p>
-        <div class="mobile-file-list" role="list">
-          {#each appState.files as file (file.name)}
-            <div class="mobile-file-row" class:mobile-file-row--active={file.name === appState.activeFileName} role="listitem">
-              <button
-                class="mobile-file-row-main"
-                type="button"
-                onclick={() => {
-                  appState.selectFile(file.name);
-                  setActiveTab('editor');
-                }}
-              >
-                <svg class="mobile-file-row-icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" stroke-width="1" fill="none" />
-                  <path d="M10 2v3h3" stroke="currentColor" stroke-width="1" fill="none" />
-                </svg>
-                <span class="mobile-file-row-name">{file.name}</span>
-                {#if file.name === appState.activeFileName && appState.unsaved}
-                  <span class="unsaved-dot" aria-hidden="true"></span>
-                {/if}
-              </button>
-              {#if file.name !== 'sketch.q'}
-                <div class="mobile-file-row-actions">
-                  <button class="mobile-file-action-btn" type="button" title="Rename" aria-label="Rename {file.name}" onclick={() => renameMobileFile(file.name)}>
-                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path d="M3 13h10M8 3l-4 4v2h2l4-4-2-2zM10 5l2 2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-                    </svg>
-                  </button>
-                  <button class="mobile-file-action-btn" type="button" title="Delete" aria-label="Delete {file.name}" onclick={() => deleteMobileFile(file.name)}>
-                    <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                      <path d="M3 4h10M5 4V3h6v1M6 7v5M10 7v5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none" />
-                      <path d="M4 4l1 9h6l1-9" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" fill="none" />
-                    </svg>
-                  </button>
-                </div>
-              {/if}
-            </div>
-          {/each}
-        </div>
-      </section>
     {:else}
       <section class="mobile-settings">
         <h1>Settings</h1>
@@ -389,63 +383,9 @@
         <div class="mobile-settings-section">
           <h2>Workspace</h2>
           <div class="mobile-segmented" role="group" aria-label="Workspace mode">
-            <button type="button" class:active={appState.workspaceMode === 'studio'} onclick={() => void appState.setWorkspaceMode('studio')}>Studio</button>
-            <button type="button" class:active={appState.workspaceMode === 'practice'} onclick={() => void appState.setWorkspaceMode('practice')}>Practice</button>
+            <button type="button" class:active={appState.workspaceMode === 'studio'} onclick={() => void chooseWorkspaceMode('studio')}>Studio</button>
+            <button type="button" class:active={appState.workspaceMode === 'practice'} onclick={() => void chooseWorkspaceMode('practice')}>Practice</button>
           </div>
-        </div>
-
-        <div class="mobile-settings-section">
-          <h2>Backend</h2>
-          <div class="mobile-backend-grid">
-            <button class:selected={backendState.draft.kind === 'browser'} type="button" onclick={() => chooseBackend('browser')}>
-              <strong>Browser</strong>
-              <span>jqport · offline</span>
-            </button>
-            <button class:selected={backendState.draft.kind === 'local-q'} type="button" onclick={() => chooseBackend('local-q')}>
-              <strong>Local q</strong>
-              <span>ws:// listener</span>
-            </button>
-            <button class:selected={backendState.draft.kind === 'cloud-q'} type="button" onclick={() => chooseBackend('cloud-q')}>
-              <strong>Cloud q</strong>
-              <span>wss:// backend</span>
-            </button>
-          </div>
-
-          {#if backendState.draft.kind === 'local-q'}
-            <label class="mobile-settings-label" for="mobile-local-q-url">Local q WebSocket</label>
-            <input
-              id="mobile-local-q-url"
-              class="mobile-settings-input"
-              type="text"
-              spellcheck="false"
-              placeholder="ws://127.0.0.1:5042"
-              value={backendState.draft.localUrl}
-              oninput={(event) => backendState.setDraftLocal(event.currentTarget.value)}
-            />
-          {:else if backendState.draft.kind === 'cloud-q'}
-            <label class="mobile-settings-label" for="mobile-cloud-q-url">Cloud q WebSocket</label>
-            <input
-              id="mobile-cloud-q-url"
-              class="mobile-settings-input"
-              type="text"
-              spellcheck="false"
-              placeholder="wss://qanvas.example.com/ws"
-              value={backendState.draft.cloudUrl}
-              oninput={(event) => backendState.setDraftCloud(event.currentTarget.value)}
-            />
-          {/if}
-
-          {#if backendState.statusMessage}
-            <p class:error={backendState.status === 'error'} class:ok={backendState.status === 'ok'} class="mobile-settings-status">{backendState.statusMessage}</p>
-          {/if}
-
-          <div class="mobile-settings-actions">
-            {#if backendState.draft.kind !== 'browser'}
-              <button type="button" onclick={() => void backendState.testConnection()} disabled={backendState.status === 'testing'}>Test</button>
-            {/if}
-            <button class="primary" type="button" onclick={applyBackendSettings}>Apply backend</button>
-          </div>
-          <p class="mobile-settings-current">Current: <strong>{backendState.activeLabel}</strong></p>
         </div>
 
         <div class="mobile-settings-section">
@@ -466,21 +406,11 @@
           </button>
           <button class="mobile-setting-row" type="button" onclick={() => appState.setCanvasPanelTab(appState.canvasPanelTab === 'canvas' ? 'compiled' : 'canvas')}>
             <span>
-              <strong>Canvas panel</strong>
-              <small>Switch between rendered canvas and compiled output.</small>
+              <strong>Canvas output</strong>
+              <small>Switch between rendered canvas and output.</small>
             </span>
-            <span class="mobile-toggle active">{appState.canvasPanelTab}</span>
+            <span class="mobile-toggle active">{appState.canvasPanelTab === 'compiled' ? 'Output' : 'Canvas'}</span>
           </button>
-        </div>
-
-        <div class="mobile-settings-section">
-          <h2>Project actions</h2>
-          <div class="mobile-settings-actions mobile-settings-actions--grid">
-            <button type="button" onclick={() => void appState.createNewSketch()}>New sketch</button>
-            <button type="button" onclick={() => void appState.saveProject(false)}>Save</button>
-            <button type="button" onclick={() => appState.clearConsole(false)}>Clear console</button>
-            <button type="button" onclick={() => appState.openProjectsModal()}>Projects</button>
-          </div>
         </div>
       </section>
     {/if}
@@ -603,8 +533,7 @@
   .mobile-canvas,
   .mobile-examples,
   .mobile-empty-panel,
-  .mobile-settings,
-  .mobile-files-panel {
+  .mobile-settings {
     overflow-y: auto;
     overscroll-behavior: contain;
   }
@@ -616,39 +545,16 @@
 
   .mobile-examples,
   .mobile-empty-panel,
-  .mobile-settings,
-  .mobile-files-panel {
+  .mobile-settings {
     height: 100%;
     min-height: 0;
   }
 
   .mobile-filebar {
     flex: 0 0 auto;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: block;
     border-bottom: 1px solid var(--mobile-border);
     background: var(--bg-sidebar);
-  }
-
-  .mobile-filetab {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-height: 44px;
-    padding: 0 18px;
-    border-right: 1px solid var(--mobile-border);
-    color: var(--accent);
-    font-weight: 700;
-  }
-
-  .mobile-canvas-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    padding: 0 18px;
-    color: var(--mobile-muted);
-    font-size: 12px;
   }
 
   .status-dot,
@@ -692,15 +598,6 @@
     min-height: 0;
     padding-top: 6px;
     padding-bottom: 8px;
-  }
-
-  .sheet-handle {
-    width: 48px;
-    height: 5px;
-    margin: 0 auto 8px;
-    border-radius: 999px;
-    background: rgba(120, 104, 84, 0.32);
-    flex-shrink: 0;
   }
 
   .mobile-console-toolbar {
@@ -804,6 +701,120 @@
     padding: 14px 16px;
   }
 
+  .mobile-practice-output {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    height: 100%;
+    padding: 18px 14px;
+    overflow: auto;
+    background: var(--mobile-panel);
+  }
+
+  .mobile-practice-output-header,
+  .mobile-practice-result-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .mobile-practice-eyebrow {
+    margin: 0 0 3px;
+    color: var(--mobile-muted);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  .mobile-practice-output h2 {
+    margin: 0;
+    font-size: 18px;
+    line-height: 1.2;
+  }
+
+  .mobile-practice-check {
+    flex: 0 0 auto;
+    min-height: 44px;
+    padding: 0 14px;
+    border-radius: 9px;
+    background: var(--mobile-hot);
+    color: white;
+    font-weight: 800;
+  }
+
+  .mobile-practice-empty,
+  .mobile-practice-result {
+    padding: 14px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .mobile-practice-empty p,
+  .mobile-practice-result p {
+    margin: 0;
+    color: var(--mobile-muted);
+    line-height: 1.45;
+  }
+
+  .mobile-practice-result--match {
+    border-color: color-mix(in srgb, var(--green), white 55%);
+  }
+
+  .mobile-practice-result--mismatch {
+    border-color: color-mix(in srgb, var(--yellow), white 55%);
+  }
+
+  .mobile-practice-result--error {
+    border-color: color-mix(in srgb, var(--red), white 55%);
+  }
+
+  .mobile-practice-result-heading {
+    margin-bottom: 10px;
+  }
+
+  .mobile-practice-result-heading span {
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--bg-chrome);
+    color: var(--mobile-muted);
+    font-size: 11px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .mobile-practice-compare {
+    display: grid;
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .mobile-practice-compare > div {
+    min-width: 0;
+    padding: 10px;
+    border-radius: 8px;
+    background: var(--bg-chrome);
+  }
+
+  .mobile-practice-compare small {
+    display: block;
+    margin-bottom: 6px;
+    color: var(--mobile-muted);
+    font-weight: 800;
+  }
+
+  .mobile-practice-compare pre {
+    margin: 0;
+    overflow-x: auto;
+    color: var(--text-code);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.45;
+    user-select: text;
+  }
+
   .mobile-canvas-meta {
     display: flex;
     justify-content: space-between;
@@ -832,6 +843,29 @@
     gap: 12px;
   }
 
+  .mobile-tools-sheet {
+    flex: 0 0 auto;
+    padding: 14px;
+    background: var(--mobile-panel);
+    border-top: 1px solid var(--mobile-border);
+  }
+
+  .mobile-tools-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .mobile-tools-sheet-header h2 {
+    margin: 0;
+  }
+
+  .mobile-tools-sheet--collapsed {
+    padding-bottom: 10px;
+  }
+
   .quick-tool {
     display: grid;
     place-items: center;
@@ -854,116 +888,6 @@
   .nav-icon {
     width: 26px;
     height: 26px;
-  }
-
-  .mobile-files-panel {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    padding: 18px 14px 24px;
-    background: var(--mobile-panel);
-  }
-
-  .mobile-files-panel-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-  }
-
-  .mobile-files-panel-header h1 {
-    margin: 0;
-    font-size: 18px;
-  }
-
-  .mobile-files-panel-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .mobile-files-panel-hint {
-    margin: 0;
-    max-width: 52ch;
-    color: var(--mobile-muted);
-    font-size: 13px;
-    line-height: 1.45;
-  }
-
-  .mobile-file-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    flex: 1 1 auto;
-    min-height: 0;
-    margin-top: 4px;
-  }
-
-  .mobile-file-row {
-    display: flex;
-    align-items: stretch;
-    gap: 0;
-    border: 1px solid var(--mobile-border);
-    border-radius: 8px;
-    background: var(--bg-chrome);
-    overflow: hidden;
-  }
-
-  .mobile-file-row--active {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent), transparent 55%);
-  }
-
-  .mobile-file-row-main {
-    flex: 1 1 auto;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    min-width: 0;
-    padding: 12px 14px;
-    text-align: left;
-    color: var(--mobile-ink);
-    font-weight: 600;
-    font-size: 14px;
-  }
-
-  .mobile-file-row-icon {
-    flex-shrink: 0;
-    width: 20px;
-    height: 20px;
-    color: var(--mobile-muted);
-  }
-
-  .mobile-file-row-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .mobile-file-row-actions {
-    display: flex;
-    align-items: center;
-    border-left: 1px solid var(--mobile-border);
-    background: color-mix(in srgb, var(--bg-editor), transparent 40%);
-  }
-
-  .mobile-file-action-btn {
-    display: inline-grid;
-    place-items: center;
-    width: 48px;
-    min-height: 100%;
-    padding: 0;
-    color: var(--mobile-muted);
-  }
-
-  .mobile-file-action-btn:active {
-    color: var(--mobile-ink);
-    background: var(--surface-hover, rgba(127, 127, 127, 0.12));
-  }
-
-  .mobile-file-action-btn svg {
-    width: 18px;
-    height: 18px;
   }
 
   .mobile-examples {
@@ -1081,7 +1005,6 @@
   }
 
   .mobile-segmented,
-  .mobile-backend-grid,
   .mobile-settings-actions {
     display: grid;
     gap: 8px;
@@ -1091,12 +1014,7 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .mobile-backend-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
   .mobile-segmented button,
-  .mobile-backend-grid button,
   .mobile-settings-actions button {
     min-height: 44px;
     border: 1px solid var(--mobile-border);
@@ -1105,26 +1023,12 @@
     color: var(--mobile-ink);
   }
 
-  .mobile-segmented button.active,
-  .mobile-backend-grid button.selected,
-  .mobile-settings-actions button.primary {
+  .mobile-segmented button.active {
     border-color: var(--mobile-hot);
     background: var(--mobile-hot);
     color: white;
   }
 
-  .mobile-backend-grid button {
-    display: grid;
-    gap: 4px;
-    padding: 10px 6px;
-    text-align: left;
-  }
-
-  .mobile-backend-grid strong {
-    font-size: 12px;
-  }
-
-  .mobile-backend-grid span,
   .mobile-setting-row small,
   .mobile-settings-current {
     color: var(--mobile-muted);
@@ -1217,7 +1121,7 @@
     flex: 0 0 auto;
     z-index: 5;
     display: grid;
-    grid-template-columns: repeat(5, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 6px;
     padding: 10px 10px calc(env(safe-area-inset-bottom) + 10px);
     border-top: 1px solid var(--mobile-border);

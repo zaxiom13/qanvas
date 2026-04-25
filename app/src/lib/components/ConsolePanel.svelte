@@ -1,41 +1,11 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
   import { appState } from '$lib/state/app-state.svelte';
-
-  let dragCleanup = () => {};
 
   function formatTimestamp(ts: number) {
     const date = new Date(ts);
     const pad = (value: number, width = 2) => String(value).padStart(width, '0');
     return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
   }
-
-  function startResize(event: PointerEvent) {
-    event.preventDefault();
-    const startY = event.clientY;
-    const startHeight = appState.consoleHeight;
-
-    const handleMove = (moveEvent: PointerEvent) => {
-      const nextHeight = startHeight - (moveEvent.clientY - startY);
-      appState.setConsoleHeight(nextHeight);
-    };
-
-    const handleUp = () => {
-      window.removeEventListener('pointermove', handleMove);
-      window.removeEventListener('pointerup', handleUp);
-      document.body.classList.remove('is-resizing-console');
-      dragCleanup = () => {};
-    };
-
-    document.body.classList.add('is-resizing-console');
-    window.addEventListener('pointermove', handleMove);
-    window.addEventListener('pointerup', handleUp);
-    dragCleanup = handleUp;
-  }
-
-  onDestroy(() => {
-    dragCleanup();
-  });
 </script>
 
 <footer
@@ -45,18 +15,6 @@
     ? 'height:auto;min-height:calc(var(--tab-h) + 1px);'
     : `height: ${appState.consoleHeight}px; min-height: ${appState.consoleHeight}px;`}
 >
-  {#if !appState.consoleCollapsed}
-    <button
-      id="console-resize-handle"
-      class="console-resize-handle"
-      type="button"
-      aria-label="Resize console"
-      title="Drag to resize console"
-      onpointerdown={startResize}
-    >
-      <span></span>
-    </button>
-  {/if}
   <div class="console-toolbar">
     <span class="console-title">Console</span>
     <div class="console-filters">

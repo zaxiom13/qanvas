@@ -1,6 +1,7 @@
 <script lang="ts">
   import { browserGateway } from '$lib/browser';
   import { onDestroy, onMount } from 'svelte';
+  import FileTabs from '$lib/components/FileTabs.svelte';
   import MonacoEditor from '$lib/components/MonacoEditor.svelte';
   import { appState } from '$lib/state/app-state.svelte';
 
@@ -8,20 +9,17 @@
 
   function handleGlobalShortcuts() {
     const saveHandler = () => void appState.saveProject(false);
-    const sidebarHandler = () => appState.toggleSidebar();
     const exampleHandler = () => (appState.activeModal = appState.activeModal === 'examples' ? null : 'examples');
     const projectsHandler = () => appState.openProjectsModal();
     const newHandler = () => void appState.createNewSketch();
 
     window.addEventListener('qanvas:save', saveHandler as EventListener);
-    window.addEventListener('qanvas:toggle-sidebar', sidebarHandler as EventListener);
     window.addEventListener('qanvas:toggle-examples', exampleHandler as EventListener);
     window.addEventListener('qanvas:toggle-projects', projectsHandler as EventListener);
     window.addEventListener('qanvas:new-sketch', newHandler as EventListener);
 
     return () => {
       window.removeEventListener('qanvas:save', saveHandler as EventListener);
-      window.removeEventListener('qanvas:toggle-sidebar', sidebarHandler as EventListener);
       window.removeEventListener('qanvas:toggle-examples', exampleHandler as EventListener);
       window.removeEventListener('qanvas:toggle-projects', projectsHandler as EventListener);
       window.removeEventListener('qanvas:new-sketch', newHandler as EventListener);
@@ -92,13 +90,17 @@
   style={`flex: 0 0 ${appState.editorPanelWidth}px; width: ${appState.editorPanelWidth}px;`}
 >
   <div class="editor-tabs">
-    <div class="editor-tab editor-tab--active" id="active-tab">
-      <svg class="file-icon" viewBox="0 0 16 16" fill="none">
-        <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" stroke-width="1" fill="none" />
-        <path d="M10 2v3h3" stroke="currentColor" stroke-width="1" fill="none" />
-      </svg>
-      <span id="active-tab-name">{appState.workspaceMode === 'practice' ? 'Practice Editor' : appState.activeFileName}</span>
-    </div>
+    {#if appState.workspaceMode === 'practice'}
+      <div class="editor-tab editor-tab--active" id="active-tab">
+        <svg class="file-icon" viewBox="0 0 16 16" fill="none">
+          <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" stroke-width="1" fill="none" />
+          <path d="M10 2v3h3" stroke="currentColor" stroke-width="1" fill="none" />
+        </svg>
+        <span id="active-tab-name">Practice Editor</span>
+      </div>
+    {:else}
+      <FileTabs />
+    {/if}
   </div>
 
   <MonacoEditor

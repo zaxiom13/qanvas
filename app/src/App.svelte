@@ -1,6 +1,5 @@
 <script lang="ts">
   import Toolbar from './lib/components/Toolbar.svelte';
-  import Sidebar from './lib/components/Sidebar.svelte';
   import EditorPanel from './lib/components/EditorPanel.svelte';
   import CanvasPanel from './lib/components/CanvasPanel.svelte';
   import PracticePanel from './lib/components/PracticePanel.svelte';
@@ -46,21 +45,7 @@
   <div class="app-root">
     <Toolbar />
 
-    <main id="workspace" class:sidebar-collapsed={appState.sidebarCollapsed}>
-      {#if appState.workspaceMode !== 'practice'}
-        <Sidebar />
-
-        <button
-          class="sidebar-expand-btn"
-          id="btn-sidebar-expand"
-          type="button"
-          title="Expand sidebar (Cmd+B)"
-          onclick={() => appState.toggleSidebar()}
-        >
-          <svg viewBox="0 0 16 16" fill="none"><path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
-        </button>
-      {/if}
-
+    <main id="workspace">
       {#if appState.workspaceMode === 'practice'}
         <PracticePanel />
         <EditorPanel />

@@ -340,7 +340,6 @@
       </button>
     </div>
     <div class="canvas-toolbar-actions">
-      <span id="fps-display" class="fps-display canvas-toolbar-fps" hidden={!appState.showFps}>{appState.fps || '—'} fps</span>
       <button
         id="btn-fps-toggle"
         class="btn-icon-only canvas-toolbar-btn"

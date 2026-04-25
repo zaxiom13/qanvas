@@ -55,13 +55,6 @@
       <span id="unsaved-dot" class="unsaved-dot" hidden={!appState.unsaved}></span>
     </div>
     <div class="toolbar-divider"></div>
-    <button id="btn-new-sketch" class="btn-icon-only" type="button" title="New sketch (Cmd+N)" onclick={() => void appState.createNewSketch()}>
-      <svg class="icon" viewBox="0 0 16 16" fill="none">
-        <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" stroke-width="1.5" fill="none" />
-        <path d="M10 2v3h3" stroke="currentColor" stroke-width="1.5" fill="none" />
-        <path d="M7 8v4M5 10h4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-      </svg>
-    </button>
     <button id="btn-projects" class="btn-icon-only" type="button" title="Project library" onclick={() => appState.openProjectsModal()}>
       <svg class="icon" viewBox="0 0 16 16" fill="none">
         <path d="M2.5 4.5h4l1.4 1.5h5.6v5.5a1 1 0 0 1-1 1h-9a1 1 0 0 1-1-1z" stroke="currentColor" stroke-width="1.2" fill="none" stroke-linejoin="round" />
