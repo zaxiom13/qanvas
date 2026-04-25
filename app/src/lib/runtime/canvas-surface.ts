@@ -46,6 +46,15 @@ export class CanvasSurface {
     return [Math.round(rect.width), Math.round(rect.height)] as const;
   }
 
+  /** Bitmap pixel dimensions (after DPR scaling), for `getImageData` / GIF frames. */
+  getBackingStoreSize() {
+    if (!this.canvas) {
+      return [0, 0] as const;
+    }
+
+    return [this.canvas.width, this.canvas.height] as const;
+  }
+
   clear(background: unknown = DEFAULT_BG) {
     if (!this.ctx) return;
     const [width, height] = this.getSize();
@@ -75,6 +84,21 @@ export class CanvasSurface {
     link.download = filename;
     link.href = this.canvas.toDataURL('image/png');
     link.click();
+  }
+
+  /**
+   * Full backing-store RGBA snapshot for GIF frames.
+   * Must use `canvas.width` / `canvas.height` with `getImageData` — logical CSS sizes
+   * only cover a fragment of the bitmap when `devicePixelRatio` > 1, which produced
+   * cropped or effectively blank exports.
+   */
+  captureRgbaSnapshot(): Uint8ClampedArray | null {
+    if (!this.ctx || !this.canvas) return null;
+    const width = this.canvas.width;
+    const height = this.canvas.height;
+    if (width < 1 || height < 1) return null;
+    const imageData = this.ctx.getImageData(0, 0, width, height);
+    return new Uint8ClampedArray(imageData.data);
   }
 
   private execute(command: DrawCommand) {

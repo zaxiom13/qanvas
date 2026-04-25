@@ -2,6 +2,7 @@
   import { browserGateway } from '$lib/browser';
   import { onMount } from 'svelte';
   import { CanvasSurface } from '$lib/runtime/canvas-surface';
+  import { encodeRgbaFramesToGif } from '$lib/runtime/gif-export';
   import { appState } from '$lib/state/app-state.svelte';
   import InlineCopy from '$lib/components/InlineCopy.svelte';
 
@@ -27,7 +28,14 @@
   };
 
   const surface = new CanvasSurface();
+  const GIF_EXPORT_FPS = 30;
   let canvasElement = $state<HTMLCanvasElement | null>(null);
+
+  let gifRecording = $state(false);
+  let gifFrames: Uint8ClampedArray[] = [];
+  let gifTargetFrameCount = 0;
+  let gifFrameDelayMs = Math.round(1000 / GIF_EXPORT_FPS);
+  let gifExportNonce = 0;
 
   let guidedTourTitle = $derived.by(() => {
     if (appState.tourFinished) return 'Restart guided tour';
@@ -127,6 +135,68 @@
     });
   }
 
+  function stopGifRecordingAndDiscard() {
+    gifRecording = false;
+    gifFrames = [];
+    gifTargetFrameCount = 0;
+  }
+
+  function cancelGifExportRecording() {
+    gifExportNonce += 1;
+    stopGifRecordingAndDiscard();
+  }
+
+  function startGifExportRecording(durationSeconds: number) {
+    stopGifRecordingAndDiscard();
+    const frames = Math.max(1, Math.round(durationSeconds * GIF_EXPORT_FPS));
+    gifTargetFrameCount = frames;
+    gifRecording = true;
+    gifExportNonce += 1;
+    const nonce = gifExportNonce;
+    appState.appendConsole('info', `Recording ${durationSeconds}s GIF at ${GIF_EXPORT_FPS} fps (${frames} frames)…`);
+
+    window.setTimeout(() => {
+      if (gifExportNonce !== nonce || !gifRecording) return;
+      void finalizeGifExport(nonce);
+    }, durationSeconds * 1000);
+  }
+
+  async function finalizeGifExport(expectedNonce: number) {
+    if (gifExportNonce !== expectedNonce) return;
+
+    const captured = gifFrames;
+    const [width, height] = surface.getBackingStoreSize();
+
+    stopGifRecordingAndDiscard();
+
+    if (captured.length === 0) {
+      appState.appendConsole('stderr', 'GIF export failed: no frames were captured.');
+      return;
+    }
+
+    if (width < 1 || height < 1) {
+      appState.appendConsole('stderr', 'GIF export failed: canvas has no backing store pixels.');
+      return;
+    }
+
+    try {
+      const bytes = encodeRgbaFramesToGif(captured, width, height, gifFrameDelayMs);
+      const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+      const blob = new Blob([arrayBuffer], { type: 'image/gif' });
+      const url = URL.createObjectURL(blob);
+      const base = appState.activeFileName.replace(/\.q$/, '') || 'sketch';
+      const link = document.createElement('a');
+      link.download = `${base}-animation.gif`;
+      link.href = url;
+      link.click();
+      URL.revokeObjectURL(url);
+      appState.appendConsole('info', `GIF exported (${captured.length} frames).`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      appState.appendConsole('stderr', `GIF export failed: ${message}`);
+    }
+  }
+
   async function renderFrame(now: number, allowPaused = false) {
     frameHandle = 0;
     if (!appState.running || (!allowPaused && appState.paused) || inFlight || activeRunNonce !== appState.runNonce) return;
@@ -158,6 +228,13 @@
 
       renderCommands([...appState.runtimeStartCommands, ...commands]);
 
+      if (gifRecording && gifFrames.length < gifTargetFrameCount) {
+        const snapshot = surface.captureRgbaSnapshot();
+        if (snapshot) {
+          gifFrames.push(snapshot);
+        }
+      }
+
       appState.setFps(surface.updateFps(now));
       frameNumber += 1;
       appState.recordRenderedFrame(allowPaused ? 'manual' : 'continuous');
@@ -176,6 +253,12 @@
       }
     }
   }
+
+  $effect(() => {
+    if (!appState.running) {
+      cancelGifExportRecording();
+    }
+  });
 
   function scheduleFrameLoop(reset: boolean) {
     cancelAnimationFrame(frameHandle);
@@ -218,9 +301,7 @@
 
     appState.registerCanvasExports(
       () => surface.exportPng(`${appState.activeFileName.replace(/\.q$/, '') || 'sketch'}-frame.png`),
-      (durationSeconds) => {
-        appState.appendConsole('info', `GIF export is queued for ${durationSeconds}s, but the encoder pass is not wired yet.`);
-      }
+      (durationSeconds) => startGifExportRecording(durationSeconds)
     );
 
     const onTourShortcut = (event: KeyboardEvent) => {
@@ -249,6 +330,7 @@
     window.addEventListener('keydown', onTourShortcut);
 
     return () => {
+      cancelGifExportRecording();
       appState.registerCanvasExports(null, null);
       resizeObserver?.disconnect();
       window.removeEventListener('resize', resize);
