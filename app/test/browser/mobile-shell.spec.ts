@@ -74,6 +74,22 @@ test('highlights q syntax in the mobile editor', async ({ page }) => {
   await expect(page.locator('.mobile-code-editor .q-token-keyword').filter({ hasText: 'enlist' }).first()).toBeVisible();
   await expect(page.locator('.mobile-code-editor .q-token-number').filter({ hasText: '800' }).first()).toBeVisible();
   await expect(page.locator('.mobile-code-editor .q-token-symbol').filter({ hasText: '`size' }).first()).toBeVisible();
+  await expect(page.locator('.mobile-code-editor .q-token-qanvas').filter({ hasText: 'background' }).first()).toBeVisible();
+  await expect(page.locator('.mobile-code-editor .q-token-qanvas').filter({ hasText: 'circle' }).first()).toBeVisible();
+});
+
+test('highlights q syntax in guided-tour lesson snippets on mobile canvas', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Canvas' }).click();
+  await page.getByRole('button', { name: /Start tour/i }).click();
+  await page.getByRole('button', { name: 'Discard' }).click();
+
+  const snippet = page.locator('.tour-lesson-highlight-code');
+  await expect(snippet).toBeVisible({ timeout: 15_000 });
+  await expect(snippet.locator('.q-token-keyword').filter({ hasText: 'enlist' }).first()).toBeVisible();
+  await expect(snippet.locator('.q-token-number').filter({ hasText: '20' }).first()).toBeVisible();
+  await expect(snippet.locator('.q-token-qanvas').filter({ hasText: 'circle' }).first()).toBeVisible();
 });
 
 test('loads an example from the mobile examples tab', async ({ page }) => {

@@ -5,6 +5,7 @@
   import { encodeRgbaFramesToGif } from '$lib/runtime/gif-export';
   import { appState } from '$lib/state/app-state.svelte';
   import InlineCopy from '$lib/components/InlineCopy.svelte';
+  import { highlightQSnippetHtml } from '$lib/mobile/q-highlight-html';
 
   type CompiledDiagnostic = {
     message: string;
@@ -618,7 +619,7 @@
                 {#if lesson.highlight}
                   <figure class="tour-lesson-panel-highlight">
                     <figcaption><InlineCopy text={lesson.highlight.caption} /></figcaption>
-                    <pre><code>{lesson.highlight.code}</code></pre>
+                    <pre><code class="tour-lesson-highlight-code">{@html highlightQSnippetHtml(lesson.highlight.code)}</code></pre>
                   </figure>
                 {/if}
                 <p class="tour-lesson-panel-shortcuts"><kbd>[</kbd> previous lesson · <kbd>]</kbd> next lesson</p>

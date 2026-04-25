@@ -429,6 +429,26 @@ const Q_QANVAS_IDENTIFIERS = [
   ...Q_CONTEXT_SYMBOLS.map((item) => item.label).filter((label) => /^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(label)),
 ];
 
+const Q_KEYWORD_SET = new Set(Q_KEYWORDS.map((w) => w.toLowerCase()));
+const Q_BUILTIN_SET = new Set(Q_BUILTIN_FUNCTIONS.map((w) => w.toLowerCase()));
+const Q_QANVAS_SET = new Set(Q_QANVAS_IDENTIFIERS.map((w) => w.toLowerCase()));
+
+/**
+ * Classify a q identifier token the same way as the desktop Monarch grammar
+ * (qanvas API / colors → builtins → keywords → default identifier).
+ */
+export function classifyMobileQIdent(raw: string): 'qanvas' | 'builtin' | 'keyword' | 'identifier' {
+  if (!/^[a-zA-Z_.][a-zA-Z0-9_.]*$/.test(raw)) return 'identifier';
+  const lower = raw.toLowerCase();
+  const leaf = raw.includes('.') ? raw.slice(raw.lastIndexOf('.') + 1).toLowerCase() : lower;
+
+  if (Q_QANVAS_SET.has(lower)) return 'qanvas';
+  // Same order as desktop Monarch: builtins before keywords (many verbs appear in both lists).
+  if (Q_BUILTIN_SET.has(lower) || Q_BUILTIN_SET.has(leaf)) return 'builtin';
+  if (Q_KEYWORD_SET.has(lower) || Q_KEYWORD_SET.has(leaf)) return 'keyword';
+  return 'identifier';
+}
+
 const Q_SLASH_SNIPPETS = [
   {
     label: '/sketch',
