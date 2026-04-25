@@ -49,7 +49,7 @@ test('runs the sketch from the mobile canvas controls sheet', async ({ page }) =
   await expect(page.locator('.mobile-playbar')).toHaveCount(0);
   await page.getByRole('button', { name: 'Run sketch' }).click();
 
-  await expect(page.getByRole('button', { name: 'Canvas' })).toHaveClass(/active/);
+  await expect(page.getByRole('button', { name: 'Canvas', exact: true })).toHaveClass(/active/);
   await expect(page.getByLabel('Sketch canvas')).toBeVisible();
   await expect(page.locator('.sketch-overlay--running')).toHaveCount(1);
 });
@@ -63,7 +63,7 @@ test('edits the active sketch from the mobile editor', async ({ page }) => {
   await page.keyboard.type('setup:{`size`bg!(320 320;Color.CREAM)}\n');
 
   await page.getByRole('button', { name: 'Canvas' }).click();
-  await page.getByRole('button', { name: 'Editor' }).click();
+  await page.getByRole('button', { name: 'Editor', exact: true }).click();
 
   await expect(editor).toContainText(/320 320/);
 });
@@ -93,7 +93,7 @@ test('exposes working controls in the mobile settings tab', async ({ page }) => 
   await expect(page.getByLabel('Practice output')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Check answer' }).first()).toBeVisible();
 
-  await page.getByRole('button', { name: 'Editor' }).click();
+  await page.getByRole('button', { name: 'Editor', exact: true }).click();
   await expect(page.getByLabel('q sketch editor')).toContainText(/answer:\(\[\] city:`symbol\$\(\); totalRevenue:`long\$\(\)\);/);
 
   await page.getByRole('button', { name: 'Settings' }).click();
