@@ -37,7 +37,10 @@ import {
 export type { QValue } from "@qpad/core";
 import { KdbLexError, lexKdbLex, type KdbLexToken } from "../../q-language/src/index.js";
 
+import { createMemoryFileSystem, type HostFileSystem } from "./host-file-system.js";
 import { parse as pegParse } from "./q-parser.js";
+
+export type { HostFileSystem } from "./host-file-system.js";
 
 export type AstNode =
   | { kind: "program"; statements: AstNode[]; source: string }
@@ -316,17 +319,6 @@ export interface EvalResult {
   canonical: CanonicalNode;
 }
 
-export interface HostFileSystem {
-  readText: (path: string) => string | null;
-  writeText: (path: string, contents: string) => void;
-  readBinary?: (path: string) => Uint8Array | null;
-  writeBinary?: (path: string, bytes: Uint8Array) => void;
-  deletePath: (path: string) => boolean;
-  list: (directory: string) => string[];
-  exists: (path: string) => boolean;
-  size?: (path: string) => number;
-}
-
 export interface HostAdapter {
   now?: () => Date;
   timezone?: () => string;
@@ -335,60 +327,6 @@ export interface HostAdapter {
   unsupported?: (name: string) => never;
   fs?: HostFileSystem;
 }
-
-const createMemoryFileSystem = (): HostFileSystem => {
-  const files = new Map<string, string>();
-  const binaries = new Map<string, Uint8Array>();
-  const normalize = (path: string) => path.replace(/^:+/, "").replace(/^\/+/, "");
-  return {
-    readText: (path) => files.get(normalize(path)) ?? null,
-    writeText: (path, contents) => {
-      const key = normalize(path);
-      files.set(key, contents);
-      binaries.delete(key);
-    },
-    readBinary: (path) => binaries.get(normalize(path)) ?? null,
-    writeBinary: (path, bytes) => {
-      const key = normalize(path);
-      binaries.set(key, bytes);
-      files.delete(key);
-    },
-    deletePath: (path) => {
-      const key = normalize(path);
-      const had = files.delete(key) || binaries.delete(key);
-      return had;
-    },
-    list: (directory) => {
-      const prefix = normalize(directory);
-      const entries = new Set<string>();
-      const collect = (name: string) => {
-        if (!prefix) {
-          const head = name.split("/")[0]!;
-          entries.add(head);
-          return;
-        }
-        if (name === prefix) entries.add(name);
-        else if (name.startsWith(`${prefix}/`)) {
-          const tail = name.slice(prefix.length + 1).split("/")[0]!;
-          entries.add(tail);
-        }
-      };
-      for (const name of files.keys()) collect(name);
-      for (const name of binaries.keys()) collect(name);
-      return [...entries].sort();
-    },
-    exists: (path) => {
-      const key = normalize(path);
-      return files.has(key) || binaries.has(key);
-    },
-    size: (path) => {
-      const key = normalize(path);
-      if (files.has(key)) return files.get(key)!.length;
-      if (binaries.has(key)) return binaries.get(key)!.byteLength;
-      return -1;
-    }
-  };
-};
 
 export class QRuntimeError extends Error {
   readonly qName: string;
@@ -403,6 +341,7 @@ export class QRuntimeError extends Error {
 
 type BuiltinImpl = (session: Session, args: QValue[]) => QValue;
 type TemporalType = "date" | "month" | "minute" | "second" | "time" | "timespan";
+type StoredFileFormat = "csv" | "tsv" | "txt" | "json" | "q";
 
 interface BuiltinEntry extends QBuiltin {
   impl: BuiltinImpl;
@@ -1757,9 +1696,7 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     if (contents === null) {
       throw new QRuntimeError("io", `read0: ${path} not found`);
     }
-    const lines = contents.split(/\r?\n/);
-    if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
-    return qList(lines.map((line) => qString(line)), true);
+    return qList(textLines(contents).map((line) => qString(line)), true);
   });
   register("read1", 1, (session, [arg]) => {
     const path = fileHandlePath(arg, "read1");
@@ -1767,18 +1704,14 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     if (fs.readBinary) {
       const bytes = fs.readBinary(path);
       if (bytes) {
-        const items: QValue[] = [];
-        for (const byte of bytes) items.push(qLong(byte));
-        return qList(items, true, "byte");
+        return byteListFromBytes(bytes);
       }
     }
     const text = fs.readText(path);
     if (text === null) {
       throw new QRuntimeError("io", `read1: ${path} not found`);
     }
-    const items: QValue[] = [];
-    for (const code of text) items.push(qLong(code.codePointAt(0)!));
-    return qList(items, true, "byte");
+    return byteListFromText(text);
   });
   register("hcount", 1, (session, [arg]) => {
     const path = fileHandlePath(arg, "hcount");
@@ -2133,10 +2066,7 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
       throw new QRuntimeError("type", "save expects a file-handle symbol like `:foo.csv");
     }
     const path = arg.value.slice(1);
-    const slash = path.lastIndexOf("/");
-    const file = slash >= 0 ? path.slice(slash + 1) : path;
-    const dot = file.lastIndexOf(".");
-    const varName = dot >= 0 ? file.slice(0, dot) : file;
+    const varName = variableNameFromFilePath(path);
     const value = session.get(varName);
     writeQValueToFs(session, path, value);
     return arg;
@@ -2146,10 +2076,7 @@ const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
       throw new QRuntimeError("type", "load expects a file-handle symbol like `:foo.csv");
     }
     const path = arg.value.slice(1);
-    const slash = path.lastIndexOf("/");
-    const file = slash >= 0 ? path.slice(slash + 1) : path;
-    const dot = file.lastIndexOf(".");
-    const varName = dot >= 0 ? file.slice(0, dot) : file;
+    const varName = variableNameFromFilePath(path);
     const value = readQValueFromFs(session, path);
     session.assignGlobal(varName, value);
     return qSymbol(varName);
@@ -5026,7 +4953,18 @@ const loadScriptFromFs = (session: Session, rawPath: string): QValue => {
   throw new QRuntimeError("io", `\\l: ${path} not found`);
 };
 
-const inferFormatFromExt = (path: string): "csv" | "tsv" | "txt" | "json" | "q" => {
+const textLines = (contents: string): string[] => {
+  const lines = contents.split(/\r?\n/);
+  return lines.length > 0 && lines[lines.length - 1] === "" ? lines.slice(0, -1) : lines;
+};
+
+const byteListFromBytes = (bytes: Uint8Array): QList =>
+  qList([...bytes].map((byte) => qLong(byte)), true, "byte");
+
+const byteListFromText = (text: string): QList =>
+  qList([...text].map((char) => qLong(char.codePointAt(0)!)), true, "byte");
+
+const inferFormatFromExt = (path: string): StoredFileFormat => {
   const dot = path.lastIndexOf(".");
   if (dot < 0) return "q";
   const ext = path.slice(dot + 1).toLowerCase();
@@ -5035,6 +4973,22 @@ const inferFormatFromExt = (path: string): "csv" | "tsv" | "txt" | "json" | "q" 
   if (ext === "txt") return "txt";
   if (ext === "json") return "json";
   return "q";
+};
+
+const isDelimitedFormat = (format: StoredFileFormat): format is "csv" | "tsv" =>
+  format === "csv" || format === "tsv";
+
+const delimiterForDelimitedFormat = (format: "csv" | "tsv"): "," | "\t" =>
+  format === "csv" ? "," : "\t";
+
+const delimiterForFormat = (format: StoredFileFormat): "," | "\t" | null =>
+  isDelimitedFormat(format) ? delimiterForDelimitedFormat(format) : null;
+
+const variableNameFromFilePath = (path: string): string => {
+  const slash = path.lastIndexOf("/");
+  const file = slash >= 0 ? path.slice(slash + 1) : path;
+  const dot = file.lastIndexOf(".");
+  return dot >= 0 ? file.slice(0, dot) : file;
 };
 
 const escapeCsvField = (text: string, delimiter: string): string => {
@@ -5063,6 +5017,16 @@ const tableToCsv = (table: QTable, delimiter: string): string => {
     lines.push(cells.join(delimiter));
   }
   return lines.join("\n");
+};
+
+const tableForDelimitedSave = (value: QValue, format: "csv" | "tsv"): QTable => {
+  if (value.kind === "keyedTable") {
+    return qTable({ ...value.keys.columns, ...value.values.columns });
+  }
+  if (value.kind === "table") {
+    return value;
+  }
+  throw new QRuntimeError("type", `save ${format}: expected a table value`);
 };
 
 const parseCsvLine = (line: string, delimiter: string): string[] => {
@@ -5135,18 +5099,9 @@ const csvToTable = (text: string, delimiter: string): QTable => {
 const writeQValueToFs = (session: Session, path: string, value: QValue): void => {
   const format = inferFormatFromExt(path);
   const fs = session.fs();
-  if (format === "csv" || format === "tsv") {
-    const delimiter = format === "csv" ? "," : "\t";
-    const table =
-      value.kind === "keyedTable"
-        ? qTable({ ...value.keys.columns, ...value.values.columns })
-        : value.kind === "table"
-          ? value
-          : null;
-    if (!table) {
-      throw new QRuntimeError("type", `save ${format}: expected a table value`);
-    }
-    fs.writeText(path, tableToCsv(table, delimiter));
+  if (isDelimitedFormat(format)) {
+    const table = tableForDelimitedSave(value, format);
+    fs.writeText(path, tableToCsv(table, delimiterForDelimitedFormat(format)));
     return;
   }
   if (format === "json") {
@@ -5173,8 +5128,8 @@ const readQValueFromFs = (session: Session, path: string): QValue => {
   if (text === null) {
     throw new QRuntimeError("io", `get: ${path} not found`);
   }
-  if (format === "csv") return csvToTable(text, ",");
-  if (format === "tsv") return csvToTable(text, "\t");
+  const delimiter = delimiterForFormat(format);
+  if (delimiter !== null) return csvToTable(text, delimiter);
   if (format === "json") {
     return hydrateCanonical(JSON.parse(text));
   }
