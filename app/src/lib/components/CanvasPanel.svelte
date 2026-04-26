@@ -7,6 +7,12 @@
   import InlineCopy from '$lib/components/InlineCopy.svelte';
   import { highlightQSnippetHtml } from '$lib/mobile/q-highlight-html';
 
+  type Props = {
+    hideTourPanel?: boolean;
+  };
+
+  let { hideTourPanel = false }: Props = $props();
+
   type CompiledDiagnostic = {
     message: string;
     severity: 'error' | 'warning' | 'info';
@@ -42,7 +48,7 @@
     if (appState.tourFinished) return 'Restart guided tour';
     if (appState.nextTourExample) {
       return appState.lastExampleId
-        ? `Next lesson · ${appState.nextTourExample.name}`
+        ? `Next tutorial · ${appState.nextTourExample.name}`
         : `Start guided tour · ${appState.nextTourExample.name}`;
     }
     return 'Restart guided tour';
@@ -522,7 +528,7 @@
       }}
     ></canvas>
 
-    <div id="sketch-overlay" class="sketch-overlay" class:sketch-overlay--idle={appState.overlayMode === 'idle' || appState.overlayMode === 'runtime-missing'} class:sketch-overlay--running={appState.overlayMode === 'running'} class:sketch-overlay--stopped={appState.overlayMode === 'stopped'} class:sketch-overlay--error={appState.overlayMode === 'error'}>
+    <div id="sketch-overlay" class="sketch-overlay" class:sketch-overlay--idle={appState.overlayMode === 'idle' || appState.overlayMode === 'runtime-missing'} class:sketch-overlay--empty-idle={appState.overlayMode === 'idle'} class:sketch-overlay--running={appState.overlayMode === 'running'} class:sketch-overlay--stopped={appState.overlayMode === 'stopped'} class:sketch-overlay--error={appState.overlayMode === 'error'}>
       <div class="overlay-content">
         {#if appState.overlayMode === 'runtime-missing'}
           <svg class="overlay-icon" viewBox="0 0 48 48" fill="none">
@@ -549,32 +555,6 @@
             <rect x="16" y="16" width="16" height="16" rx="2" fill="var(--text-secondary)"></rect>
           </svg>
           <p class="overlay-label">Sketch stopped</p>
-        {:else}
-          <svg class="overlay-icon" viewBox="0 0 48 48" fill="none">
-            <circle cx="24" cy="24" r="20" stroke="var(--accent)" stroke-width="2"></circle>
-            <polygon points="19,16 35,24 19,32" fill="var(--accent)"></polygon>
-          </svg>
-          <p class="overlay-label">Press <kbd>Run</kbd> to start</p>
-          {#if appState.isOnTour}
-            <p class="overlay-tour-hint">Lesson notes are in the panel below — they stay put when you run.</p>
-          {/if}
-          <div class="overlay-actions">
-            {#if appState.tourFinished}
-              <button class="btn-primary overlay-primary-action" type="button" onclick={() => void appState.restartTour()}>
-                Restart tour
-              </button>
-            {:else if appState.nextTourExample}
-              <button class="btn-primary overlay-primary-action" type="button" onclick={() => void appState.loadNextTourExample()}>
-                {appState.lastExampleId ? `Next lesson · ${appState.nextTourExample.name}` : `Start tour · ${appState.nextTourExample.name}`}
-              </button>
-            {/if}
-            {#if appState.previousTourExample}
-              <button class="overlay-link" type="button" onclick={() => void appState.loadPreviousTourExample()}>
-                ← Previous · {appState.previousTourExample.name}
-              </button>
-            {/if}
-            <button class="overlay-link" type="button" onclick={() => (appState.activeModal = 'examples')}>Browse all examples</button>
-          </div>
         {/if}
       </div>
     </div>
@@ -589,11 +569,11 @@
             type="button"
             onclick={() => void appState.loadPreviousTourExample()}
             disabled={!appState.previousTourExample}
-            title="Previous lesson ( [ )"
-            aria-label="Previous lesson"
+            title="Previous tutorial ( [ )"
+            aria-label="Previous tutorial"
           >‹</button>
-          <div class="tour-strip-label" title={`Lesson ${appState.currentTourStep} of ${appState.tourLength}`}>
-            <span class="tour-strip-step">Lesson {appState.currentTourStep}/{appState.tourLength}</span>
+          <div class="tour-strip-label" title={`Tutorial ${appState.currentTourStep} of ${appState.tourLength}`}>
+            <span class="tour-strip-step">Tutorial {appState.currentTourStep}/{appState.tourLength}</span>
             <span class="tour-strip-name">{tourEx?.name ?? ''}</span>
           </div>
           <button
@@ -601,12 +581,12 @@
             type="button"
             onclick={() => void appState.loadNextTourExample()}
             disabled={!appState.nextTourExample}
-            title="Next lesson ( ] )"
-            aria-label="Next lesson"
+            title="Next tutorial ( ] )"
+            aria-label="Next tutorial"
           >›</button>
         </div>
 
-        {#if tourEx && lesson}
+        {#if tourEx && lesson && !hideTourPanel}
           <aside
             class="tour-lesson-panel"
             class:tour-lesson-panel--collapsed={!appState.tourLessonExpanded}
@@ -614,7 +594,7 @@
           >
             <div class="tour-lesson-panel-bar">
               <div class="tour-lesson-panel-bar-text">
-                <span class="tour-lesson-panel-eyebrow">Lesson {appState.currentTourStep} of {appState.tourLength}</span>
+                <span class="tour-lesson-panel-eyebrow">Tutorial {appState.currentTourStep} of {appState.tourLength}</span>
                 <span class="tour-lesson-panel-title">{tourEx.name}</span>
               </div>
               <button
@@ -636,7 +616,7 @@
                     <pre><code class="tour-lesson-highlight-code">{@html highlightQSnippetHtml(lesson.highlight.code)}</code></pre>
                   </figure>
                 {/if}
-                <p class="tour-lesson-panel-shortcuts"><kbd>[</kbd> previous lesson · <kbd>]</kbd> next lesson</p>
+                <p class="tour-lesson-panel-shortcuts"><kbd>[</kbd> previous tutorial · <kbd>]</kbd> next tutorial</p>
               </div>
             {/if}
           </aside>

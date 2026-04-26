@@ -34,10 +34,8 @@
 
     const startX = event.clientX;
     const startWidth = appState.editorPanelWidth;
-    const practice = appState.workspaceMode === 'practice';
-
     const handleMove = (moveEvent: PointerEvent) => {
-      const delta = practice ? startX - moveEvent.clientX : moveEvent.clientX - startX;
+      const delta = moveEvent.clientX - startX;
       appState.setEditorPanelWidth(startWidth + delta);
     };
 
@@ -91,13 +89,7 @@
 >
   <div class="editor-tabs">
     {#if appState.workspaceMode === 'practice'}
-      <div class="editor-tab editor-tab--active" id="active-tab">
-        <svg class="file-icon" viewBox="0 0 16 16" fill="none">
-          <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" stroke-width="1" fill="none" />
-          <path d="M10 2v3h3" stroke="currentColor" stroke-width="1" fill="none" />
-        </svg>
-        <span id="active-tab-name">Practice Editor</span>
-      </div>
+      <FileTabs />
     {:else}
       <FileTabs />
     {/if}
@@ -112,7 +104,6 @@
 
   <button
     class="editor-resize-handle"
-    class:editor-resize-handle--left={appState.workspaceMode === 'practice'}
     type="button"
     aria-label={appState.workspaceMode === 'practice' ? 'Resize practice and editor' : 'Resize editor and canvas'}
     title="Drag to resize"

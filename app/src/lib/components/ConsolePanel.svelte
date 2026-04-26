@@ -6,6 +6,7 @@
     const pad = (value: number, width = 2) => String(value).padStart(width, '0');
     return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
   }
+
 </script>
 
 <footer

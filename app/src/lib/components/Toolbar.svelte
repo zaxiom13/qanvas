@@ -89,24 +89,6 @@
       </button>
     </div>
 
-    <button
-      id="btn-run"
-      class="btn-toolbar btn-run"
-      type="button"
-      class:running={appState.workspaceMode === 'studio' && appState.running && !appState.paused}
-      title={appState.workspaceMode === 'practice' ? 'Run verification' : 'Run sketch'}
-      onclick={() => (appState.workspaceMode === 'studio' && appState.running ? void appState.stopSketch() : void appState.runSketch())}
-    >
-      <svg class="icon btn-run-icon" viewBox="0 0 16 16" fill="none">
-        {#if appState.workspaceMode === 'studio' && appState.running && !appState.paused}
-          <rect x="4" y="2" width="8" height="12" fill="currentColor"></rect>
-        {:else}
-          <polygon points="4,2 14,8 4,14" fill="currentColor"></polygon>
-        {/if}
-      </svg>
-      <span class="btn-run-label">{appState.workspaceMode === 'studio' && appState.running && !appState.paused ? 'Stop' : 'Run'}</span>
-    </button>
-
     {#if appState.workspaceMode === 'studio'}
       <button
         id="btn-step"

@@ -153,18 +153,18 @@
       <p class="practice-hint"><span class="practice-hint-lead">Hint</span> — {challenge.hint}</p>
       <div class="practice-actions">
         {#if appState.practiceAnswerVisible}
-          <button class="btn-secondary" id="btn-practice-hide-answer" type="button" onclick={() => appState.hidePracticeAnswer()}>
-            Hide answer
-          </button>
           <button class="btn-secondary" id="btn-practice-load-answer" type="button" onclick={() => appState.loadPracticeAnswer()}>
             Use answer
+          </button>
+          <button class="btn-secondary" id="btn-practice-hide-answer" type="button" onclick={() => appState.hidePracticeAnswer()}>
+            Hide reference
           </button>
           <button class="btn-secondary" id="btn-practice-reset" type="button" onclick={() => appState.resetPracticeStarter()}>
             Reset starter
           </button>
         {:else}
           <button class="btn-secondary" id="btn-practice-show-answer" type="button" onclick={() => appState.revealPracticeAnswer()}>
-            Show answer
+            Reveal hint/reference
           </button>
           <button class="btn-secondary" type="button" onclick={() => appState.resetPracticeStarter()}>
             Reset starter
@@ -176,11 +176,11 @@
     {#if appState.practiceAnswerVisible}
       <article class="practice-card practice-card--answer">
         <div class="practice-card-header">
-          <h3>Working answer</h3>
+          <h3>Reference answer</h3>
         </div>
 
         <div class="practice-answer-body">
-          <p class="practice-answer-copy">If you’re stuck, this is a runnable answer for the current practice. You can inspect it here or load it into the editor and verify it.</p>
+          <p class="practice-answer-copy">A runnable reference for the current practice. Inspect it here or load it into the editor, then use Run in the console.</p>
           <pre class="practice-code-block">{appState.activePracticeSolution}</pre>
         </div>
       </article>

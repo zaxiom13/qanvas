@@ -4,6 +4,8 @@
   import { bracketMatching, indentOnInput, syntaxHighlighting } from '@codemirror/language';
   import { EditorState } from '@codemirror/state';
   import { EditorView, keymap, lineNumbers } from '@codemirror/view';
+  import { autocompletion, snippetCompletion, type CompletionContext } from '@codemirror/autocomplete';
+  import { Q_SLASH_SNIPPETS } from '$lib/monaco/q-language';
   import { qMobileEditorHighlightStyle } from './q-highlight-html';
   import { qLanguage } from './q-codemirror';
 
@@ -63,6 +65,28 @@
     },
   });
 
+  const mobileSlashSnippets = Q_SLASH_SNIPPETS.map((item) =>
+    snippetCompletion(item.insertText, {
+      label: item.label,
+      detail: item.detail,
+      info: item.documentation,
+      type: 'keyword',
+    })
+  );
+
+  function mobileQCompletions(context: CompletionContext) {
+    const slash = context.matchBefore(/\/[a-zA-Z]*/);
+    if (slash) {
+      if (slash.from === slash.to && !context.explicit) return null;
+      return {
+        from: slash.from,
+        options: mobileSlashSnippets,
+      };
+    }
+
+    return null;
+  }
+
   onMount(() => {
     if (!host) return;
 
@@ -74,6 +98,10 @@
           lineNumbers(),
           history(),
           qLanguage,
+          autocompletion({
+            override: [mobileQCompletions],
+            activateOnTyping: true,
+          }),
           syntaxHighlighting(qMobileEditorHighlightStyle),
           mobileTheme,
           bracketMatching(),

@@ -8,7 +8,7 @@ import {
 } from '$lib/examples';
 import { browserGateway } from '$lib/browser';
 import { getCompiledOutputView } from '$lib/compiler/compiled-output';
-import { StructuredConsoleFormatter } from '$lib/formatting/value-format';
+import { formatDisplayValue, StructuredConsoleFormatter } from '$lib/formatting/value-format';
 import {
   PRACTICE_CHALLENGES,
   getPracticeChallenge,
@@ -45,6 +45,8 @@ const STORAGE_KEYS = {
 
 const PRACTICE_FILE_NAME = 'practice.q';
 const RUNTIME_SOURCE_EXTENSIONS = ['.q'];
+const DEFAULT_STUDIO_EDITOR_WIDTH = 640;
+const DEFAULT_PRACTICE_EDITOR_WIDTH = 820;
 
 export const DEFAULT_SKETCH = `setup:{
   \`size\`bg!(800 600;Color.CREAM)
@@ -158,7 +160,7 @@ class AppState {
   consoleCollapsed = $state(readStored(STORAGE_KEYS.consoleCollapsed) === '1');
   mobileConsoleCollapsed = $state(readStored(STORAGE_KEYS.mobileConsoleCollapsed) === '1');
   mobileCanvasControlsCollapsed = $state(readStored(STORAGE_KEYS.mobileCanvasControlsCollapsed) === '1');
-  editorPanelWidth = $state(readStoredNumber(STORAGE_KEYS.editorPanelWidth, 640));
+  editorPanelWidth = $state(readStoredNumber(STORAGE_KEYS.editorPanelWidth, DEFAULT_STUDIO_EDITOR_WIDTH));
   consoleFilter = $state<'all' | 'stdout' | 'stderr' | 'info'>('all');
   consoleEntries = $state<ConsoleEntry[]>([]);
   activeModal = $state<ModalName>(null);
@@ -431,6 +433,13 @@ class AppState {
     if (mode === 'practice') {
       this.showCanvasOutput();
       this.applyPracticeStarter();
+      if (typeof window !== 'undefined') {
+        requestAnimationFrame(() => {
+          this.setEditorPanelWidth(Math.max(this.editorPanelWidth, DEFAULT_PRACTICE_EDITOR_WIDTH));
+        });
+      } else {
+        this.editorPanelWidth = Math.max(this.editorPanelWidth, DEFAULT_PRACTICE_EDITOR_WIDTH);
+      }
     } else {
       this.setCanvasPanelTab('canvas');
     }
@@ -662,7 +671,7 @@ class AppState {
     await this.runSketch();
   }
 
-  /** Start the tour, advance to the next lesson, or restart after completion — used by the canvas toolbar control. */
+  /** Start the tour, advance to the next tutorial, or restart after completion — used by the canvas toolbar control. */
   async startOrContinueGuidedTour() {
     if (this.tourFinished) {
       await this.restartTour();
@@ -807,7 +816,10 @@ class AppState {
       if (matches) {
         this.markPracticeComplete(challenge.id);
       }
-      this.appendConsole('info', matches ? `Verified: ${challenge.title}` : `Checked: ${challenge.title}`);
+      this.appendConsole(
+        matches ? 'info' : 'stderr',
+        `${matches ? 'Match' : 'No match'}: ${challenge.title} | expected ${formatDisplayValue(challenge.expected)} | got ${formatDisplayValue(result.value)}`
+      );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.practiceVerification = {

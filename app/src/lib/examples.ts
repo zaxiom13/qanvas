@@ -252,7 +252,7 @@ draw:{[state;frameInfo;input;canvas]
         caption: '`src` can be any URL or data URI. Cache it in state, reuse every frame.',
         code: `image[([]
   src:enlist state\`img;
-  p:enlist 236 146;
+  p:enlist 0.5*canvas\`size - 105 105;
   s:enlist 210 210;
   alpha:enlist 0.98
 )]`,
@@ -265,10 +265,12 @@ draw:{[state;frameInfo;input;canvas]
 
 draw:{[state;frameInfo;input;canvas]
   background[state\`bg];
+  center:0.5*canvas\`size;
+  stampSize:210 210;
   image[([]
     src:enlist state\`img;
-    p:enlist 236 146;
-    s:enlist 210 210;
+    p:enlist center-0.5*stampSize;
+    s:enlist stampSize;
     alpha:enlist 0.98
   )];
   state
@@ -443,11 +445,12 @@ draw:{[state;frameInfo;input;canvas]
   background[Color.NIGHT];
   center:0.5*canvas\`size;
   t:0.02*frameInfo\`frameNum;
+  scale:(min canvas\`size)%800;
   bodies:([]
-    radius:75 140 205 275f;
+    radius:scale*52 96 142 190f;
     speed:0.9 0.62 0.44 0.32;
     fill:(Color.BLUE;Color.GOLD;Color.PURPLE;Color.CORAL);
-    size:6 8 10 12f
+    size:scale*7 10 13 16f
   );
   n:count bodies;
   ang:bodies[\`speed]*t;
@@ -461,7 +464,7 @@ draw:{[state;frameInfo;input;canvas]
   )];
   circle[([]
     p:enlist center;
-    r:enlist 18+2*sin 0.06*frameInfo\`frameNum;
+    r:enlist scale*24+4*sin 0.06*frameInfo\`frameNum;
     fill:enlist Color.YELLOW;
     alpha:enlist 0.95
   )];
@@ -709,7 +712,7 @@ setup:{
   idx:til n*n;
   vals:"j"$raze mandelbrot n;
   fill:vals + 256*vals + 65536*vals;
-  p:flip (cell*idx mod n;cell*idx div n);
+  p:flip (cell*idx mod n;(cell*idx div n)-28);
   background[bg];
   pixel[([]
     p:p;

@@ -49,8 +49,8 @@
 
     <main id="workspace">
       {#if appState.workspaceMode === 'practice'}
-        <PracticePanel />
         <EditorPanel />
+        <PracticePanel />
       {:else}
         <EditorPanel />
         <CanvasPanel />

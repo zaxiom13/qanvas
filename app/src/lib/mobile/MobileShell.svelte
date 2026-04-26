@@ -6,6 +6,8 @@
   import { getExamplePreviewSrc } from '$lib/example-previews';
   import { appState } from '$lib/state/app-state.svelte';
   import { pretextFit } from '$lib/text/pretext-fit';
+  import InlineCopy from '$lib/components/InlineCopy.svelte';
+  import { highlightQSnippetHtml } from '$lib/mobile/q-highlight-html';
   import MobileCodeEditor from './MobileCodeEditor.svelte';
 
   type MobileTab = 'editor' | 'canvas' | 'examples' | 'settings';
@@ -16,12 +18,13 @@
 
   let bottomTabs = $derived<{ id: MobileTab; label: string; icon: string }[]>([
     { id: 'editor', label: 'Editor', icon: 'code' },
-    { id: 'canvas', label: appState.workspaceMode === 'practice' ? 'Output' : 'Canvas', icon: 'palette' },
+    { id: 'canvas', label: appState.workspaceMode === 'practice' ? 'Output' : 'Canvas', icon: appState.workspaceMode === 'practice' ? 'terminal' : 'palette' },
     { id: 'examples', label: appState.workspaceMode === 'practice' ? 'Lessons' : 'Examples', icon: 'cube' },
     { id: 'settings', label: 'Settings', icon: 'sliders' },
   ]);
 
   let examples = $derived(appState.filteredExamples.slice(0, 9));
+  let practiceLessons = $derived(appState.practiceChallenges.slice(0, 12));
   let filteredConsoleEntries = $derived(appState.filteredConsole);
 
   function formatTimestamp(ts: number) {
@@ -47,6 +50,8 @@
     activeTab = tab;
     if (tab === 'canvas') {
       appState.setCanvasPanelTab(appState.workspaceMode === 'practice' ? 'compiled' : 'canvas');
+      if (appState.tourLessonExpanded) appState.toggleTourLessonPanel();
+      if (!appState.mobileCanvasControlsCollapsed) appState.toggleMobileCanvasControlsCollapsed();
     }
   }
 
@@ -59,6 +64,13 @@
     }
   });
 
+  $effect(() => {
+    if (appState.workspaceMode !== 'studio' || !appState.isOnTour) return;
+    if (appState.tourLessonExpanded && !appState.mobileCanvasControlsCollapsed) {
+      appState.toggleMobileCanvasControlsCollapsed();
+    }
+  });
+
   async function runOrStop() {
     if (appState.running) {
       await appState.stopSketch();
@@ -68,6 +80,24 @@
     setActiveTab('canvas');
     await tick();
     await appState.runSketch();
+  }
+
+  function toggleMobileControls() {
+    if (appState.mobileCanvasControlsCollapsed) {
+      if (appState.tourLessonExpanded) appState.toggleTourLessonPanel();
+      appState.toggleMobileCanvasControlsCollapsed();
+      return;
+    }
+    appState.toggleMobileCanvasControlsCollapsed();
+  }
+
+  function toggleMobileGuide() {
+    if (!appState.tourLessonExpanded) {
+      if (!appState.mobileCanvasControlsCollapsed) appState.toggleMobileCanvasControlsCollapsed();
+      appState.toggleTourLessonPanel();
+      return;
+    }
+    appState.toggleTourLessonPanel();
   }
 
   async function resetSketch() {
@@ -83,6 +113,11 @@
       appState.setCanvasPanelTab('compiled');
       setActiveTab('editor');
     }
+  }
+
+  function pickPracticeLesson(id: string) {
+    appState.setPracticeChallenge(id);
+    setActiveTab('editor');
   }
 </script>
 
@@ -219,9 +254,6 @@
                   <p class="mobile-practice-eyebrow">Output</p>
                   <h2>{appState.activePracticeChallenge.title}</h2>
                 </div>
-                <button class="mobile-practice-check" type="button" onclick={() => void appState.runSketch()}>
-                  Check answer
-                </button>
               </div>
               {#if appState.practiceVerification}
                 <article class="mobile-practice-result mobile-practice-result--{appState.practiceVerification.status}">
@@ -243,13 +275,13 @@
                 </article>
               {:else}
                 <div class="mobile-practice-empty">
-                  <p>Edit your answer, then tap <strong>Check answer</strong>. The result appears here.</p>
+                  <p>Edit your answer, then use <strong>Run</strong> in the editor tab. The result appears here.</p>
                 </div>
               {/if}
               {#if appState.practiceAnswerVisible}
                 <article class="mobile-practice-result mobile-practice-answer">
                   <div class="mobile-practice-result-heading">
-                    <strong>Working answer</strong>
+                  <strong>Reference answer</strong>
                     <button type="button" onclick={() => appState.loadPracticeAnswer()}>Use</button>
                   </div>
                   <pre>{appState.activePracticeSolution}</pre>
@@ -257,79 +289,118 @@
               {/if}
             </div>
           {:else}
-            <CanvasPanel />
+            <CanvasPanel hideTourPanel />
           {/if}
         </div>
-        <div class="mobile-canvas-meta">
-          <span>{appState.currentCanvasSize[0] || 800} x {appState.currentCanvasSize[1] || 600}</span>
-          <span>t: 359</span>
-        </div>
-        <div class="mobile-tools-sheet" class:mobile-tools-sheet--collapsed={appState.mobileCanvasControlsCollapsed}>
-          <div class="mobile-tools-sheet-header">
-            <h2>{appState.workspaceMode === 'practice' ? 'Practice controls' : 'Canvas controls'}</h2>
-            <button
-              class="btn-icon-only mobile-tools-collapse-btn"
-              type="button"
-              aria-expanded={!appState.mobileCanvasControlsCollapsed}
-              aria-label={appState.mobileCanvasControlsCollapsed ? 'Expand canvas controls' : 'Collapse canvas controls'}
-              title={appState.mobileCanvasControlsCollapsed ? 'Expand canvas controls' : 'Collapse canvas controls'}
-              onclick={() => appState.toggleMobileCanvasControlsCollapsed()}
-            >
-              <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                {#if appState.mobileCanvasControlsCollapsed}
-                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
-                {:else}
-                  <path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+        {#if appState.workspaceMode !== 'practice'}
+          <div class="mobile-canvas-meta">
+            <span>{appState.currentCanvasSize[0] || 800} x {appState.currentCanvasSize[1] || 600}</span>
+          </div>
+        {/if}
+        {#if appState.workspaceMode === 'studio' && appState.isOnTour && appState.currentTourExample?.lesson}
+          {@const tourEx = appState.currentTourExample}
+          {@const lesson = tourEx.lesson}
+          {#if !appState.tourLessonExpanded && appState.mobileCanvasControlsCollapsed}
+            <div class="mobile-panel-switch" role="group" aria-label="Canvas panels">
+              <button type="button" onclick={toggleMobileGuide}>Guide</button>
+              <button type="button" onclick={toggleMobileControls}>Controls</button>
+            </div>
+          {/if}
+          {#if appState.tourLessonExpanded}
+            <div class="mobile-guide-sheet" style={`--example-accent:${tourEx.accent}`}>
+              <div class="mobile-guide-sheet-header">
+                <h2>Tutorial {appState.currentTourStep}/{appState.tourLength}</h2>
+                <button
+                  class="btn-icon-only mobile-tools-collapse-btn"
+                  type="button"
+                  aria-expanded="true"
+                  aria-label="Collapse guide"
+                  title="Collapse guide"
+                  onclick={toggleMobileGuide}
+                >
+                  <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                    <path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                  </svg>
+                </button>
+              </div>
+              <div class="mobile-guide-sheet-body">
+                <h3>{tourEx.name}</h3>
+                <p class="mobile-guide-teaches"><InlineCopy text={lesson?.teaches ?? ''} /></p>
+                <p><InlineCopy text={lesson?.intro ?? ''} /></p>
+                {#if lesson?.highlight}
+                  <pre><code class="tour-lesson-highlight-code">{@html highlightQSnippetHtml(lesson.highlight.code)}</code></pre>
                 {/if}
-              </svg>
-            </button>
-          </div>
-          {#if !appState.mobileCanvasControlsCollapsed}
-          <div class="quick-tools-grid">
-            {#if appState.workspaceMode === 'practice'}
-              <button class="quick-tool quick-tool--primary" type="button" aria-label="Check answer" onclick={() => void appState.runSketch()}>
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                <span>Check</span>
-              </button>
-              <button class="quick-tool" type="button" aria-label="Back to editor" onclick={() => setActiveTab('editor')}>
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 8-4 4 4 4M15 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                <span>Edit</span>
-              </button>
-              <button class="quick-tool" type="button" aria-label="Show answer" onclick={() => appState.revealPracticeAnswer()}>
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5 0 8 7 8 7s-3 7-8 7-8-7-8-7 3-7 8-7Z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-                <span>Answer</span>
-              </button>
-              <button class="quick-tool" type="button" aria-label="Reset starter" onclick={() => appState.resetPracticeStarter()}>
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                <span>Reset</span>
-              </button>
-            {:else}
-              <button class="quick-tool quick-tool--primary" type="button" aria-label={appState.running ? 'Stop sketch' : 'Run sketch'} onclick={runOrStop}>
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true">
-                  {#if appState.running}
-                    <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"></rect>
-                  {:else}
-                    <path d="M8 5v14l11-7z" fill="currentColor"></path>
-                  {/if}
-                </svg>
-                <span>{appState.running ? 'Stop' : 'Run'}</span>
-              </button>
-              <button class="quick-tool" type="button" aria-label="Reset sketch" onclick={() => void resetSketch()}>
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
-                <span>Reset</span>
-              </button>
-              <button class="quick-tool" type="button" aria-label="Export PNG" onclick={() => appState.exportPng()}>
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h2l1.5-2h3L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="13" r="3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
-                <span>PNG</span>
-              </button>
-              <button class="quick-tool" type="button" aria-label="Export GIF" onclick={() => appState.openGifModal()}>
-                <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M8 4v3M12 4v3M16 4v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
-                <span>GIF</span>
-              </button>
-            {/if}
-          </div>
+              </div>
+            </div>
           {/if}
-        </div>
+        {:else if appState.workspaceMode === 'studio'}
+          {#if appState.mobileCanvasControlsCollapsed}
+            <div class="mobile-panel-switch mobile-panel-switch--single" role="group" aria-label="Canvas panels">
+              <button type="button" onclick={toggleMobileControls}>Controls</button>
+            </div>
+          {/if}
+        {/if}
+        {#if appState.workspaceMode === 'practice'}
+          {#if appState.mobileCanvasControlsCollapsed}
+            <div class="mobile-panel-switch mobile-panel-switch--single" role="group" aria-label="Practice panels">
+              <button type="button" onclick={toggleMobileControls}>Controls</button>
+            </div>
+          {/if}
+        {/if}
+        {#if !appState.mobileCanvasControlsCollapsed}
+          <div class="mobile-tools-sheet">
+            <div class="mobile-tools-sheet-header">
+              <h2>{appState.workspaceMode === 'practice' ? 'Practice controls' : 'Canvas controls'}</h2>
+              <button
+                class="btn-icon-only mobile-tools-collapse-btn"
+                type="button"
+                aria-expanded="true"
+                aria-label={appState.workspaceMode === 'practice' ? 'Collapse practice controls' : 'Collapse canvas controls'}
+                title={appState.workspaceMode === 'practice' ? 'Collapse practice controls' : 'Collapse canvas controls'}
+                onclick={toggleMobileControls}
+              >
+                <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M4 10l4-4 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+              </button>
+            </div>
+            <div class="quick-tools-grid">
+              {#if appState.workspaceMode === 'practice'}
+                <button class="quick-tool quick-tool--primary" type="button" aria-label="Reveal hint and reference" onclick={() => appState.revealPracticeAnswer()}>
+                  <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5c5 0 8 7 8 7s-3 7-8 7-8-7-8-7 3-7 8-7Z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="12" r="2.5" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                  <span>Reference</span>
+                </button>
+                <button class="quick-tool" type="button" aria-label="Reset starter" onclick={() => appState.resetPracticeStarter()}>
+                  <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  <span>Reset</span>
+                </button>
+              {:else}
+                <button class="quick-tool quick-tool--primary" type="button" aria-label={appState.running ? 'Stop sketch' : 'Run sketch'} onclick={runOrStop}>
+                  <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true">
+                    {#if appState.running}
+                      <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"></rect>
+                    {:else}
+                      <path d="M8 5v14l11-7z" fill="currentColor"></path>
+                    {/if}
+                  </svg>
+                  <span>{appState.running ? 'Stop' : 'Run'}</span>
+                </button>
+                <button class="quick-tool" type="button" aria-label="Reset sketch" onclick={() => void resetSketch()}>
+                  <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+                  <span>Reset</span>
+                </button>
+                <button class="quick-tool" type="button" aria-label="Export PNG" onclick={() => appState.exportPng()}>
+                  <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 7h2l1.5-2h3L15 7h2a3 3 0 0 1 3 3v6a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3v-6a3 3 0 0 1 3-3z" fill="none" stroke="currentColor" stroke-width="2" /><circle cx="12" cy="13" r="3" fill="none" stroke="currentColor" stroke-width="2" /></svg>
+                  <span>PNG</span>
+                </button>
+                <button class="quick-tool" type="button" aria-label="Export GIF" onclick={() => appState.openGifModal()}>
+                  <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="7" width="16" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="2" /><path d="M8 4v3M12 4v3M16 4v3" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+                  <span>GIF</span>
+                </button>
+              {/if}
+            </div>
+          </div>
+        {/if}
       </section>
     {:else if activeTab === 'examples'}
       <section class="mobile-examples">
@@ -339,33 +410,49 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
           </button>
         </div>
-        <div class="mobile-category-row">
-          {#each appState.exampleCategories as category}
-            <button class:active={appState.exampleCategory === category} type="button" onclick={() => (appState.exampleCategory = category)}>{category}</button>
-          {/each}
-        </div>
-        <div class="mobile-example-grid">
-          {#each examples as example}
-            {@const previewSrc = getExamplePreviewSrc(example.id)}
-            <button
-              class="mobile-example-card"
-              type="button"
-              style={`--example-accent: ${example.accent}`}
-              onclick={() => {
-                void appState.loadExample(example.id);
-                setActiveTab('editor');
-              }}
-            >
-              <span class="example-thumb">
-                {#if previewSrc}
-                  <img src={previewSrc} alt="" loading="lazy" decoding="async" />
-                {/if}
-              </span>
-              <strong use:pretextFit={{ min: 10, max: 13 }}>{example.name}</strong>
-              <small>by qanvas5</small>
-            </button>
-          {/each}
-        </div>
+        {#if appState.workspaceMode === 'practice'}
+          <div class="mobile-lesson-list">
+            {#each practiceLessons as lesson}
+              <button
+                class="mobile-lesson-card"
+                class:active={lesson.id === appState.practiceChallengeId}
+                type="button"
+                onclick={() => pickPracticeLesson(lesson.id)}
+              >
+                <strong>{lesson.title}</strong>
+                <span>{lesson.difficulty}{#if lesson.topic} · {lesson.topic}{/if}</span>
+              </button>
+            {/each}
+          </div>
+        {:else}
+          <div class="mobile-category-row">
+            {#each appState.exampleCategories as category}
+              <button class:active={appState.exampleCategory === category} type="button" onclick={() => (appState.exampleCategory = category)}>{category}</button>
+            {/each}
+          </div>
+          <div class="mobile-example-grid">
+            {#each examples as example}
+              {@const previewSrc = getExamplePreviewSrc(example.id)}
+              <button
+                class="mobile-example-card"
+                type="button"
+                style={`--example-accent: ${example.accent}`}
+                onclick={() => {
+                  void appState.loadExample(example.id);
+                  setActiveTab('editor');
+                }}
+              >
+                <span class="example-thumb">
+                  {#if previewSrc}
+                    <img src={previewSrc} alt="" loading="lazy" decoding="async" />
+                  {/if}
+                </span>
+                <strong use:pretextFit={{ min: 10, max: 13 }}>{example.name}</strong>
+                <small>by qanvas5</small>
+              </button>
+            {/each}
+          </div>
+        {/if}
       </section>
     {:else}
       <section class="mobile-settings">
@@ -416,6 +503,9 @@
           {:else if tab.icon === 'palette'}
             <path d="M12 4a8 8 0 0 0 0 16h1.2a1.9 1.9 0 0 0 1.2-3.4 1.4 1.4 0 0 1 .9-2.5H17a3 3 0 0 0 3-3C20 7.2 16.5 4 12 4z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
             <path d="M8.5 10h.01M11 7.8h.01M14 8.3h.01" stroke="currentColor" stroke-width="3" stroke-linecap="round" />
+          {:else if tab.icon === 'terminal'}
+            <path d="M4 6l3.5 3L4 12M9 12h5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" />
+            <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2" />
           {:else if tab.icon === 'cube'}
             <path d="m12 3 7 4v10l-7 4-7-4V7zM12 11l7-4M12 11v10M12 11 5 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
           {:else if tab.icon === 'file'}
@@ -525,13 +615,13 @@
   .mobile-examples,
   .mobile-empty-panel,
   .mobile-settings {
-    overflow-y: auto;
     overscroll-behavior: contain;
   }
 
   .mobile-canvas {
     display: flex;
     flex-direction: column;
+    overflow: hidden;
   }
 
   .mobile-examples,
@@ -539,6 +629,7 @@
   .mobile-settings {
     height: 100%;
     min-height: 0;
+    overflow-y: auto;
   }
 
   .mobile-filebar {
@@ -725,14 +816,94 @@
     line-height: 1.2;
   }
 
-  .mobile-practice-check {
+  .mobile-panel-switch {
     flex: 0 0 auto;
-    min-height: 44px;
-    padding: 0 14px;
-    border-radius: 9px;
-    background: var(--mobile-hot);
-    color: white;
-    font-weight: 800;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+    padding: 10px 14px 0;
+    background: var(--mobile-panel);
+  }
+
+  .mobile-panel-switch--single {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .mobile-panel-switch button {
+    min-height: 34px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 8px;
+    background: var(--bg-chrome);
+    color: var(--mobile-muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .mobile-guide-sheet {
+    flex: 0 0 auto;
+    max-height: min(34dvh, 300px);
+    min-height: 0;
+    padding: 14px;
+    border-top: 1px solid var(--mobile-border);
+    border-left: 4px solid var(--example-accent, var(--mobile-hot));
+    background: var(--mobile-panel);
+    overflow: hidden;
+  }
+
+  .mobile-guide-sheet-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+  }
+
+  .mobile-guide-sheet-header h2 {
+    margin: 0;
+    color: var(--mobile-ink);
+    font-size: 14px;
+  }
+
+  .mobile-guide-sheet-body {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-height: calc(min(34dvh, 300px) - 52px);
+    overflow-y: auto;
+    padding-top: 10px;
+    overscroll-behavior: contain;
+  }
+
+  .mobile-guide-sheet-body h3,
+  .mobile-guide-sheet-body p {
+    margin: 0;
+  }
+
+  .mobile-guide-teaches {
+    color: var(--mobile-ink);
+    font-weight: 700;
+  }
+
+  .mobile-guide-sheet-body p {
+    color: var(--mobile-muted);
+    font-size: 13px;
+    line-height: 1.45;
+  }
+
+  .mobile-guide-sheet-body pre {
+    margin: 0;
+    padding: 10px;
+    overflow-x: auto;
+    border: 1px solid var(--mobile-border);
+    border-radius: 7px;
+    background: var(--bg-chrome);
+    color: var(--text-code);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .mobile-canvas-stage :global(.tour-lesson-panel) {
+    display: none;
   }
 
   .mobile-practice-empty,
@@ -880,12 +1051,13 @@
     display: grid;
     place-items: center;
     gap: 8px;
-    min-height: 84px;
+    min-height: 64px;
     border: 1px solid var(--mobile-border);
     border-radius: 8px;
     background: var(--bg-editor);
     color: var(--mobile-ink);
-    font-size: 12px;
+    font-size: 10.5px;
+    font-weight: 700;
   }
 
   .quick-tool--primary {
@@ -896,8 +1068,8 @@
 
   .quick-tool-icon,
   .nav-icon {
-    width: 26px;
-    height: 26px;
+    width: 22px;
+    height: 22px;
   }
 
   .mobile-examples {
@@ -938,6 +1110,38 @@
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+  }
+
+  .mobile-lesson-list {
+    display: grid;
+    gap: 10px;
+  }
+
+  .mobile-lesson-card {
+    display: grid;
+    gap: 5px;
+    padding: 12px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 8px;
+    background: var(--mobile-panel);
+    color: var(--mobile-ink);
+    text-align: left;
+  }
+
+  .mobile-lesson-card.active {
+    border-color: var(--mobile-hot);
+    box-shadow: inset 3px 0 0 var(--mobile-hot);
+  }
+
+  .mobile-lesson-card strong {
+    font-size: 13px;
+    line-height: 1.25;
+  }
+
+  .mobile-lesson-card span {
+    color: var(--mobile-muted);
+    font-size: 11px;
+    text-transform: capitalize;
   }
 
   .mobile-example-card {

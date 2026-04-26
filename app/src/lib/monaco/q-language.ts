@@ -449,7 +449,7 @@ export function classifyMobileQIdent(raw: string): 'qanvas' | 'builtin' | 'keywo
   return 'identifier';
 }
 
-const Q_SLASH_SNIPPETS = [
+export const Q_SLASH_SNIPPETS = [
   {
     label: '/sketch',
     detail: 'Snippet',

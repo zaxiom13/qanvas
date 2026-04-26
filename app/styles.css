@@ -674,7 +674,7 @@ button {
 }
 
 .editor-panel--practice {
-  border-right: none;
+  border-right: 1px solid var(--border);
 }
 
 .editor-resize-handle {
@@ -803,7 +803,8 @@ body.is-resizing-editor {
 }
 
 .file-tab-action,
-.file-tab-tool {
+.file-tab-tool,
+.file-tab-run {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -815,15 +816,32 @@ body.is-resizing-editor {
 }
 
 .file-tab-action svg,
-.file-tab-tool svg {
+.file-tab-tool svg,
+.file-tab-run svg {
   width: 12px;
   height: 12px;
 }
 
 .file-tab-action:hover,
-.file-tab-tool:hover {
+.file-tab-tool:hover,
+.file-tab-run:hover {
   background: var(--surface-active);
   color: var(--text-primary);
+}
+
+.file-tab-run {
+  gap: 4px;
+  min-width: 46px;
+  padding: 0 8px;
+  border-left: 1px solid var(--border-soft);
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.file-tab-run.running {
+  color: var(--red);
 }
 
 .file-tab-actions {
@@ -1018,7 +1036,7 @@ body.is-resizing-editor {
   flex-direction: column;
   overflow: hidden;
   background: var(--bg-editor);
-  border-right: 1px solid var(--border);
+  border-right: none;
 }
 
 .practice-toolbar {
@@ -1995,6 +2013,15 @@ body.is-resizing-editor {
   pointer-events: auto;
 }
 
+.sketch-overlay--empty-idle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sketch-overlay--empty-idle .overlay-content {
+  display: none;
+}
+
 .sketch-overlay--running {
   opacity: 0;
   pointer-events: none;
@@ -2879,7 +2906,7 @@ textarea:focus-visible {
 }
 
 /* ================================================================
-   OVERLAY — rich lesson card + shortcut hint
+   OVERLAY — rich tutorial card + shortcut hint
 ================================================================ */
 
 .inline-code {
@@ -2893,7 +2920,7 @@ textarea:focus-visible {
 }
 
 /* ================================================================
-   TOUR — chrome above overlay (strip + bottom lesson panel)
+   TOUR — chrome above overlay (strip + bottom tutorial panel)
 ================================================================ */
 
 .tour-canvas-chrome {
@@ -3118,7 +3145,7 @@ textarea:focus-visible {
 }
 
 /* ================================================================
-   TOUR STRIP — persistent in-canvas lesson nav
+   TOUR STRIP — persistent in-canvas tutorial nav
 ================================================================ */
 
 .tour-strip {
