@@ -61,7 +61,7 @@
   </div>
 
   <div class="file-tab-actions" aria-label="File actions">
-    <button class="file-tab-tool" id={mobile ? 'mobile-btn-new-cue-file' : 'btn-new-cue-file'} type="button" title="New .cue file" aria-label="New .cue file" onclick={() => appState.openNewFileModal()}>
+    <button class="file-tab-tool" id={mobile ? 'mobile-btn-new-q-file' : 'btn-new-q-file'} type="button" title="New .q file" aria-label="New .q file" onclick={() => appState.openNewFileModal()}>
       <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
         <path d="M4 2h6l3 3v9H4V2z" stroke="currentColor" stroke-width="1.4" fill="none" />
         <path d="M10 2v3h3M7 8v4M5 10h4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" />

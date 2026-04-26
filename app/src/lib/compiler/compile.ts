@@ -41,32 +41,13 @@ export function compileSketch(source: string): CompiledSketchResult {
 
 function emitProgram(program: LoweredProgram) {
   return `(() => {
-  const Color = rtColors();
-  function rtColors() {
-    return {
-      INK: 0x0D0D1F,
-      NIGHT: 0x05060C,
-      MIDNIGHT: 0x0B0D1A,
-      DEEP: 0x081028,
-      BLUE: 0x5B6FE8,
-      SKY: 0x7CA6FF,
-      GOLD: 0xC4956E,
-      CORAL: 0xE07A52,
-      RED: 0xD1694E,
-      PURPLE: 0x8C6BC9,
-      GREEN: 0x4E9F92,
-      CREAM: 0xF4ECD8,
-      YELLOW: 0xFFE2A0,
-      SOFT_YELLOW: 0xFFE2B8,
-      LAVENDER: 0xE4B7FF,
-      ORBIT: 0x26294A
-    };
-  }
   return ({
   setup(rt) {
+    const Color = rt.colors;
 ${emitLambdaBody(program.setup, 2)}
   },
   draw(state, frameInfo, input, canvas, rt) {
+    const Color = rt.colors;
 ${emitLambdaBody(program.draw, 2)}
   }
   });

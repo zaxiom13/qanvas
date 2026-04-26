@@ -10,6 +10,7 @@
   import ExamplesModal from './lib/components/modals/ExamplesModal.svelte';
   import ProjectsModal from './lib/components/modals/ProjectsModal.svelte';
   import ExportGifModal from './lib/components/modals/ExportGifModal.svelte';
+  import InfoModal from './lib/components/modals/InfoModal.svelte';
   import MobileShell from './lib/mobile/MobileShell.svelte';
   import { appState } from './lib/state/app-state.svelte';
 
@@ -41,6 +42,7 @@
   <ExamplesModal />
   <ProjectsModal />
   <ExportGifModal />
+  <InfoModal />
 {:else}
   <div class="app-root">
     <Toolbar />
@@ -63,5 +65,6 @@
     <ExamplesModal />
     <ProjectsModal />
     <ExportGifModal />
+    <InfoModal />
   </div>
 {/if}

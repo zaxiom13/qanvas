@@ -29,7 +29,7 @@
   };
 
   const surface = new CanvasSurface();
-  const GIF_EXPORT_FPS = 30;
+  const GIF_EXPORT_FPS = 60;
   let canvasElement = $state<HTMLCanvasElement | null>(null);
 
   let gifRecording = $state(false);
@@ -61,6 +61,7 @@
   let compiledOutputDiagnostics = $state<CompiledDiagnostic[]>([]);
   let compiledOutputUnsupported = $state<string[]>([]);
   let compiledOutputHasCode = $state(false);
+  let canvasMenuOpen = $state(false);
 
   $effect(() => {
     const view = appState.activeCompiledOutput as unknown as CompiledOutputView;
@@ -130,9 +131,30 @@
   }
 
   function renderCommands(commands: Record<string, unknown>[]) {
-    surface.draw(commands, {
+    surface.draw(resolveImageSources(commands), {
       showFps: appState.showFps,
       fps: appState.fps,
+    });
+  }
+
+  function resolveImageSources(commands: Record<string, unknown>[]) {
+    return commands.map((command) => {
+      if (command.kind !== 'image') return command;
+      const data = command.data;
+      if (!Array.isArray(data)) {
+        if (!data || typeof data !== 'object' || !('src' in data)) return command;
+        return {
+          ...command,
+          data: { ...(data as Record<string, unknown>), src: appState.resolveAssetSource(String((data as Record<string, unknown>).src ?? '')) },
+        };
+      }
+      return {
+        ...command,
+        data: data.map((row) => {
+          if (!row || typeof row !== 'object' || !('src' in row)) return row;
+          return { ...(row as Record<string, unknown>), src: appState.resolveAssetSource(String((row as Record<string, unknown>).src ?? '')) };
+        }),
+      };
     });
   }
 
@@ -329,6 +351,12 @@
       }
     };
     window.addEventListener('keydown', onTourShortcut);
+    const onDocumentPointerDown = (event: PointerEvent) => {
+      if (!(event.target as HTMLElement | null)?.closest('.canvas-action-menu')) {
+        canvasMenuOpen = false;
+      }
+    };
+    window.addEventListener('pointerdown', onDocumentPointerDown);
 
     return () => {
       cancelGifExportRecording();
@@ -336,6 +364,7 @@
       resizeObserver?.disconnect();
       window.removeEventListener('resize', resize);
       window.removeEventListener('keydown', onTourShortcut);
+      window.removeEventListener('pointerdown', onDocumentPointerDown);
       cancelAnimationFrame(frameHandle);
     };
   });
@@ -410,7 +439,7 @@
         class:is-active={appState.canvasPanelTab === 'canvas'}
         onclick={() => appState.setCanvasPanelTab('canvas')}
       >
-        Canvas
+        {appState.workspaceMode === 'practice' ? 'Output' : 'Canvas'}
       </button>
       <button
         id="canvas-tab-compiled"
@@ -423,48 +452,33 @@
       </button>
     </div>
     <div class="canvas-toolbar-actions">
-      <button
-        id="btn-fps-toggle"
-        class="btn-icon-only canvas-toolbar-btn"
-        type="button"
-        class:is-active={appState.showFps}
-        title="Toggle FPS overlay"
-        onclick={() => appState.toggleFps()}
-      >
-        <svg class="icon" viewBox="0 0 16 16" fill="none">
-          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" />
-          <path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-        </svg>
-      </button>
-      <button
-        id="btn-guided-tour"
-        class="btn-icon-only canvas-toolbar-btn"
-        type="button"
-        title={guidedTourTitle}
-        aria-label={guidedTourTitle}
-        onclick={() => void appState.startOrContinueGuidedTour()}
-      >
-        <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <path d="M5 3h8M5 8h8M5 13h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-          <path d="M2.5 3.5h.01M2.5 8.5h.01M2.5 13.5h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
-        </svg>
-      </button>
-      <button id="btn-export-png" class="btn-icon-only canvas-toolbar-btn" type="button" title="Export PNG" onclick={() => appState.exportPng()}>
-        <svg class="icon" viewBox="0 0 16 16" fill="none">
-          <rect x="2" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" />
-          <path d="M2 9l3-3 3 3 2-2 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-          <circle cx="5.5" cy="5.5" r="1" fill="currentColor" />
-        </svg>
-      </button>
-      <button id="btn-export-gif" class="btn-icon-only canvas-toolbar-btn" type="button" title="Export GIF" onclick={() => appState.openGifModal()}>
-        <svg class="icon" viewBox="0 0 16 16" fill="none">
-          <rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" />
-          <path d="M5 8h2v1H5V7h3" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round" fill="none" />
-          <path d="M9 7h2" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
-          <path d="M10 7v2" stroke="currentColor" stroke-width="1" stroke-linecap="round" />
-          <path d="M4 4V3M8 4V3M12 4V3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-        </svg>
-      </button>
+      <div class="canvas-action-menu">
+        <button id="btn-canvas-actions" class="btn-icon-only canvas-toolbar-btn" type="button" title="Canvas actions" aria-label="Canvas actions" aria-expanded={canvasMenuOpen} onclick={() => (canvasMenuOpen = !canvasMenuOpen)}>
+          <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <path d="M3 4h10M3 8h10M3 12h10" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+          </svg>
+        </button>
+        {#if canvasMenuOpen}
+          <div class="canvas-action-dropdown" role="menu">
+            <button type="button" role="menuitem" class:is-active={appState.showFps} onclick={() => { appState.toggleFps(); canvasMenuOpen = false; }}>
+              <svg class="icon" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5" /><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /></svg>
+              <span>Toggle FPS overlay</span>
+            </button>
+            <button type="button" role="menuitem" onclick={() => { void appState.startOrContinueGuidedTour(); canvasMenuOpen = false; }}>
+              <svg class="icon" viewBox="0 0 16 16" fill="none"><path d="M5 3h8M5 8h8M5 13h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" /><path d="M2.5 3.5h.01M2.5 8.5h.01M2.5 13.5h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+              <span>{guidedTourTitle}</span>
+            </button>
+            <button type="button" role="menuitem" onclick={() => { appState.exportPng(); canvasMenuOpen = false; }}>
+              <svg class="icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="2" width="12" height="10" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" /><path d="M2 9l3-3 3 3 2-2 4 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none" /><circle cx="5.5" cy="5.5" r="1" fill="currentColor" /></svg>
+              <span>Export PNG</span>
+            </button>
+            <button type="button" role="menuitem" onclick={() => { appState.openGifModal(); canvasMenuOpen = false; }}>
+              <svg class="icon" viewBox="0 0 16 16" fill="none"><rect x="2" y="4" width="12" height="8" rx="1.5" stroke="currentColor" stroke-width="1.5" fill="none" /><path d="M5 8h2v1H5V7h3M9 7h2M10 7v2M4 4V3M8 4V3M12 4V3" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+              <span>Export GIF</span>
+            </button>
+          </div>
+        {/if}
+      </div>
       <div class="canvas-size-label" id="canvas-size-label">{appState.currentCanvasSize[0]} × {appState.currentCanvasSize[1]}</div>
     </div>
   </div>

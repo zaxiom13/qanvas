@@ -44,7 +44,7 @@ const STORAGE_KEYS = {
 };
 
 const PRACTICE_FILE_NAME = 'practice.q';
-const RUNTIME_SOURCE_EXTENSIONS = ['.q', '.cue'];
+const RUNTIME_SOURCE_EXTENSIONS = ['.q'];
 
 export const DEFAULT_SKETCH = `setup:{
   \`size\`bg!(800 600;Color.CREAM)
@@ -66,7 +66,7 @@ const SKETCH_ADJECTIVES = ['cosmic', 'warm', 'gentle', 'ember', 'lunar', 'quiet'
 const SKETCH_NOUNS = ['spiral', 'glow', 'bloom', 'ripple', 'drift', 'garden', 'echo', 'field', 'trail', 'galaxy', 'current'];
 
 type OverlayMode = 'idle' | 'running' | 'stopped' | 'error' | 'runtime-missing';
-type ModalName = null | 'settings' | 'new-file' | 'examples' | 'projects' | 'export-gif' | 'unsaved';
+type ModalName = null | 'settings' | 'new-file' | 'examples' | 'projects' | 'export-gif' | 'unsaved' | 'info';
 type UnsavedDecision = 'continue' | 'discard' | 'cancel';
 type WorkspaceMode = 'studio' | 'practice';
 type CanvasPanelTab = 'canvas' | 'compiled';
@@ -158,7 +158,7 @@ class AppState {
   consoleCollapsed = $state(readStored(STORAGE_KEYS.consoleCollapsed) === '1');
   mobileConsoleCollapsed = $state(readStored(STORAGE_KEYS.mobileConsoleCollapsed) === '1');
   mobileCanvasControlsCollapsed = $state(readStored(STORAGE_KEYS.mobileCanvasControlsCollapsed) === '1');
-  editorPanelWidth = $state(readStoredNumber(STORAGE_KEYS.editorPanelWidth, 520));
+  editorPanelWidth = $state(readStoredNumber(STORAGE_KEYS.editorPanelWidth, 640));
   consoleFilter = $state<'all' | 'stdout' | 'stderr' | 'info'>('all');
   consoleEntries = $state<ConsoleEntry[]>([]);
   activeModal = $state<ModalName>(null);
@@ -169,6 +169,7 @@ class AppState {
   runNonce = $state(0);
 
   private booted = false;
+  private autoRunAttempted = false;
   private unsavedResolver: ((decision: UnsavedDecision) => void) | null = null;
   private exportPngHandler: (() => void) | null = null;
   private exportGifHandler: ((durationSeconds: number) => void) | null = null;
@@ -321,6 +322,15 @@ class AppState {
     browserGateway.menu.onSaveAs(() => {
       void this.saveProject(true);
     });
+
+    if (!this.autoRunAttempted) {
+      this.autoRunAttempted = true;
+      queueMicrotask(() => {
+        if (this.workspaceMode === 'studio' && !this.running && !this.runtimeTransitioning) {
+          void this.runSketch();
+        }
+      });
+    }
   }
 
   appendConsole(type: ConsoleType, text: string) {
@@ -514,6 +524,16 @@ class AppState {
 
   async importAssets() {
     await this.projectSession.importAssets(this);
+  }
+
+  resolveAssetSource(src: string) {
+    const asset = this.assets.find((entry) =>
+      entry.relativePath === src ||
+      entry.name === src ||
+      entry.sourcePath === src ||
+      entry.absolutePath === src
+    );
+    return asset?.dataUrl || asset?.absolutePath || asset?.sourcePath || src;
   }
 
   async detectRuntime() {

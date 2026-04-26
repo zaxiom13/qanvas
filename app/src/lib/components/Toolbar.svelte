@@ -29,6 +29,12 @@
     <div class="app-brand">
       <span class="brand-q">Q</span><span class="brand-anvas">anvas</span><span class="brand-5">5</span>
     </div>
+    <button id="btn-info" class="btn-icon-only" type="button" title="About Qanvas5" aria-label="About Qanvas5" onclick={() => (appState.activeModal = 'info')}>
+      <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4" />
+        <path d="M8 7.2v4.2M8 4.8h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+      </svg>
+    </button>
     <div class="toolbar-divider"></div>
     <div class="project-info">
       {#if appState.renamingProject}
@@ -142,7 +148,7 @@
   </div>
 
   <div class="toolbar-right">
-    <button id="btn-examples" class="btn-icon-only" type="button" title="Browse examples (Cmd+E)" onclick={() => (appState.activeModal = 'examples')}>
+    <button id="btn-examples" class="btn-icon-only" type="button" title={appState.workspaceMode === 'practice' ? 'Browse lessons (Cmd+E)' : 'Browse examples (Cmd+E)'} aria-label={appState.workspaceMode === 'practice' ? 'Browse lessons' : 'Browse examples'} onclick={() => (appState.activeModal = 'examples')}>
       <svg class="icon" viewBox="0 0 16 16" fill="none">
         <rect x="1" y="2" width="6" height="5" rx="1" stroke="currentColor" stroke-width="1.5" fill="none" />
         <rect x="9" y="2" width="6" height="5" rx="1" stroke="currentColor" stroke-width="1.5" fill="none" />

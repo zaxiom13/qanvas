@@ -6,7 +6,7 @@ export type MenuEventName = BrowserMenuEventName;
 
 export type BrowserGateway = {
   files: {
-    pickAssets: () => Promise<string[]>;
+    pickAssets: () => Promise<AssetEntry[]>;
   };
   projects: {
     root: () => Promise<string>;

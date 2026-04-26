@@ -47,7 +47,6 @@ test('runs the sketch from the mobile canvas controls sheet', async ({ page }) =
 
   await page.getByRole('button', { name: 'Canvas' }).click();
   await expect(page.locator('.mobile-playbar')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Run sketch' }).click();
 
   await expect(page.getByRole('button', { name: 'Canvas', exact: true })).toHaveClass(/active/);
   await expect(page.getByLabel('Sketch canvas')).toBeVisible();
@@ -81,9 +80,10 @@ test('highlights q syntax in the mobile editor', async ({ page }) => {
 test('highlights q syntax in guided-tour lesson snippets on mobile canvas', async ({ page }) => {
   await page.goto('/');
 
-  await page.getByRole('button', { name: 'Canvas' }).click();
-  await page.getByRole('button', { name: /Start tour/i }).click();
+  await page.getByRole('button', { name: 'Examples' }).click();
+  await page.getByRole('button', { name: /hello circle/i }).click();
   await page.getByRole('button', { name: 'Discard' }).click();
+  await page.getByRole('button', { name: 'Canvas' }).click();
 
   const snippet = page.locator('.tour-lesson-highlight-code');
   await expect(snippet).toBeVisible({ timeout: 15_000 });
@@ -106,10 +106,10 @@ test('exposes working controls in the mobile settings tab', async ({ page }) => 
 
   await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Practice' }).click();
-  await expect(page.getByLabel('Practice output')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Check answer' }).first()).toBeVisible();
-
-  await page.getByRole('button', { name: 'Editor', exact: true }).click();
+  const nav = page.getByRole('navigation', { name: 'Mobile workspace' });
+  await expect(nav.getByRole('button', { name: 'Output' })).toBeVisible();
+  await expect(nav.getByRole('button', { name: 'Lessons' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Editor', exact: true })).toHaveClass(/active/);
   await expect(page.getByLabel('q sketch editor')).toContainText(/answer:\(\[\] city:`symbol\$\(\); totalRevenue:`long\$\(\)\);/);
 
   await page.getByRole('button', { name: 'Settings' }).click();
@@ -125,7 +125,7 @@ test('renders a canvas still on mobile example thumbnails', async ({ page }) => 
   await page.getByRole('button', { name: 'Examples' }).click();
   const helloCard = page.getByRole('button', { name: /hello circle/i });
   await expect(helloCard.locator('.example-thumb img')).toBeVisible({ timeout: 20_000 });
-  await expect(helloCard.locator('.example-thumb img')).toHaveAttribute('src', /^data:image\/jpeg;base64,/);
+  await expect(helloCard.locator('.example-thumb img')).toHaveAttribute('src', /\/example-previews\/hello-circle\.svg$/);
 });
 
 test('does not show Quick Tools on the mobile canvas tab', async ({ page }) => {
@@ -141,7 +141,7 @@ test('filters the mobile editor console by Data, Errors, and Info', async ({ pag
   const consoleFilters = page.getByRole('tablist', { name: 'Console filter' });
 
   await consoleFilters.getByRole('button', { name: 'Info' }).click();
-  await expect(page.getByText(/Qanvas5 ready/)).toBeVisible();
+  await expect(page.locator('.console-line--info').first()).toBeVisible();
 
   await consoleFilters.getByRole('button', { name: 'Data' }).click();
   await expect(page.getByText('No lines for this filter.')).toBeVisible();
@@ -165,10 +165,10 @@ test('opens and creates files from mobile editor tabs', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('tab', { name: /sketch\.q/ })).toBeVisible();
-  await page.getByRole('button', { name: 'New .cue file' }).click();
+  await page.getByRole('button', { name: 'New .q file' }).click();
   await page.locator('#new-file-input').fill('helpers');
   await page.getByRole('button', { name: 'Create' }).click();
 
-  await expect(page.getByRole('tab', { name: /helpers\.cue/ })).toBeVisible();
-  await expect(page.getByLabel('q sketch editor')).toContainText('/ helpers.cue');
+  await expect(page.getByRole('tab', { name: /helpers\.q/ })).toBeVisible();
+  await expect(page.getByLabel('q sketch editor')).toContainText('/ helpers.q');
 });

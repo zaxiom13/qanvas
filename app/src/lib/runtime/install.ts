@@ -109,13 +109,61 @@ function listProjectRecords(): StoredProjectRecord[] {
 
 // ---------- install BrowserRendererAPI ----------
 
+function pickImageAssets() {
+  return new Promise<AssetEntry[]>((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/*';
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+
+    const cleanup = () => {
+      input.remove();
+    };
+
+    input.addEventListener('cancel', () => {
+      cleanup();
+      resolve([]);
+    }, { once: true });
+
+    input.addEventListener('change', async () => {
+      const files = Array.from(input.files ?? []);
+      const assets = await Promise.all(files.map((file) => new Promise<AssetEntry>((assetResolve) => {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+          assetResolve({
+            name: file.name,
+            sourcePath: file.name,
+            relativePath: `assets/${file.name}`,
+            dataUrl: typeof reader.result === 'string' ? reader.result : null,
+          });
+        }, { once: true });
+        reader.addEventListener('error', () => {
+          assetResolve({
+            name: file.name,
+            sourcePath: file.name,
+            relativePath: `assets/${file.name}`,
+          });
+        }, { once: true });
+        reader.readAsDataURL(file);
+      })));
+      cleanup();
+      resolve(assets);
+    }, { once: true });
+
+    input.click();
+  });
+}
+
 export function installQanvasAPI(): BrowserRendererAPI {
   if (!readStored(STORAGE_KEYS.runtimePath)) {
     writeStored(STORAGE_KEYS.runtimePath, 'qanvas://runtime');
   }
 
   const api: BrowserRendererAPI = {
-    pickAssets: async () => [],
+    pickAssets: pickImageAssets,
     getProjectsRoot: async () => 'qanvas://projects',
     listProjects: async () =>
       listProjectRecords()

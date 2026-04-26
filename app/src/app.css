@@ -9,6 +9,7 @@ body,
 
 body {
   margin: 0;
+  touch-action: manipulation;
 }
 
 .app-root {

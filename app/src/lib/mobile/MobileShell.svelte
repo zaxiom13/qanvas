@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { tick, untrack } from 'svelte';
+  import { tick } from 'svelte';
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
   import FileTabs from '$lib/components/FileTabs.svelte';
   import { formatDisplayValue } from '$lib/formatting/value-format';
-  import { captureExampleStillDataUrl } from '$lib/mobile/example-preview-still';
+  import { getExamplePreviewSrc } from '$lib/example-previews';
   import { appState } from '$lib/state/app-state.svelte';
+  import { pretextFit } from '$lib/text/pretext-fit';
   import MobileCodeEditor from './MobileCodeEditor.svelte';
 
   type MobileTab = 'editor' | 'canvas' | 'examples' | 'settings';
@@ -13,16 +14,15 @@
   let activeTab = $state<MobileTab>('editor');
   let mobileCode = $state(appState.activeEditorValue);
 
-  const bottomTabs: { id: MobileTab; label: string; icon: string }[] = [
+  let bottomTabs = $derived<{ id: MobileTab; label: string; icon: string }[]>([
     { id: 'editor', label: 'Editor', icon: 'code' },
-    { id: 'canvas', label: 'Canvas', icon: 'palette' },
-    { id: 'examples', label: 'Examples', icon: 'cube' },
+    { id: 'canvas', label: appState.workspaceMode === 'practice' ? 'Output' : 'Canvas', icon: 'palette' },
+    { id: 'examples', label: appState.workspaceMode === 'practice' ? 'Lessons' : 'Examples', icon: 'cube' },
     { id: 'settings', label: 'Settings', icon: 'sliders' },
-  ];
+  ]);
 
   let examples = $derived(appState.filteredExamples.slice(0, 9));
   let filteredConsoleEntries = $derived(appState.filteredConsole);
-  let examplePreviewUrls = $state<Record<string, string>>({});
 
   function formatTimestamp(ts: number) {
     const date = new Date(ts);
@@ -38,41 +38,6 @@
     mobileCode = appState.activeEditorValue;
   });
 
-  $effect(() => {
-    if (activeTab !== 'examples' || typeof window === 'undefined') return;
-    // Track tab + category only — avoid subscribing to unrelated appState churn.
-    void appState.exampleCategory;
-
-    const list = untrack(() => appState.filteredExamples.slice(0, 9));
-    const existing = untrack(() => examplePreviewUrls);
-    if (!list.length) return;
-    if (list.every((ex) => Boolean(existing[ex.id]))) return;
-
-    let cancelled = false;
-
-    const run = async () => {
-      const out: Record<string, string> = { ...existing };
-      for (const ex of list) {
-        if (cancelled) return;
-        if (out[ex.id]) continue;
-        await new Promise<void>((resolve) => {
-          requestAnimationFrame(() => resolve());
-        });
-        if (cancelled) return;
-        const url = await captureExampleStillDataUrl(ex.code);
-        if (url) out[ex.id] = url;
-      }
-      if (!cancelled) {
-        examplePreviewUrls = out;
-      }
-    };
-
-    void run();
-    return () => {
-      cancelled = true;
-    };
-  });
-
   function updateCode(value: string) {
     mobileCode = value;
     appState.updateActiveEditorContent(value);
@@ -84,6 +49,15 @@
       appState.setCanvasPanelTab(appState.workspaceMode === 'practice' ? 'compiled' : 'canvas');
     }
   }
+
+  $effect(() => {
+    if (appState.workspaceMode !== 'studio' || !appState.running) return;
+    if (activeTab !== 'canvas' && !appState.paused) {
+      appState.pauseSketch();
+    } else if (activeTab === 'canvas' && appState.paused) {
+      appState.pauseSketch();
+    }
+  });
 
   async function runOrStop() {
     if (appState.running) {
@@ -106,7 +80,8 @@
   async function chooseWorkspaceMode(mode: 'studio' | 'practice') {
     await appState.setWorkspaceMode(mode);
     if (mode === 'practice') {
-      setActiveTab('canvas');
+      appState.setCanvasPanelTab('compiled');
+      setActiveTab('editor');
     }
   }
 </script>
@@ -119,6 +94,12 @@
       </div>
       <p>kdb+/q creative coding</p>
     </div>
+    <button class="mobile-action mobile-info-action" type="button" aria-label="About Qanvas5" onclick={() => (appState.activeModal = 'info')}>
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+        <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+      </svg>
+    </button>
   </header>
 
   <main class="mobile-main">
@@ -265,6 +246,15 @@
                   <p>Edit your answer, then tap <strong>Check answer</strong>. The result appears here.</p>
                 </div>
               {/if}
+              {#if appState.practiceAnswerVisible}
+                <article class="mobile-practice-result mobile-practice-answer">
+                  <div class="mobile-practice-result-heading">
+                    <strong>Working answer</strong>
+                    <button type="button" onclick={() => appState.loadPracticeAnswer()}>Use</button>
+                  </div>
+                  <pre>{appState.activePracticeSolution}</pre>
+                </article>
+              {/if}
             </div>
           {:else}
             <CanvasPanel />
@@ -344,7 +334,7 @@
     {:else if activeTab === 'examples'}
       <section class="mobile-examples">
         <div class="mobile-search-row">
-          <h1>Examples</h1>
+          <h1>{appState.workspaceMode === 'practice' ? 'Lessons' : 'Examples'}</h1>
           <button class="mobile-action" type="button" aria-label="Search examples">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2" /><path d="M16.5 16.5 21 21" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
           </button>
@@ -356,6 +346,7 @@
         </div>
         <div class="mobile-example-grid">
           {#each examples as example}
+            {@const previewSrc = getExamplePreviewSrc(example.id)}
             <button
               class="mobile-example-card"
               type="button"
@@ -366,11 +357,11 @@
               }}
             >
               <span class="example-thumb">
-                {#if examplePreviewUrls[example.id]}
-                  <img src={examplePreviewUrls[example.id]} alt="" loading="lazy" decoding="async" />
+                {#if previewSrc}
+                  <img src={previewSrc} alt="" loading="lazy" decoding="async" />
                 {/if}
               </span>
-              <strong>{example.name}</strong>
+              <strong use:pretextFit={{ min: 10, max: 13 }}>{example.name}</strong>
               <small>by qanvas5</small>
             </button>
           {/each}
@@ -433,7 +424,7 @@
             <path d="M5 7h14M5 17h14M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM16 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           {/if}
         </svg>
-        <span>{tab.label}</span>
+        <span use:pretextFit={{ min: 9, max: 11 }}>{tab.label}</span>
       </button>
     {/each}
   </nav>
@@ -466,7 +457,7 @@
     flex: 0 0 auto;
     display: flex;
     align-items: center;
-    justify-content: flex-start;
+    justify-content: space-between;
     gap: 16px;
     padding: calc(env(safe-area-inset-top) + 14px) 18px 12px;
     background: var(--bg-toolbar);
@@ -750,6 +741,25 @@
     border: 1px solid var(--mobile-border);
     border-radius: 12px;
     background: #fff;
+  }
+
+  .mobile-practice-answer pre {
+    margin-top: 10px;
+    white-space: pre-wrap;
+    word-break: normal;
+    overflow-wrap: anywhere;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    line-height: 1.45;
+  }
+
+  .mobile-practice-result-heading button {
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 7px;
+    background: var(--bg-chrome);
+    font-weight: 800;
   }
 
   .mobile-practice-empty p,

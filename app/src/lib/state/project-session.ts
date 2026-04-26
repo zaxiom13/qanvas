@@ -2,7 +2,7 @@ import type { BrowserGateway } from '$lib/browser';
 
 export const DEFAULT_PROJECT_NAME = 'untitled';
 const DEFAULT_ENTRY_FILE = 'sketch.q';
-const DEFAULT_HELPER_EXTENSION = '.cue';
+const DEFAULT_HELPER_EXTENSION = '.q';
 
 type ProjectHost = {
   projectPath: string | null;
@@ -105,19 +105,20 @@ export class ProjectSessionController {
   }
 
   async importAssets(host: ProjectHost) {
-    const paths = await this.browser.files.pickAssets();
-    if (!paths.length) return false;
+    const pickedAssets = await this.browser.files.pickAssets();
+    if (!pickedAssets.length) return false;
 
     const existing = new Set(host.assets.map((asset) => asset.name));
     const nextAssets = [...host.assets];
 
-    for (const assetPath of paths) {
-      const name = assetPath.split('/').pop() || assetPath;
+    for (const asset of pickedAssets) {
+      const name = asset.name || asset.sourcePath?.split('/').pop() || `asset-${nextAssets.length + 1}`;
       if (existing.has(name)) continue;
       existing.add(name);
       nextAssets.push({
         name,
-        sourcePath: assetPath,
+        sourcePath: asset.sourcePath ?? asset.dataUrl ?? null,
+        dataUrl: asset.dataUrl ?? null,
         relativePath: joinPath('assets', name),
       });
       host.appendConsole('info', `Asset imported: ${name}`);

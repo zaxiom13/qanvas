@@ -13,7 +13,7 @@
     </div>
     <div class="modal-body">
       <label class="settings-label" for="new-file-input">Filename</label>
-      <input type="text" id="new-file-input" class="settings-input" placeholder="functions.cue" spellcheck="false" bind:value={appState.newFileName} onkeydown={(event) => event.key === 'Enter' && appState.createFile()} />
+      <input type="text" id="new-file-input" class="settings-input" placeholder="functions.q" spellcheck="false" bind:value={appState.newFileName} onkeydown={(event) => event.key === 'Enter' && appState.createFile()} />
     </div>
     <div class="modal-footer">
       <button class="btn-secondary" id="btn-new-file-cancel" type="button" onclick={() => appState.closeModal('new-file')}>Cancel</button>

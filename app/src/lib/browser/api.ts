@@ -299,11 +299,59 @@ function emitStderr(value: string) {
   eventListeners.stderr.forEach((listener) => listener(value));
 }
 
+function pickImageAssets() {
+  return new Promise<AssetEntry[]>((resolve) => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true;
+    input.accept = 'image/*';
+    input.style.position = 'fixed';
+    input.style.left = '-9999px';
+    document.body.appendChild(input);
+
+    const cleanup = () => {
+      input.remove();
+    };
+
+    input.addEventListener('cancel', () => {
+      cleanup();
+      resolve([]);
+    }, { once: true });
+
+    input.addEventListener('change', async () => {
+      const files = Array.from(input.files ?? []);
+      const assets = await Promise.all(files.map((file) => new Promise<AssetEntry>((assetResolve) => {
+        const reader = new FileReader();
+        reader.addEventListener('load', () => {
+          assetResolve({
+            name: file.name,
+            sourcePath: file.name,
+            relativePath: `assets/${file.name}`,
+            dataUrl: typeof reader.result === 'string' ? reader.result : null,
+          });
+        }, { once: true });
+        reader.addEventListener('error', () => {
+          assetResolve({
+            name: file.name,
+            sourcePath: file.name,
+            relativePath: `assets/${file.name}`,
+          });
+        }, { once: true });
+        reader.readAsDataURL(file);
+      })));
+      cleanup();
+      resolve(assets);
+    }, { once: true });
+
+    input.click();
+  });
+}
+
 export function installBrowserAPI(): BrowserAPI {
   ensureBrowserRuntimePath();
 
   const api: BrowserAPI = {
-    pickAssets: async () => [],
+    pickAssets: pickImageAssets,
     getProjectsRoot: async () => 'browser://projects',
     listProjects: async () =>
       listProjectRecords()

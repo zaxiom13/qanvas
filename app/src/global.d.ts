@@ -18,6 +18,7 @@ declare global {
     sourcePath?: string | null;
     absolutePath?: string | null;
     relativePath?: string | null;
+    dataUrl?: string | null;
   };
 
   type ProjectPayload = {
@@ -112,7 +113,7 @@ declare global {
     | 'menu:toggle-comment';
 
   type BrowserRendererAPI = {
-    pickAssets: () => Promise<string[]>;
+    pickAssets: () => Promise<AssetEntry[]>;
     getProjectsRoot: () => Promise<string>;
     listProjects: () => Promise<ProjectLibraryEntry[]>;
     readProject: (projectPath: string) => Promise<ProjectSnapshot>;

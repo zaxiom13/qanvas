@@ -49,6 +49,7 @@ export function createCompiledRuntimeHelpers() {
   }
 
   const helpers = {
+    colors: QANVAS_COLORS,
     resetCommands() {
       commands = [];
     },
