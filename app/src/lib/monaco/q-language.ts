@@ -4,7 +4,7 @@ import { QANVAS_COLORS } from '$lib/runtime/compiled-runtime-helpers';
 
 const registeredMonacoInstances = new WeakSet<object>();
 
-const Q_KEYWORDS = [
+export const Q_KEYWORDS = [
   'select',
   'from',
   'where',
@@ -96,7 +96,7 @@ const Q_KEYWORDS = [
   'except',
 ];
 
-const Q_BUILTIN_FUNCTIONS = [
+export const Q_BUILTIN_FUNCTIONS = [
   'neg',
   'not',
   'null',
@@ -235,7 +235,7 @@ const Q_BUILTIN_FUNCTIONS = [
   'use',
 ];
 
-const Q_CANVAS_FUNCTIONS = [
+export const Q_CANVAS_FUNCTIONS = [
   {
     label: 'background',
     detail: 'Qanvas draw helper',
@@ -316,7 +316,7 @@ const Q_CANVAS_FUNCTIONS = [
   },
 ];
 
-const Q_CONTEXT_SYMBOLS = [
+export const Q_CONTEXT_SYMBOLS = [
   {
     label: 'setup',
     detail: 'Sketch lifecycle',
@@ -416,7 +416,7 @@ const Q_CONTEXT_SYMBOLS = [
   },
 ];
 
-const Q_COLOR_SYMBOLS = Object.entries(QANVAS_COLORS).map(([name, value]) => ({
+export const Q_COLOR_SYMBOLS = Object.entries(QANVAS_COLORS).map(([name, value]) => ({
   label: `Color.${name}`,
   detail: 'Qanvas color',
   documentation: `Built-in color constant, equivalent to 0x${value.toString(16).toUpperCase().padStart(6, '0')}.`,

@@ -4,8 +4,15 @@
   import { bracketMatching, indentOnInput, syntaxHighlighting } from '@codemirror/language';
   import { EditorState } from '@codemirror/state';
   import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-  import { autocompletion, snippetCompletion, type CompletionContext } from '@codemirror/autocomplete';
-  import { Q_SLASH_SNIPPETS } from '$lib/monaco/q-language';
+  import { autocompletion, snippetCompletion, type Completion, type CompletionContext } from '@codemirror/autocomplete';
+  import {
+    Q_BUILTIN_FUNCTIONS,
+    Q_CANVAS_FUNCTIONS,
+    Q_COLOR_SYMBOLS,
+    Q_CONTEXT_SYMBOLS,
+    Q_KEYWORDS,
+    Q_SLASH_SNIPPETS,
+  } from '$lib/monaco/q-language';
   import { qMobileEditorHighlightStyle } from './q-highlight-html';
   import { qLanguage } from './q-codemirror';
 
@@ -74,6 +81,81 @@
     })
   );
 
+  const mobileQanvasCompletions = Q_CANVAS_FUNCTIONS.map((item) =>
+    snippetCompletion(item.insertText, {
+      label: item.label,
+      detail: item.detail,
+      info: item.documentation,
+      type: 'function',
+    })
+  );
+
+  const mobileContextCompletions = Q_CONTEXT_SYMBOLS.map((item) =>
+    item.insertText.includes('${')
+      ? snippetCompletion(item.insertText, {
+          label: item.label,
+          detail: item.detail,
+          info: item.documentation,
+          type: 'variable',
+        })
+      : ({
+          label: item.label,
+          detail: item.detail,
+          info: item.documentation,
+          apply: item.insertText,
+          type: 'variable',
+        } satisfies Completion)
+  );
+
+  const mobileColorCompletions = Q_COLOR_SYMBOLS.map(
+    (item) =>
+      ({
+        label: item.label,
+        detail: item.detail,
+        info: item.documentation,
+        apply: item.insertText,
+        type: 'constant',
+      }) satisfies Completion
+  );
+
+  const mobileBuiltinCompletions = Q_BUILTIN_FUNCTIONS.map(
+    (label) =>
+      ({
+        label,
+        detail: 'q built-in',
+        info: 'Built-in q function.',
+        type: 'function',
+      }) satisfies Completion
+  );
+
+  const mobileKeywordCompletions = Q_KEYWORDS.map(
+    (label) =>
+      ({
+        label,
+        detail: 'q keyword',
+        info: 'Core q keyword or query word.',
+        type: 'keyword',
+      }) satisfies Completion
+  );
+
+  function dedupeMobileCompletions(items: Completion[]) {
+    const seen = new Set<string>();
+    return items.filter((item) => {
+      if (seen.has(item.label)) return false;
+      seen.add(item.label);
+      return true;
+    });
+  }
+
+  const mobileQCompletionsList = dedupeMobileCompletions([
+    ...mobileSlashSnippets,
+    ...mobileQanvasCompletions,
+    ...mobileContextCompletions,
+    ...mobileColorCompletions,
+    ...mobileBuiltinCompletions,
+    ...mobileKeywordCompletions,
+  ]);
+
   function mobileQCompletions(context: CompletionContext) {
     const slash = context.matchBefore(/\/[a-zA-Z]*/);
     if (slash) {
@@ -84,7 +166,18 @@
       };
     }
 
-    return null;
+    const word = context.matchBefore(/[a-zA-Z_.][a-zA-Z0-9_.`]*/);
+    if (!word || (word.from === word.to && !context.explicit)) return null;
+
+    const lineStart = context.state.doc.lineAt(context.pos).from;
+    const before = context.state.sliceDoc(lineStart, context.pos);
+    const color = before.match(/Color\.[A-Z_]*$/);
+
+    return {
+      from: color ? context.pos - color[0].length : word.from,
+      options: mobileQCompletionsList,
+      validFor: /^[a-zA-Z_.][a-zA-Z0-9_.`]*$/,
+    };
   }
 
   onMount(() => {
