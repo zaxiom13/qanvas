@@ -240,8 +240,19 @@
 <div class="mobile-code-editor" bind:this={host}></div>
 
 <style>
+  /* `body` uses user-select: none for UI chrome; re-enable for CodeMirror on touch/desktop. */
   .mobile-code-editor {
     height: 100%;
     min-height: 0;
+    user-select: text;
+    -webkit-user-select: text;
+  }
+
+  .mobile-code-editor :global(.cm-editor),
+  .mobile-code-editor :global(.cm-scroller),
+  .mobile-code-editor :global(.cm-content),
+  .mobile-code-editor :global(.cm-line) {
+    user-select: text;
+    -webkit-user-select: text;
   }
 </style>
