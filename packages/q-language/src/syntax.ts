@@ -146,6 +146,9 @@ export const qMonarchSyntax = {
     "$",
     "!",
     "?",
+    "0:",
+    "1:",
+    "2:",
     "+",
     "-",
     "*",
@@ -186,7 +189,7 @@ export const qMonarchSyntax = {
       { include: "@whitespace" },
       [/[{}()[\]]/, "@brackets"],
       [
-        /@symbols/,
+        /[012]:|@symbols/,
         {
           cases: {
             "@operators": "delimiter",
@@ -194,9 +197,12 @@ export const qMonarchSyntax = {
           }
         }
       ],
+      [/\d{4}\.\d{2}\.\d{2}[DT]\d{1,2}:\d{2}:\d{2}(\.\d{3,9})?/, "date"],
+      [/-?\d+D\d{1,2}:\d{2}:\d{2}(\.\d{1,9})?/, "date"],
       [/\d{4}\.\d{2}\.\d{2}/, "date"],
       [/\d{2}:\d{2}:\d{2}(.\d{1,9})?/, "time"],
-      [/0[NWwn]|-0[Ww]|\d+(\.\d+)?([eE][-+]?\d+)?[fij]?/, "number"],
+      [/0x[0-9a-fA-F]*/, "number"],
+      [/0N[ijhe]?|0n|-?0W[ijhe]?|-?0w|\d+(\.\d+)?([eE][-+]?\d+)?[fhije]?/, "number"],
       [/"([^"\\]|\\.)*$/, "string.invalid"],
       [/"/, { token: "string.quote", bracket: "@open", next: "@string" }]
     ],

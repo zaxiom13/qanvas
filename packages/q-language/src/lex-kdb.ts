@@ -185,6 +185,13 @@ export function lexKdbLex(source: string): KdbLexToken[] {
       continue;
     }
 
+    const fileOperatorMatch = rest.match(/^[012]:/);
+    if (fileOperatorMatch) {
+      pushToken(tokens, "operator", fileOperatorMatch[0], start, start + fileOperatorMatch[0].length);
+      i += fileOperatorMatch[0].length;
+      continue;
+    }
+
     const spacedBoolMatch = rest.match(/^[01](?:[ \t]+[01])+b(?![a-zA-Z0-9_])/);
     if (spacedBoolMatch) {
       pushToken(tokens, "boolvector", spacedBoolMatch[0], start, start + spacedBoolMatch[0].length);
@@ -205,10 +212,29 @@ export function lexKdbLex(source: string): KdbLexToken[] {
       continue;
     }
 
-    const nullMatch = rest.match(/^(0Wj|-0Wj|0N|0n|-0W|0W|-0w|0w)/);
+    const nullMatch = rest.match(/^(0N[ijhe]?|0n|-?0W[ijhe]?|-?0w)/);
     if (nullMatch) {
       pushToken(tokens, "number", nullMatch[0], start, start + nullMatch[0].length);
       i += nullMatch[0].length;
+      continue;
+    }
+
+    const temporalBoundary = "(?=$|[ \\t\\r\\n\\]\\)\\};,])";
+    const timestampMatch = rest.match(
+      new RegExp(`^\\d{4}\\.\\d{2}\\.\\d{2}[DT]\\d{1,2}:\\d{2}:\\d{2}(?:\\.\\d{3,9})?${temporalBoundary}`)
+    );
+    if (timestampMatch) {
+      pushToken(tokens, "date", timestampMatch[0], start, start + timestampMatch[0].length);
+      i += timestampMatch[0].length;
+      continue;
+    }
+
+    const dayTimespanMatch = rest.match(
+      new RegExp(`^-?\\d+D\\d{1,2}:\\d{2}:\\d{2}(?:\\.\\d{1,9})?${temporalBoundary}`)
+    );
+    if (dayTimespanMatch) {
+      pushToken(tokens, "date", dayTimespanMatch[0], start, start + dayTimespanMatch[0].length);
+      i += dayTimespanMatch[0].length;
       continue;
     }
 
@@ -219,11 +245,17 @@ export function lexKdbLex(source: string): KdbLexToken[] {
       continue;
     }
 
-    const temporalBoundary = "(?=$|[ \\t\\r\\n\\]\\)\\};,])";
     const monthMatch = rest.match(new RegExp(`^\\d{4}\\.\\d{2}m?${temporalBoundary}`));
     if (monthMatch) {
       pushToken(tokens, "date", monthMatch[0], start, start + monthMatch[0].length);
       i += monthMatch[0].length;
+      continue;
+    }
+
+    const hexMatch = rest.match(new RegExp(`^0x[0-9a-fA-F]*${temporalBoundary}`));
+    if (hexMatch) {
+      pushToken(tokens, "number", hexMatch[0], start, start + hexMatch[0].length);
+      i += hexMatch[0].length;
       continue;
     }
 

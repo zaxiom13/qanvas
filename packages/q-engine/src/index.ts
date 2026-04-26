@@ -340,7 +340,7 @@ export class QRuntimeError extends Error {
 }
 
 type BuiltinImpl = (session: Session, args: QValue[]) => QValue;
-type TemporalType = "date" | "month" | "minute" | "second" | "time" | "timespan";
+type TemporalType = "date" | "month" | "minute" | "second" | "time" | "timespan" | "datetime" | "timestamp";
 type StoredFileFormat = "csv" | "tsv" | "txt" | "json" | "q";
 
 interface BuiltinEntry extends QBuiltin {
@@ -3436,6 +3436,10 @@ const renderAst = (node: AstNode): string => {
 };
 
 const parseNumericLiteral = (raw: string): QValue => {
+  if (/^0x[0-9a-fA-F]*$/.test(raw)) {
+    const bytes = raw.slice(2).match(/[0-9a-fA-F]{2}/g) ?? [];
+    return qList(bytes.map((byte) => qLong(Number.parseInt(byte, 16))), true, "byte");
+  }
   if (raw === "0N") return qLong(0, "longNull");
   if (raw === "0Ni") return qInt(0, "intNull");
   if (raw === "0Nh") return qShort(0, "shortNull");
@@ -3464,6 +3468,15 @@ const parseNumericLiteral = (raw: string): QValue => {
 };
 
 const parseTemporalLiteral = (raw: string): QValue => {
+  if (/^\d{4}\.\d{2}\.\d{2}D\d{1,2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(raw)) {
+    return qTemporal("timestamp", raw);
+  }
+  if (/^\d{4}\.\d{2}\.\d{2}T\d{1,2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(raw)) {
+    return qTemporal("datetime", raw);
+  }
+  if (/^-?\d+D\d{1,2}:\d{2}:\d{2}(?:\.\d{1,9})?$/.test(raw)) {
+    return qTemporal("timespan", raw);
+  }
   if (/^\d{4}\.\d{2}\.\d{2}$/.test(raw)) {
     return qDate(raw);
   }
@@ -6253,6 +6266,7 @@ const castNameFromLeftOperand = (left: QValue) => {
 const CAST_ALIAS_GROUPS: ReadonlyArray<{ aliases: readonly string[]; cast: CastHandler }> = [
   { aliases: ["", "symbol", "11h"], cast: (value) => castSymbolValue(value) },
   { aliases: ["boolean", "bool", "1h"], cast: (value) => castBooleanValue(value) },
+  { aliases: ["byte", "x", "4h"], cast: (value) => castByteValue(value) },
   { aliases: ["short", "h", "5h"], cast: (value) => castShortValue(value) },
   { aliases: ["int", "i", "6h"], cast: (value) => castIntValue(value) },
   { aliases: ["long", "j", "7h"], cast: (value) => castLongValue(value) },
@@ -6949,6 +6963,31 @@ const castBooleanAtom = (value: QValue): QValue => {
   throw new QRuntimeError("type", "boolean$ expects boolean or numeric values");
 };
 
+const castByteValue = (value: QValue): QValue => {
+  if (value.kind === "string") {
+    return byteListFromText(value.value);
+  }
+  if (value.kind === "list") {
+    return qList(
+      value.items.map((item) => (item.kind === "list" ? castByteValue(item) : castByteAtom(item))),
+      true,
+      "byte"
+    );
+  }
+  return qList([castByteAtom(value)], true, "byte");
+};
+
+const castByteAtom = (value: QValue): QValue => {
+  if (value.kind === "number" || value.kind === "boolean") {
+    const n = Math.trunc(toNumber(value));
+    return qLong(((n % 256) + 256) % 256);
+  }
+  if (value.kind === "string" && value.value.length === 1) {
+    return qLong(value.value.codePointAt(0) ?? 0);
+  }
+  throw new QRuntimeError("type", "byte$ expects numeric, boolean, char, or string values");
+};
+
 const castShortValue = (value: QValue): QValue => {
   if (value.kind === "list") {
     return qList(
@@ -7575,6 +7614,12 @@ const formatBare = (value: QValue): string => {
     case "temporal":
       return value.value;
     case "list":
+      if (value.attribute === "byte" && value.items.every((item) => item.kind === "number")) {
+        return `0x${value.items
+          .map((item) => Math.max(0, Math.min(255, Math.trunc(toNumber(item)))))
+          .map((byte) => byte.toString(16).padStart(2, "0"))
+          .join("")}`;
+      }
       if (value.items.length === 0) {
         return "()";
       }

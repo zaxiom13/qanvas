@@ -88,6 +88,27 @@
     ].includes(value);
   }
 
+  function isBareWordDiadAt(options, index) {
+    return (
+      tokenMatches(options, index, "identifier") &&
+      isWordDiad(tokenAt(options, index).value) &&
+      !tokenMatches(options, index + 1, "lbracket")
+    );
+  }
+
+  function isProjectedOperatorAt(options, index) {
+    if (!tokenMatches(options, index, "operator")) return false;
+    let cursor = index + 1;
+    while (tokenMatches(options, cursor, "operator")) {
+      cursor += 1;
+    }
+    return tokenMatches(options, cursor, "lbracket");
+  }
+
+  function isBareOperatorAt(options, index) {
+    return tokenMatches(options, index, "operator") && !isProjectedOperatorAt(options, index);
+  }
+
   function isAssignmentOperator(value) {
     return value.length > 1 && value.endsWith(":") && value !== "::";
   }
@@ -408,24 +429,33 @@ Assignment
   / Binary
 
 Binary
-  = left:Application !ClauseStop DiadicOperator bad:OperatorExpressionTerminator
+  = left:Application !ClauseStop DiadicOperator bad:OperatorDanglingNewline
     { throw buildParseLocationError(options, bad, "Expected expression after operator"); }
   / left:Application tail:(
-      !ClauseStop op:DiadicOperator &{ return isTerminator(options, location().start.offset); }
+      !ClauseStop op:OperatorComma args:BracketArgs NewlineGap right:(!{ return isTerminator(options, location().start.offset); } value:Assignment { return value; })?
+        {
+          const projection = applySuffix({ kind: "identifier", name: op }, { kind: "bracket", args });
+          const projected = right ? buildAdjacent(projection, [right]) : projection;
+          return { commaProjection: true, projected };
+        }
+    / !ClauseStop op:DiadicOperator &{ return isTerminator(options, location().start.offset); }
         { return { op, postfix: true }; }
-    / !ClauseStop op:DiadicOperator right:Expression
+    / !ClauseStop op:DiadicOperator NewlineGap right:Expression
         { return { op, right }; }
     )?
     {
       if (!tail) return left;
+      if (tail.commaProjection) return { kind: "vector", items: [left, tail.projected] };
       if (tail.postfix) return { kind: "call", callee: { kind: "identifier", name: tail.op }, args: [left] };
       return pushBinaryIntoImplicitCall(left, tail.op, tail.right);
     }
 
-OperatorExpressionTerminator
+OperatorDanglingNewline
   = &{
-      const token = tokenAt(options, location().start.offset);
-      return token.kind === "newline" || token.kind === "eof";
+      const index = location().start.offset;
+      const token = tokenAt(options, index);
+      const next = tokenAt(options, index + 1);
+      return token.kind === "newline" && ["rparen", "rbracket", "rbrace"].includes(next.kind);
     }
     "" { return location().start.offset; }
 
@@ -433,7 +463,7 @@ Application
   = callee:PostfixPrimary tail:(
       EachKeyword arg:Assignment
         { return { kind: "each", arg }; }
-    / &{ return isMonadCallee(callee) && !(tokenMatches(options, location().start.offset, "identifier") && isWordDiad(tokenAt(options, location().start.offset).value)); } arg:Assignment
+    / &{ return isMonadCallee(callee) && !isBareWordDiadAt(options, location().start.offset); } arg:Assignment
         { return { kind: "monad", arg }; }
     / adjacent:AdjacentPrimary*
         { return { kind: "adjacent", adjacent }; }
@@ -462,13 +492,33 @@ CallSuffix
 
 AdjacentPrimary
   = !ClauseStop
-    !{ return tokenMatches(options, location().start.offset, "operator"); }
-    !{ return tokenMatches(options, location().start.offset, "identifier") && isWordDiad(tokenAt(options, location().start.offset).value); }
+    !{ return isBareOperatorAt(options, location().start.offset); }
+    !{ return isBareWordDiadAt(options, location().start.offset); }
+    value:AssignmentAdjacent { return value; }
+  / !ClauseStop
+    !{ return isBareOperatorAt(options, location().start.offset); }
+    !{ return isBareWordDiadAt(options, location().start.offset); }
     value:MonadicAdjacent { return value; }
   / !ClauseStop
-    !{ return tokenMatches(options, location().start.offset, "operator"); }
-    !{ return tokenMatches(options, location().start.offset, "identifier") && isWordDiad(tokenAt(options, location().start.offset).value); }
+    !{ return isBareOperatorAt(options, location().start.offset); }
+    !{ return isBareWordDiadAt(options, location().start.offset); }
     value:PostfixPrimary { return value; }
+
+AssignmentAdjacent
+  = name:IdentifierToken op:AssignmentOperator value:Expression
+    {
+      if (op === ":") return { kind: "assign", name, value };
+      return {
+        kind: "assign",
+        name,
+        value: {
+          kind: "binary",
+          op: op.slice(0, -1),
+          left: { kind: "identifier", name },
+          right: value
+        }
+      };
+    }
 
 MonadicAdjacent
   = name:IdentifierToken
@@ -490,19 +540,19 @@ Primary
   / name:IdentifierToken { return { kind: "identifier", name }; }
 
 TableOrGroup
-  = TokenLParen TokenRParen
+  = TokenLParen NewlineGap TokenRParen
     { return { kind: "list", items: [] }; }
-  / TokenLParen TokenLBracket TokenRBracket AutoColumnReset columns:ColumnDefinitions TokenRParen
+  / TokenLParen NewlineGap TokenLBracket TokenRBracket AutoColumnReset columns:ColumnDefinitions NewlineGap TokenRParen
     { return { kind: "table", columns }; }
-  / TokenLParen TokenLBracket AutoColumnReset keys:ColumnDefinitions TokenRBracket Separator? AutoColumnReset values:ColumnDefinitions TokenRParen
+  / TokenLParen NewlineGap TokenLBracket AutoColumnReset keys:ColumnDefinitions TokenRBracket Separator? AutoColumnReset values:ColumnDefinitions NewlineGap TokenRParen
     { return { kind: "keyedTable", keys, values }; }
-  / TokenLParen first:Expression tail:(Separator item:Expression { return item; })+ Separator? TokenRParen
+  / TokenLParen NewlineGap first:Expression tail:(Separator NewlineGap item:Expression { return item; })+ Separator? NewlineGap TokenRParen
     { return { kind: "list", items: [first, ...tail] }; }
-  / TokenLParen value:Expression TokenRParen
+  / TokenLParen NewlineGap value:Expression NewlineGap TokenRParen
     { return { kind: "group", value }; }
 
 ColumnDefinitions
-  = head:ColumnDefinition? tail:(Separator column:ColumnDefinition? { return column; })*
+  = NewlineGap head:ColumnDefinition? tail:(Separator NewlineGap column:ColumnDefinition? { return column; })*
     { return [head, ...tail].filter(Boolean); }
 
 AutoColumnReset
@@ -547,11 +597,11 @@ LambdaStatement
   / Expression
 
 BracketArgs
-  = TokenLBracket args:BracketArgList? TokenRBracket
+  = TokenLBracket NewlineGap args:BracketArgList? NewlineGap TokenRBracket
     { return args ?? []; }
 
 BracketArgList
-  = head:BracketArg tail:(Separator arg:BracketArg { return arg; })* trailing:Separator?
+  = head:BracketArg tail:(Separator NewlineGap arg:BracketArg { return arg; })* trailing:Separator?
     {
       const args = [head, ...tail];
       if (trailing) args.push({ kind: "placeholder" });
@@ -562,6 +612,8 @@ BracketArg
   = left:Application op:DiadicOperator &{ return tokenMatches(options, location().start.offset, "separator") || tokenMatches(options, location().start.offset, "rbracket"); }
     { return { kind: "call", callee: { kind: "identifier", name: op }, args: [left] }; }
   / &Separator { return { kind: "placeholder" }; }
+  / OperatorColon &{ return tokenMatches(options, location().start.offset, "separator") || tokenMatches(options, location().start.offset, "rbracket"); }
+    { return { kind: "identifier", name: ":" }; }
   / Expression
 
 NumberLiteral
@@ -627,7 +679,7 @@ EachKeyword = &{ return tokenMatches(options, location().start.offset, "identifi
 
 WordDiadOperator
   = value:TokenIdentifierAny
-    &{ return isWordDiad(value); }
+    &{ return isWordDiad(value) && !tokenMatches(options, location().start.offset, "lbracket"); }
     { return value; }
 
 ClauseStop
@@ -718,6 +770,9 @@ StatementBreak
 
 Gap
   = Separator*
+
+NewlineGap
+  = NewlineToken*
 
 NonEof
   = &{ return !tokenMatches(options, location().start.offset, "eof"); } ""

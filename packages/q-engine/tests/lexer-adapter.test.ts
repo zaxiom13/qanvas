@@ -28,4 +28,20 @@ describe("KDBLex adapter", () => {
       { kind: "eof", value: "", start: 32, end: 32 }
     ]);
   });
+
+  it("recognizes q byte, timestamp, timespan, and file-handle operator tokens", () => {
+    expect(tokenize("0x424d;2010.01.25D14:17:46.962375000;0D14:17:45.519682000;fn 1: 0x00"))
+      .toMatchObject([
+        { kind: "number", value: "0x424d" },
+        { kind: "separator" },
+        { kind: "date", value: "2010.01.25D14:17:46.962375000" },
+        { kind: "separator" },
+        { kind: "date", value: "0D14:17:45.519682000" },
+        { kind: "separator" },
+        { kind: "identifier", value: "fn" },
+        { kind: "operator", value: "1:" },
+        { kind: "number", value: "0x00" },
+        { kind: "eof" }
+      ]);
+  });
 });

@@ -28,4 +28,19 @@ describe("q language highlighting", () => {
     expect(matchesAny("(.cx.new /)each")).toBe(false);
     expect(matchesAny("/:")).toBe(false);
   });
+
+  it("covers Rosetta literal and file-handle forms", () => {
+    expect(qMonarchSyntax.operators).toEqual(expect.arrayContaining(["0:", "1:", "2:"]));
+
+    const rootPatterns = (qMonarchSyntax.tokenizer.root as readonly unknown[])
+      .filter(Array.isArray)
+      .map((rule) => (rule as readonly unknown[])[0])
+      .filter((rule): rule is RegExp => rule instanceof RegExp);
+    const matchesAnyRoot = (input: string) => rootPatterns.some((pattern) => pattern.test(input));
+
+    expect(matchesAnyRoot("0x424d")).toBe(true);
+    expect(matchesAnyRoot("2010.01.25D14:17:46.962375000")).toBe(true);
+    expect(matchesAnyRoot("0D14:17:45.519682000")).toBe(true);
+    expect(matchesAnyRoot("1:")).toBe(true);
+  });
 });

@@ -120,6 +120,17 @@ describe("q parser grammar corpus", () => {
     expect(() => parse("flip each (enlist `a`b;enlist 1 2)")).not.toThrow();
   });
 
+  it("parses Rosetta-style projections, continuations, and file-handle operators", () => {
+    expect(() => parse("sd:sum s@")).not.toThrow();
+    expect(() => parse("sn:{sum xexp[;-2] 1+til x}")).not.toThrow();
+    expect(() => parse("text:(\n  \"a\";\n  \"b\" )")).not.toThrow();
+    expect(() => parse("DAYS:\"first second\",\n  \" third fourth\"")).not.toThrow();
+    expect(() => parse("(count'')s:\"$\"vs/:txt")).not.toThrow();
+    expect(() => parse("1,[;\"\\n\\n\"]\"\\n\"sv raze each ps")).not.toThrow();
+    expect(() => parse("t:(\"IIIII\";enlist \",\")0: `:input.csv")).not.toThrow();
+    expect(() => parse("fn 1: 0x424d,\"x\"$1 2 255")).not.toThrow();
+  });
+
   it("parses qSQL clause islands and comma-separated expressions", () => {
     expect(stripSource(parse("select sum v+a by a,b from ([]a:1 1 2;b:`x`x`y;v:10 20 30) where v>10"))).toMatchObject({
       kind: "program",
