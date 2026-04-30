@@ -67,6 +67,37 @@ test('edits the active sketch from the mobile editor', async ({ page }) => {
   await expect(editor).toContainText(/320 320/);
 });
 
+test('does not cancel default touch handling on editor tap (soft keyboard)', async ({ page }) => {
+  await page.goto('/');
+
+  const defaultPrevented = await page.locator('.mobile-code-editor .cm-content').evaluate((content) => {
+    const box = content.getBoundingClientRect();
+    const x = box.left + Math.min(80, box.width / 2);
+    const y = box.top + box.height / 2;
+    const touch = new Touch({
+      identifier: 42,
+      target: content,
+      clientX: x,
+      clientY: y,
+      radiusX: 1,
+      radiusY: 1,
+      rotationAngle: 0,
+      force: 0.5,
+    });
+    const event = new TouchEvent('touchstart', {
+      bubbles: true,
+      cancelable: true,
+      touches: [touch],
+      targetTouches: [touch],
+      changedTouches: [touch],
+    });
+    content.dispatchEvent(event);
+    return event.defaultPrevented;
+  });
+
+  expect(defaultPrevented).toBe(false);
+});
+
 test('selects code with a touch drag instead of panning the mobile editor', async ({ page }) => {
   await page.goto('/');
 
