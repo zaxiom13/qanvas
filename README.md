@@ -100,7 +100,7 @@ QSQL-driven particle system.
 
 ```
 ┌────────────────────────────────────────────┐
-│  app/  (Svelte 5 + Vite + Monaco)          │
+│  app/  (Svelte 5 + Vite + CodeMirror)      │
 │  ┌──────────────────────────────────────┐  │
 │  │   window.browserAPI  (p5-style)      │  │
 │  └───────────────┬──────────────────────┘  │
@@ -120,7 +120,7 @@ QSQL-driven particle system.
 
 Packages:
 
-- `app/` — Svelte UI, Monaco editor with q highlighting, runtime adapters.
+- `app/` — Svelte UI, CodeMirror editor with q highlighting, runtime adapters.
 - `packages/q-core`, `q-engine`, `q-language` — vendored
 `[jqport](https://github.com/…)` for browser execution.
 - `server/qanvas-boot.q` — q script implementing the protocol.

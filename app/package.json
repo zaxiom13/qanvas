@@ -2,7 +2,7 @@
   "name": "@qanvas/app",
   "version": "0.1.0",
   "private": true,
-  "description": "Qanvas frontend: Svelte + Vite + Monaco + jqport with pluggable q runtime backends",
+  "description": "Qanvas frontend: Svelte + Vite + CodeMirror + jqport running client-side",
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4173",
@@ -31,8 +31,6 @@
     "@qpad/language": "*",
     "@simonwep/pickr": "^1.9.1",
     "gifenc": "^1.0.3",
-    "monaco-editor": "^0.52.2",
-    "nouislider": "^15.8.1",
     "svelte": "^5.38.6"
   },
   "devDependencies": {

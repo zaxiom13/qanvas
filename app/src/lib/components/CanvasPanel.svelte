@@ -341,7 +341,7 @@
       if (target) {
         const tag = target.tagName;
         if (tag === 'INPUT' || tag === 'TEXTAREA' || target.isContentEditable) return;
-        if (target.closest('.monaco-editor')) return;
+        if (target.closest('.cm-editor')) return;
       }
       if (!appState.isOnTour && !appState.lastExampleId && event.key === ']') {
         event.preventDefault();

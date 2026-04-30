@@ -42,9 +42,7 @@ Keep the current webapp theme instead of copying the reference image's neon-dark
 
 1. Add a mobile shell component that consumes existing `appState`.
 2. Swap the root layout into the mobile shell behind a viewport/device flag or dedicated mobile entry.
-3. Replace Monaco with a mobile-friendly editor strategy where needed:
-   - Start with Monaco on tablets and large phones.
-   - Evaluate CodeMirror 6 for better phone editing.
+3. Use the shared CodeMirror 6 editor stack across mobile, tablet, and desktop.
 4. Package with Capacitor:
    - `@capacitor/core`, `@capacitor/ios`, `@capacitor/android`, `@capacitor/cli`.
    - Set `webDir` to the Vite build output.

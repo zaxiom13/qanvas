@@ -1,7 +1,7 @@
 import { StreamLanguage, type StringStream } from '@codemirror/language';
 import { tags as t } from '@lezer/highlight';
 import { lexKdbLex, type KdbLexToken } from '@qpad/language';
-import { classifyMobileQIdent } from '$lib/monaco/q-language';
+import { classifyMobileQIdent } from '$lib/editor/q-language';
 
 /** Maps CodeMirror stream token names → Lezer highlight tags (via tokenTable). */
 export const qHighlightStyle = {

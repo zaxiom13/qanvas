@@ -804,7 +804,7 @@ body.is-resizing-editor {
 
 .file-tab-action,
 .file-tab-tool,
-.file-tab-run {
+.file-tab-control {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -817,27 +817,49 @@ body.is-resizing-editor {
 
 .file-tab-action svg,
 .file-tab-tool svg,
-.file-tab-run svg {
+.file-tab-control svg {
   width: 12px;
   height: 12px;
 }
 
 .file-tab-action:hover,
 .file-tab-tool:hover,
-.file-tab-run:hover {
+.file-tab-control:hover {
   background: var(--surface-active);
   color: var(--text-primary);
 }
 
-.file-tab-run {
+.file-tab-controls {
+  display: inline-flex;
+  align-items: stretch;
+  border-left: 1px solid var(--border-soft);
+  background: color-mix(in srgb, var(--bg-editor), var(--bg-toolbar) 18%);
+}
+
+.file-tab-wrap--active .file-tab-controls {
+  border-left-color: transparent;
+  background: inherit;
+}
+
+.file-tab-control {
   gap: 4px;
   min-width: 46px;
   padding: 0 8px;
-  border-left: 1px solid var(--border-soft);
   font-family: var(--font-mono);
   font-size: 10.5px;
   font-weight: 700;
+}
+
+.file-tab-control + .file-tab-control {
+  border-left: 1px solid var(--border-soft);
+}
+
+.file-tab-run {
   color: var(--accent);
+}
+
+.file-tab-step {
+  color: var(--text-secondary);
 }
 
 .file-tab-run.running {
@@ -868,7 +890,8 @@ body.is-resizing-editor {
 }
 
 .file-tabs--mobile .file-tab-action,
-.file-tabs--mobile .file-tab-tool {
+.file-tabs--mobile .file-tab-tool,
+.file-tabs--mobile .file-tab-control {
   min-width: 42px;
 }
 
@@ -876,14 +899,14 @@ body.is-resizing-editor {
   background: color-mix(in srgb, var(--bg-toolbar), white 8%);
 }
 
-#monaco-editor {
+.qanvas-code-editor {
   flex: 1;
   min-height: 0;
   overflow: hidden;
 }
 
 /* ================================================================
-   INLINE LITERALS / COLOR / SLIDER CONTROLS
+   INLINE LITERALS / COLOR CONTROLS
 ================================================================ */
 
 .qanvas-inline-literal {
@@ -920,40 +943,6 @@ body.is-resizing-editor {
   font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-secondary);
-}
-
-.qanvas-inline-control__slider {
-  width: 160px;
-  margin: 0 2px;
-}
-
-.qanvas-inline-control__slider .noUi-target {
-  height: 6px;
-  border: 1px solid var(--border);
-  border-radius: 2px;
-  background: var(--bg-chrome);
-  box-shadow: none;
-}
-
-.qanvas-inline-control__slider .noUi-connect {
-  background: var(--inline-control-accent);
-}
-
-.qanvas-inline-control__slider .noUi-handle {
-  width: 12px;
-  height: 12px;
-  top: -4px;
-  right: -6px;
-  border: 2px solid #fff;
-  border-radius: 50%;
-  background: var(--inline-control-accent);
-  box-shadow: 0 0 0 1px rgba(35, 32, 28, 0.3);
-  cursor: ew-resize;
-}
-
-.qanvas-inline-control__slider .noUi-handle::before,
-.qanvas-inline-control__slider .noUi-handle::after {
-  display: none;
 }
 
 .qanvas-inline-control__swatch {
@@ -3079,45 +3068,55 @@ textarea:focus-visible {
   font-size: inherit;
 }
 
-/* q token colors — align mobile CodeMirror + tour snippets with desktop Monaco `qanvas-warm` */
+/* q token colors — align CodeMirror editors + tour snippets */
 .mobile-code-editor .cm-content .q-token-keyword,
+.qanvas-code-editor .cm-content .q-token-keyword,
 .tour-lesson-highlight-code .q-token-keyword {
   color: #7d4e2d;
 }
 .mobile-code-editor .cm-content .q-token-builtin,
+.qanvas-code-editor .cm-content .q-token-builtin,
 .tour-lesson-highlight-code .q-token-builtin {
   color: #2f7a6d;
 }
 .mobile-code-editor .cm-content .q-token-qanvas,
+.qanvas-code-editor .cm-content .q-token-qanvas,
 .tour-lesson-highlight-code .q-token-qanvas {
   color: #c06b2c;
 }
 .mobile-code-editor .cm-content .q-token-variable,
+.qanvas-code-editor .cm-content .q-token-variable,
 .tour-lesson-highlight-code .q-token-variable {
   color: #2c2520;
 }
 .mobile-code-editor .cm-content .q-token-symbol,
+.qanvas-code-editor .cm-content .q-token-symbol,
 .tour-lesson-highlight-code .q-token-symbol {
   color: #8b674b;
 }
 .mobile-code-editor .cm-content .q-token-number,
+.qanvas-code-editor .cm-content .q-token-number,
 .tour-lesson-highlight-code .q-token-number {
   color: #5b6fe8;
 }
 .mobile-code-editor .cm-content .q-token-string,
+.qanvas-code-editor .cm-content .q-token-string,
 .tour-lesson-highlight-code .q-token-string {
   color: #b35b3f;
 }
 .mobile-code-editor .cm-content .q-token-comment,
+.qanvas-code-editor .cm-content .q-token-comment,
 .tour-lesson-highlight-code .q-token-comment {
   color: #a89b8e;
   font-style: italic;
 }
 .mobile-code-editor .cm-content .q-token-operator,
+.qanvas-code-editor .cm-content .q-token-operator,
 .tour-lesson-highlight-code .q-token-operator {
   color: #5c534c;
 }
 .mobile-code-editor .cm-content .q-token-bracket,
+.qanvas-code-editor .cm-content .q-token-bracket,
 .tour-lesson-highlight-code .q-token-bracket {
   color: #5c534c;
 }

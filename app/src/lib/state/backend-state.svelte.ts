@@ -4,6 +4,7 @@
  */
 import {
   loadBackendSettings,
+  REMOTE_Q_BACKENDS_ENABLED,
   saveBackendSettings,
   settingsToConfig,
   type PersistedBackendSettings,
@@ -19,6 +20,7 @@ class BackendStateHost {
   activeLabel = $state('Browser (jqport)');
   status = $state<ConnectionStatus>('idle');
   statusMessage = $state('');
+  remoteBackendsEnabled = REMOTE_Q_BACKENDS_ENABLED;
 
   constructor() {
     subscribeRuntimeInfo((label) => {
@@ -33,6 +35,7 @@ class BackendStateHost {
   }
 
   setDraftKind(kind: QanvasBackendKind) {
+    if (!this.remoteBackendsEnabled && kind !== 'browser') return;
     this.draft = { ...this.draft, kind };
   }
   setDraftLocal(url: string) {
@@ -43,6 +46,9 @@ class BackendStateHost {
   }
 
   apply() {
+    if (!this.remoteBackendsEnabled && this.draft.kind !== 'browser') {
+      this.draft = { ...this.draft, kind: 'browser' };
+    }
     const next: PersistedBackendSettings = {
       kind: this.draft.kind,
       localUrl: this.draft.localUrl.trim() || 'ws://127.0.0.1:5042',

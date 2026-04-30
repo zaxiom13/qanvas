@@ -8,13 +8,20 @@
   import { pretextFit } from '$lib/text/pretext-fit';
   import InlineCopy from '$lib/components/InlineCopy.svelte';
   import { highlightQSnippetHtml } from '$lib/mobile/q-highlight-html';
-  import MobileCodeEditor from './MobileCodeEditor.svelte';
+  import CodeMirrorEditor from '$lib/components/CodeMirrorEditor.svelte';
+  import { browserGateway } from '$lib/browser';
 
   type MobileTab = 'editor' | 'canvas' | 'examples' | 'settings';
   type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
 
   let activeTab = $state<MobileTab>('editor');
   let mobileCode = $state(appState.activeEditorValue);
+  let backgroundFrameHandle = 0;
+  let backgroundFrameInFlight = false;
+  let backgroundRunNonce = -1;
+  let backgroundFrameNumber = 0;
+  let backgroundStartTime = 0;
+  let backgroundLastTime = 0;
 
   let bottomTabs = $derived<{ id: MobileTab; label: string; icon: string }[]>([
     { id: 'editor', label: 'Editor', icon: 'code' },
@@ -23,7 +30,7 @@
     { id: 'settings', label: 'Settings', icon: 'sliders' },
   ]);
 
-  let examples = $derived(appState.filteredExamples.slice(0, 9));
+  let examples = $derived(appState.filteredExamples);
   let practiceLessons = $derived(appState.practiceChallenges.slice(0, 12));
   let filteredConsoleEntries = $derived(appState.filteredConsole);
 
@@ -55,12 +62,76 @@
     }
   }
 
+  function stopBackgroundFrameLoop() {
+    cancelAnimationFrame(backgroundFrameHandle);
+    backgroundFrameHandle = 0;
+  }
+
+  function resetBackgroundFrameLoop(now: number) {
+    backgroundRunNonce = appState.runNonce;
+    backgroundFrameNumber = appState.runtimeControl.frameNumber;
+    backgroundStartTime = now;
+    backgroundLastTime = now;
+  }
+
+  async function runBackgroundFrame(now: number) {
+    backgroundFrameHandle = 0;
+    if (
+      appState.workspaceMode !== 'studio' ||
+      activeTab === 'canvas' ||
+      !appState.running ||
+      appState.paused ||
+      backgroundFrameInFlight
+    ) {
+      return;
+    }
+
+    backgroundFrameInFlight = true;
+
+    try {
+      if (backgroundRunNonce !== appState.runNonce || !backgroundStartTime) {
+        resetBackgroundFrameLoop(now);
+      }
+
+      const size: [number, number] = appState.currentCanvasSize[0] && appState.currentCanvasSize[1]
+        ? [appState.currentCanvasSize[0], appState.currentCanvasSize[1]]
+        : [800, 600];
+
+      await browserGateway.runtime.frame({
+        frameInfo: {
+          frameNum: backgroundFrameNumber,
+          time: now - backgroundStartTime,
+          dt: backgroundFrameNumber === 0 ? 16 : now - backgroundLastTime,
+        },
+        input: { mouse: [0, 0], mouseDown: false, key: '', keys: [] },
+        canvas: {
+          size,
+          pixelRatio: window.devicePixelRatio || 1,
+        },
+        debugConsole: appState.debugConsole,
+      });
+
+      backgroundFrameNumber += 1;
+      backgroundLastTime = now;
+      appState.recordRenderedFrame('continuous');
+    } catch (error) {
+      appState.handleRuntimeError(error instanceof Error ? error.message : String(error));
+    } finally {
+      backgroundFrameInFlight = false;
+      if (appState.workspaceMode === 'studio' && appState.running && !appState.paused) {
+        backgroundFrameHandle = requestAnimationFrame(runBackgroundFrame);
+      }
+    }
+  }
+
   $effect(() => {
-    if (appState.workspaceMode !== 'studio' || !appState.running) return;
-    if (activeTab !== 'canvas' && !appState.paused) {
-      appState.pauseSketch();
-    } else if (activeTab === 'canvas' && appState.paused) {
-      appState.pauseSketch();
+    if (appState.workspaceMode !== 'studio' || activeTab === 'canvas' || !appState.running || appState.paused) {
+      stopBackgroundFrameLoop();
+      return;
+    }
+
+    if (!backgroundFrameHandle && !backgroundFrameInFlight) {
+      backgroundFrameHandle = requestAnimationFrame(runBackgroundFrame);
     }
   });
 
@@ -72,6 +143,12 @@
   });
 
   async function runOrStop() {
+    if (appState.running && appState.paused) {
+      setActiveTab('canvas');
+      await tick();
+      appState.pauseSketch();
+      return;
+    }
     if (appState.running) {
       await appState.stopSketch();
       return;
@@ -144,7 +221,7 @@
           <FileTabs mobile />
         </div>
         <div class="mobile-code">
-          <MobileCodeEditor value={mobileCode} onChange={updateCode} />
+          <CodeMirrorEditor activeKey={appState.activeEditorKey} value={mobileCode} onChange={updateCode} />
         </div>
         <div
           class="mobile-console"
@@ -375,15 +452,15 @@
                   <span>Reset</span>
                 </button>
               {:else}
-                <button class="quick-tool quick-tool--primary" type="button" aria-label={appState.running ? 'Stop sketch' : 'Run sketch'} onclick={runOrStop}>
+                <button class="quick-tool quick-tool--primary" type="button" aria-label={appState.running && !appState.paused ? 'Stop sketch' : 'Run sketch'} onclick={runOrStop}>
                   <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true">
-                    {#if appState.running}
+                    {#if appState.running && !appState.paused}
                       <rect x="7" y="7" width="10" height="10" rx="1.5" fill="currentColor"></rect>
                     {:else}
                       <path d="M8 5v14l11-7z" fill="currentColor"></path>
                     {/if}
                   </svg>
-                  <span>{appState.running ? 'Stop' : 'Run'}</span>
+                  <span>{appState.running && !appState.paused ? 'Stop' : 'Run'}</span>
                 </button>
                 <button class="quick-tool" type="button" aria-label="Reset sketch" onclick={() => void resetSketch()}>
                   <svg class="quick-tool-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M17 5v5h-5M17 10a6 6 0 1 0 1.5 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" /></svg>

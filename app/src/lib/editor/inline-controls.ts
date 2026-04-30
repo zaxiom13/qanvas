@@ -1,19 +1,4 @@
-export type InlineControlLiteral =
-  | NumericInlineControlLiteral
-  | ColorInlineControlLiteral;
-
-export type NumericInlineControlLiteral = {
-  kind: 'number';
-  raw: string;
-  startColumn: number;
-  endColumn: number;
-  value: number;
-  step: number;
-  min: number;
-  max: number;
-  suffix: string;
-  decimals: number;
-};
+export type InlineControlLiteral = ColorInlineControlLiteral;
 
 export type ColorInlineControlLiteral = {
   kind: 'color';
@@ -24,7 +9,6 @@ export type ColorInlineControlLiteral = {
 };
 
 const HEX_COLOR_PATTERN = /0x[0-9a-fA-F]{6}\b/g;
-const NUMERIC_PATTERN = /(?:\d+\.\d+|\d+|\.\d+)(?:f)?/g;
 
 export function findInlineControlLiteral(lineText: string, column: number): InlineControlLiteral | null {
   if (/^\s*\//.test(lineText)) {
@@ -33,9 +17,8 @@ export function findInlineControlLiteral(lineText: string, column: number): Inli
 
   const columnIndex = Math.max(0, column - 1);
   const colorMatches = collectMatches(lineText, HEX_COLOR_PATTERN, createColorLiteral);
-  const numericMatches = collectMatches(lineText, NUMERIC_PATTERN, createNumericLiteral, colorMatches);
 
-  for (const literal of [...colorMatches, ...numericMatches]) {
+  for (const literal of colorMatches) {
     const startIndex = literal.startColumn - 1;
     const endIndex = literal.endColumn - 1;
     if (columnIndex >= startIndex && columnIndex < endIndex) {
@@ -47,24 +30,9 @@ export function findInlineControlLiteral(lineText: string, column: number): Inli
 }
 
 export function formatInlineControlValue(literal: InlineControlLiteral, nextValue: number | string) {
-  if (literal.kind === 'color') {
-    const value = typeof nextValue === 'string' ? nextValue : String(nextValue);
-    const hex = value.startsWith('#') ? value.slice(1) : value;
-    return `0x${hex.slice(0, 6).toUpperCase()}`;
-  }
-
-  const numericValue = typeof nextValue === 'number' ? nextValue : Number(nextValue);
-  if (!Number.isFinite(numericValue)) {
-    return literal.raw;
-  }
-
-  const clamped = clamp(numericValue, literal.min, literal.max);
-  const rounded = literal.decimals > 0
-    ? Number(clamped.toFixed(literal.decimals))
-    : Math.round(clamped);
-  const normalized = Object.is(rounded, -0) ? 0 : rounded;
-  const raw = literal.decimals > 0 ? normalized.toFixed(literal.decimals) : String(normalized);
-  return `${raw}${literal.suffix}`;
+  const value = typeof nextValue === 'string' ? nextValue : String(nextValue);
+  const hex = value.startsWith('#') ? value.slice(1) : value;
+  return `0x${hex.slice(0, 6).toUpperCase()}`;
 }
 
 function collectMatches<T extends InlineControlLiteral>(
@@ -104,48 +72,6 @@ function createColorLiteral(raw: string, startIndex: number): ColorInlineControl
   };
 }
 
-function createNumericLiteral(raw: string, startIndex: number, lineText: string): NumericInlineControlLiteral | null {
-  if (lineText[startIndex - 1] === '-' && !isLiteralNeighbor(lineText[startIndex - 2])) {
-    raw = `-${raw}`;
-    startIndex -= 1;
-  }
-
-  const suffix = raw.endsWith('f') ? 'f' : '';
-  const core = suffix ? raw.slice(0, -1) : raw;
-  const value = Number(core);
-  if (!Number.isFinite(value)) {
-    return null;
-  }
-
-  const decimals = countDecimals(core);
-  const step = decimals > 0 ? Number(`1e-${decimals}`) : 1;
-  const span = 10;
-  const min = value - span;
-  const max = value + span;
-
-  return {
-    kind: 'number',
-    raw,
-    startColumn: startIndex + 1,
-    endColumn: startIndex + raw.length + 1,
-    value,
-    step,
-    min,
-    max,
-    suffix,
-    decimals,
-  };
-}
-
-function countDecimals(value: string) {
-  const decimalIndex = value.indexOf('.');
-  if (decimalIndex < 0) {
-    return 0;
-  }
-
-  return value.length - decimalIndex - 1;
-}
-
 function hasLiteralBoundary(lineText: string, startIndex: number, endIndex: number) {
   const prev = lineText[startIndex - 1];
   const next = lineText[endIndex];
@@ -170,8 +96,4 @@ function isIndexInsideString(lineText: string, index: number) {
 
 function overlaps(startA: number, endA: number, startB: number, endB: number) {
   return startA < endB && endA > startB;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value));
 }

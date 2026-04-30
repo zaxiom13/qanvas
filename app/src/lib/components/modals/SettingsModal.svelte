@@ -33,8 +33,7 @@
     </div>
     <div class="modal-body">
       <p class="settings-description">
-        Qanvas sketches can run in three places. All backends speak the same wire protocol,
-        so you can switch at any time without changing your code.
+        Qanvas sketches run entirely in your browser.
       </p>
 
       <div class="settings-section">
@@ -45,20 +44,22 @@
             <div class="backend-desc">Runs a TypeScript port of q in a Web Worker. Great for sharing sketches as a static page.</div>
           </button>
 
-          <button type="button" class="backend-card" class:selected={backendState.draft.kind === 'local-q'} onclick={() => choose('local-q')}>
-            <div class="backend-title">Local q</div>
-            <div class="backend-sub">real kdb+ · needs your license</div>
-            <div class="backend-desc">Connect over WebSocket to a q process on this machine. Unlocks full q semantics and speed.</div>
-          </button>
+          {#if backendState.remoteBackendsEnabled}
+            <button type="button" class="backend-card" class:selected={backendState.draft.kind === 'local-q'} onclick={() => choose('local-q')}>
+              <div class="backend-title">Local q</div>
+              <div class="backend-sub">real kdb+ · needs your license</div>
+              <div class="backend-desc">Connect over WebSocket to a q process on this machine. Unlocks full q semantics and speed.</div>
+            </button>
 
-          <button type="button" class="backend-card" class:selected={backendState.draft.kind === 'cloud-q'} onclick={() => choose('cloud-q')}>
-            <div class="backend-title">Cloud q</div>
-            <div class="backend-sub">real kdb+ · hosted somewhere</div>
-            <div class="backend-desc">Point at a remote q WebSocket. Share one backend across many clients, or use ours.</div>
-          </button>
+            <button type="button" class="backend-card" class:selected={backendState.draft.kind === 'cloud-q'} onclick={() => choose('cloud-q')}>
+              <div class="backend-title">Cloud q</div>
+              <div class="backend-sub">real kdb+ · hosted somewhere</div>
+              <div class="backend-desc">Point at a remote q WebSocket. Share one backend across many clients, or use ours.</div>
+            </button>
+          {/if}
         </div>
 
-        {#if backendState.draft.kind === 'local-q'}
+        {#if backendState.remoteBackendsEnabled && backendState.draft.kind === 'local-q'}
           <div class="settings-input-row" style="margin-top: 1rem;">
             <label class="settings-label" for="local-q-url">Local q WebSocket</label>
             <input
@@ -77,7 +78,7 @@
           </p>
         {/if}
 
-        {#if backendState.draft.kind === 'cloud-q'}
+        {#if backendState.remoteBackendsEnabled && backendState.draft.kind === 'cloud-q'}
           <div class="settings-input-row" style="margin-top: 1rem;">
             <label class="settings-label" for="cloud-q-url">Cloud q WebSocket URL</label>
             <input
@@ -110,7 +111,7 @@
       </div>
     </div>
     <div class="modal-footer">
-      {#if backendState.draft.kind !== 'browser'}
+      {#if backendState.remoteBackendsEnabled && backendState.draft.kind !== 'browser'}
         <button class="btn-secondary" type="button" onclick={test} disabled={backendState.status === 'testing'}>
           Test connection
         </button>

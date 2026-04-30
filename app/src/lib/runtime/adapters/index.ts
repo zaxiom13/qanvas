@@ -1,9 +1,13 @@
 import type { QanvasBackendConfig, QanvasRuntime } from '../backend';
+import { REMOTE_Q_BACKENDS_ENABLED } from '../backend';
 import { createBrowserAdapter } from './browser';
 import { createWebSocketAdapter } from './websocket';
 
 export function createRuntime(config: QanvasBackendConfig): QanvasRuntime {
   if (config.kind === 'browser') {
+    return createBrowserAdapter();
+  }
+  if (!REMOTE_Q_BACKENDS_ENABLED) {
     return createBrowserAdapter();
   }
   if (config.kind === 'local-q') {

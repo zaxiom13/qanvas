@@ -5,8 +5,7 @@ import { tags as t } from '@lezer/highlight';
 import { qLanguage } from './q-codemirror';
 
 /**
- * Matches desktop Monaco theme `qanvas-warm` token colors
- * (`registerQLanguage` in `$lib/monaco/q-language.ts`).
+ * Matches the shared CodeMirror q editor token colors.
  */
 export const qMobileEditorHighlightStyle = HighlightStyle.define([
   { tag: t.keyword, class: 'q-token-keyword', color: '#7D4E2D' },

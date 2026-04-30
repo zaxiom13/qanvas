@@ -2,7 +2,7 @@
   import { browserGateway } from '$lib/browser';
   import { onDestroy, onMount } from 'svelte';
   import FileTabs from '$lib/components/FileTabs.svelte';
-  import MonacoEditor from '$lib/components/MonacoEditor.svelte';
+  import CodeMirrorEditor from '$lib/components/CodeMirrorEditor.svelte';
   import { appState } from '$lib/state/app-state.svelte';
 
   let dragCleanup = () => {};
@@ -95,7 +95,7 @@
     {/if}
   </div>
 
-  <MonacoEditor
+  <CodeMirrorEditor
     activeKey={appState.activeEditorKey}
     value={appState.activeEditorValue}
     onChange={(value) => appState.updateActiveEditorContent(value)}

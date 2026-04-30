@@ -38,7 +38,7 @@ The product is inspired by p5.js but replaces JavaScript with q and focuses on l
 |---|---|
 | Desktop shell | Electron |
 | Renderer | p5.js Canvas2D |
-| Editor | Monaco Editor |
+| Editor | CodeMirror 6 |
 | Syntax highlighting | Boothroyd q grammar |
 | Runtime | q executable provided by kdb-x |
 | Communication | JSON over stdin/stdout |
@@ -59,7 +59,7 @@ The product is inspired by p5.js but replaces JavaScript with q and focuses on l
 - Menu system
 
 **Electron Renderer Process**
-- Monaco editor
+- CodeMirror editor
 - Canvas rendering
 - Input capture
 - Frame scheduling

@@ -1,14 +1,8 @@
 /**
  * Qanvas runtime backend abstraction.
  *
- * Three concrete implementations exist:
- *   - browser: runs jqport (TypeScript q) in a Web Worker. Zero install, fully offline.
- *   - local-q: connects via WebSocket to a real q process running on the user's machine.
- *               Unlocks the full power of kdb+ when the user has a license.
- *   - cloud-q: connects via WebSocket to a remote q process (provided by us, or self-hosted).
- *
- * All three speak the same wire protocol so upper layers don't care.
- * See server/qanvas-boot.q for the q-side implementation of the protocol.
+ * Browser-first runtime backend abstraction. The default runtime runs entirely
+ * client-side in a Web Worker.
  */
 
 export type QanvasBackendKind = 'browser' | 'local-q' | 'cloud-q';
@@ -57,14 +51,16 @@ const DEFAULTS: PersistedBackendSettings = {
 };
 
 const STORAGE_KEY = 'qanvas:backend:settings';
+export const REMOTE_Q_BACKENDS_ENABLED = import.meta.env.VITE_QANVAS_ENABLE_REMOTE_Q === 'true';
 
 export function loadBackendSettings(): PersistedBackendSettings {
   try {
     const raw = typeof window !== 'undefined' ? window.localStorage.getItem(STORAGE_KEY) : null;
     if (!raw) return { ...DEFAULTS };
     const parsed = JSON.parse(raw) as Partial<PersistedBackendSettings>;
+    const persistedKind = parsed.kind === 'local-q' || parsed.kind === 'cloud-q' ? parsed.kind : 'browser';
     return {
-      kind: parsed.kind === 'local-q' || parsed.kind === 'cloud-q' ? parsed.kind : 'browser',
+      kind: REMOTE_Q_BACKENDS_ENABLED ? persistedKind : 'browser',
       localUrl: typeof parsed.localUrl === 'string' && parsed.localUrl ? parsed.localUrl : DEFAULTS.localUrl,
       cloudUrl: typeof parsed.cloudUrl === 'string' ? parsed.cloudUrl : DEFAULTS.cloudUrl,
     };
@@ -82,6 +78,7 @@ export function saveBackendSettings(next: PersistedBackendSettings): void {
 }
 
 export function settingsToConfig(s: PersistedBackendSettings): QanvasBackendConfig {
+  if (!REMOTE_Q_BACKENDS_ENABLED) return { kind: 'browser' };
   if (s.kind === 'local-q') return { kind: 'local-q', url: s.localUrl };
   if (s.kind === 'cloud-q') return { kind: 'cloud-q', url: s.cloudUrl };
   return { kind: 'browser' };

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import { appState } from '$lib/state/app-state.svelte';
 
   type Props = {
@@ -27,12 +28,29 @@
   }
 
   function runOrStop() {
+    if (appState.workspaceMode === 'studio' && appState.running && appState.paused) {
+      appState.pauseSketch();
+      return;
+    }
     if (appState.workspaceMode === 'studio' && appState.running) {
       void appState.stopSketch();
       return;
     }
     void appState.runSketch();
   }
+
+  onMount(() => {
+    const stop = () => appState.stopStepHold();
+    window.addEventListener('pointerup', stop);
+    window.addEventListener('pointercancel', stop);
+    window.addEventListener('blur', stop);
+
+    return () => {
+      window.removeEventListener('pointerup', stop);
+      window.removeEventListener('pointercancel', stop);
+      window.removeEventListener('blur', stop);
+    };
+  });
 </script>
 
 <div class="file-tabs" class:file-tabs--mobile={mobile} aria-label="Project files">
@@ -52,7 +70,7 @@
           </svg>
           <span class="file-tab-name">Practice Editor</span>
         </button>
-        <button class="file-tab-run" type="button" title="Run answer" aria-label="Run answer" onclick={runOrStop}>
+        <button class="file-tab-control file-tab-run" type="button" title="Run answer" aria-label="Run answer" onclick={runOrStop}>
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <polygon points="5,3 13,8 5,13" fill="currentColor"></polygon>
           </svg>
@@ -79,24 +97,43 @@
               <span class="unsaved-dot" aria-hidden="true"></span>
             {/if}
           </button>
-          {#if file.name === 'sketch.q'}
-            <button
-              class="file-tab-run"
-              type="button"
-              class:running={appState.running && !appState.paused}
-              title={appState.running ? 'Stop sketch' : 'Run sketch'}
-              aria-label={appState.running ? 'Stop sketch' : 'Run sketch'}
-              onclick={runOrStop}
-            >
-              <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                {#if appState.running && !appState.paused}
-                  <rect x="5" y="4" width="6" height="8" fill="currentColor"></rect>
-                {:else}
-                  <polygon points="5,3 13,8 5,13" fill="currentColor"></polygon>
-                {/if}
-              </svg>
-              <span>{appState.running && !appState.paused ? 'Stop' : 'Run'}</span>
-            </button>
+          {#if file.name === 'sketch.q' && file.name === appState.activeFileName}
+            <div class="file-tab-controls" aria-label="Sketch controls">
+              <button
+                class="file-tab-control file-tab-run"
+                type="button"
+                class:running={appState.running && !appState.paused}
+                title={appState.running && !appState.paused ? 'Stop sketch' : 'Run sketch'}
+                aria-label={appState.running && !appState.paused ? 'Stop sketch' : 'Run sketch'}
+                onclick={runOrStop}
+              >
+                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  {#if appState.running && !appState.paused}
+                    <rect x="5" y="4" width="6" height="8" fill="currentColor"></rect>
+                  {:else}
+                    <polygon points="5,3 13,8 5,13" fill="currentColor"></polygon>
+                  {/if}
+                </svg>
+                <span>{appState.running && !appState.paused ? 'Stop' : 'Run'}</span>
+              </button>
+              <button
+                id={mobile ? 'mobile-btn-step' : 'btn-step'}
+                class="file-tab-control file-tab-step"
+                type="button"
+                title="Step through setup and frames"
+                aria-label="Step through setup and frames"
+                onclick={() => void appState.stepSketch()}
+                onpointerdown={() => appState.startStepHold()}
+                onpointerup={() => appState.stopStepHold()}
+                onpointerleave={() => appState.stopStepHold()}
+              >
+                <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M3 2v12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+                  <path d="M6 3l7 5-7 5V3z" fill="currentColor" />
+                </svg>
+                <span>Step</span>
+              </button>
+            </div>
           {/if}
           {#if file.name !== 'sketch.q'}
             <button class="file-tab-action" type="button" title="Rename {file.name}" aria-label="Rename {file.name}" onclick={() => renameFile(file.name)}>

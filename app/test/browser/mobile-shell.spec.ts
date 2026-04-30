@@ -67,6 +67,43 @@ test('edits the active sketch from the mobile editor', async ({ page }) => {
   await expect(editor).toContainText(/320 320/);
 });
 
+test('selects code with a touch drag instead of panning the mobile editor', async ({ page }) => {
+  await page.goto('/');
+
+  const line = page.locator('.mobile-code-editor .cm-line').first();
+  await expect(line).toBeVisible();
+  const box = await line.boundingBox();
+  expect(box).not.toBeNull();
+
+  const start = { x: box!.x + 24, y: box!.y + box!.height / 2 };
+  const end = { x: box!.x + 160, y: box!.y + box!.height / 2 };
+  await line.evaluate((node, points) => {
+    const fire = (type: 'touchstart' | 'touchmove' | 'touchend', point: { x: number; y: number }) => {
+      const touch = new Touch({
+        identifier: 1,
+        target: node,
+        clientX: point.x,
+        clientY: point.y,
+      });
+      node.dispatchEvent(
+        new TouchEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          touches: type === 'touchend' ? [] : [touch],
+          targetTouches: type === 'touchend' ? [] : [touch],
+          changedTouches: [touch],
+        })
+      );
+    };
+
+    fire('touchstart', points.start);
+    fire('touchmove', points.end);
+    fire('touchend', points.end);
+  }, { start, end });
+
+  await expect(page.locator('.mobile-code-editor')).not.toHaveAttribute('data-selection-length', '0');
+});
+
 test('highlights q syntax in the mobile editor', async ({ page }) => {
   await page.goto('/');
 
@@ -84,6 +121,7 @@ test('highlights q syntax in guided-tour lesson snippets on mobile canvas', asyn
   await page.getByRole('button', { name: /hello circle/i }).click();
   await page.getByRole('button', { name: 'Discard' }).click();
   await page.getByRole('button', { name: 'Canvas' }).click();
+  await page.getByRole('button', { name: 'Guide' }).click();
 
   const snippet = page.locator('.tour-lesson-highlight-code');
   await expect(snippet).toBeVisible({ timeout: 15_000 });
@@ -165,10 +203,14 @@ test('opens and creates files from mobile editor tabs', async ({ page }) => {
   await page.goto('/');
 
   await expect(page.getByRole('tab', { name: /sketch\.q/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /^(Run|Stop) sketch$/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Step through setup and frames' })).toBeVisible();
   await page.getByRole('button', { name: 'New .q file' }).click();
   await page.locator('#new-file-input').fill('helpers');
   await page.getByRole('button', { name: 'Create' }).click();
 
   await expect(page.getByRole('tab', { name: /helpers\.q/ })).toBeVisible();
   await expect(page.getByLabel('q sketch editor')).toContainText('/ helpers.q');
+  await expect(page.getByRole('button', { name: /^(Run|Stop) sketch$/ })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Step through setup and frames' })).toHaveCount(0);
 });

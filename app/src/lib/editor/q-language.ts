@@ -1,8 +1,5 @@
-import type * as Monaco from 'monaco-editor';
-import { KDBLex } from '@qpad/language';
 import { QANVAS_COLORS } from '$lib/runtime/compiled-runtime-helpers';
 
-const registeredMonacoInstances = new WeakSet<object>();
 
 export const Q_KEYWORDS = [
   'select',
@@ -477,6 +474,24 @@ export const Q_SLASH_SNIPPETS = [
     insertText: '${1:fn}:{[]\n  ${2:1+1}\n}',
   },
   {
+    label: '/function1',
+    detail: 'Snippet',
+    documentation: 'Creates a monadic (one-argument) function in q style: name:{[x] …}.',
+    insertText: '${1:fn}:{[${2:x}]\n  ${3:x}\n}',
+  },
+  {
+    label: '/function2',
+    detail: 'Snippet',
+    documentation: 'Creates a dyadic (two-argument) function in q style: name:{[x;y] …}.',
+    insertText: '${1:fn}:{[${2:x};${3:y}]\n  ${4:x+y}\n}',
+  },
+  {
+    label: '/function3',
+    detail: 'Snippet',
+    documentation: 'Creates a triadic (three-argument) function in q style: name:{[x;y;z] …}.',
+    insertText: '${1:fn}:{[${2:x};${3:y};${4:z}]\n  ${5:x+y+z}\n}',
+  },
+  {
     label: '/background',
     detail: 'Snippet',
     documentation: 'Inserts a background command.',
@@ -543,242 +558,3 @@ export const Q_SLASH_SNIPPETS = [
     insertText: 'push[];\n${1:/ drawing commands}\npop[];',
   },
 ];
-
-function buildWordBoundaryPattern(words: string[]) {
-  return new RegExp(`\\b(${words.join('|')})\\b`);
-}
-
-function translateKdbLexToken(token: string) {
-  switch (token) {
-    case 'variable':
-      return 'identifier';
-    case 'delimiter':
-      return 'operator';
-    default:
-      return token;
-  }
-}
-
-function translateKdbLexRule(rule: unknown): Monaco.languages.IMonarchLanguageRule {
-  if (!Array.isArray(rule)) {
-    return rule as Monaco.languages.IMonarchLanguageRule;
-  }
-
-  const [pattern, action] = rule;
-  if (typeof action === 'string') {
-    return [pattern, translateKdbLexToken(action)] as Monaco.languages.IMonarchLanguageRule;
-  }
-
-  if (action && typeof action === 'object' && 'cases' in action) {
-    const cases = Object.fromEntries(
-      Object.entries(action.cases as Record<string, string>).map(([key, value]) => [key, translateKdbLexToken(value)])
-    );
-    return [pattern, { ...action, cases }] as Monaco.languages.IMonarchLanguageRule;
-  }
-
-  return rule as Monaco.languages.IMonarchLanguageRule;
-}
-
-function buildMonacoKdbLexLanguage(): Monaco.languages.IMonarchLanguage {
-  const canonicalRoot = KDBLex.tokenizer.root as readonly unknown[];
-  const canonicalString = KDBLex.tokenizer.string as readonly unknown[];
-  const identifierRule = canonicalRoot[0];
-  const trailingRules = canonicalRoot.slice(1).map(translateKdbLexRule);
-
-  return {
-    ...KDBLex,
-    qanvasIdentifiers: Q_QANVAS_IDENTIFIERS,
-    builtinFunctions: Q_BUILTIN_FUNCTIONS,
-    tokenizer: {
-      root: [
-        [
-          (identifierRule as [RegExp])[0],
-          {
-            cases: {
-              '@qanvasIdentifiers': 'qanvas',
-              '@builtinFunctions': 'builtin',
-              '@keywords': 'keyword',
-              '@default': 'identifier',
-            },
-          },
-        ],
-        ...trailingRules,
-      ] as Monaco.languages.IMonarchLanguageRule[],
-      whitespace: [
-        [/[ \t\r\n]+/, ''],
-        [/\/(?=\s).*$/, 'comment'],
-      ] as Monaco.languages.IMonarchLanguageRule[],
-      string: canonicalString.map(translateKdbLexRule),
-    },
-  } as Monaco.languages.IMonarchLanguage;
-}
-
-function dedupeSuggestions<T extends { label: string }>(items: T[]) {
-  const seen = new Set<string>();
-  return items.filter((item) => {
-    if (seen.has(item.label)) return false;
-    seen.add(item.label);
-    return true;
-  });
-}
-
-function getSlashSnippetRange(monaco: typeof Monaco, model: Monaco.editor.ITextModel, position: Monaco.Position) {
-  const lineContent = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
-  const match = lineContent.match(/\/[a-zA-Z]*$/);
-  if (!match) {
-    const word = model.getWordUntilPosition(position);
-    return new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
-  }
-
-  return new monaco.Range(position.lineNumber, position.column - match[0].length, position.lineNumber, position.column);
-}
-
-function getColorCompletionRange(monaco: typeof Monaco, model: Monaco.editor.ITextModel, position: Monaco.Position, fallback: Monaco.Range) {
-  const lineContent = model.getLineContent(position.lineNumber).slice(0, position.column - 1);
-  const match = lineContent.match(/Color\.[A-Z_]*$/);
-  if (!match) return fallback;
-  return new monaco.Range(position.lineNumber, position.column - match[0].length, position.lineNumber, position.column);
-}
-
-export function registerQLanguage(monaco: typeof Monaco) {
-  if (registeredMonacoInstances.has(monaco)) return;
-  registeredMonacoInstances.add(monaco);
-
-  monaco.languages.register({ id: 'q' });
-  monaco.languages.setLanguageConfiguration('q', {
-    comments: {
-      lineComment: '/',
-    },
-    brackets: [
-      ['{', '}'],
-      ['[', ']'],
-      ['(', ')'],
-    ],
-    autoClosingPairs: [
-      { open: '{', close: '}' },
-      { open: '[', close: ']' },
-      { open: '(', close: ')' },
-      { open: '"', close: '"' },
-    ],
-    surroundingPairs: [
-      { open: '{', close: '}' },
-      { open: '[', close: ']' },
-      { open: '(', close: ')' },
-      { open: '"', close: '"' },
-    ],
-  });
-
-  monaco.languages.setMonarchTokensProvider('q', buildMonacoKdbLexLanguage());
-
-  monaco.languages.registerCompletionItemProvider('q', {
-    triggerCharacters: ['/', '\\', '`', '.'],
-    provideCompletionItems(model, position) {
-      const word = model.getWordUntilPosition(position);
-      const wordRange = new monaco.Range(position.lineNumber, word.startColumn, position.lineNumber, word.endColumn);
-      const slashRange = getSlashSnippetRange(monaco, model, position);
-      const colorRange = getColorCompletionRange(monaco, model, position, wordRange);
-
-      const suggestions = dedupeSuggestions([
-        ...Q_SLASH_SNIPPETS.map((item) => ({
-          label: item.label,
-          kind: monaco.languages.CompletionItemKind.Snippet,
-          detail: item.detail,
-          documentation: { value: item.documentation },
-          insertText: item.insertText,
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          filterText: item.label,
-          range: slashRange,
-          sortText: `0_${item.label}`,
-        })),
-        ...Q_CANVAS_FUNCTIONS.map((item) => ({
-          label: item.label,
-          kind: monaco.languages.CompletionItemKind.Function,
-          detail: item.detail,
-          documentation: { value: item.documentation },
-          insertText: item.insertText,
-          insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-          range: wordRange,
-          sortText: `1_${item.label}`,
-        })),
-        ...Q_CONTEXT_SYMBOLS.map((item) => ({
-          label: item.label,
-          kind: monaco.languages.CompletionItemKind.Variable,
-          detail: item.detail,
-          documentation: { value: item.documentation },
-          insertText: item.insertText,
-          insertTextRules: item.insertText.includes('${')
-            ? monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
-            : undefined,
-          range: wordRange,
-          sortText: `2_${item.label}`,
-        })),
-        ...Q_COLOR_SYMBOLS.map((item) => ({
-          label: item.label,
-          kind: monaco.languages.CompletionItemKind.Color,
-          detail: item.detail,
-          documentation: { value: item.documentation },
-          insertText: item.insertText,
-          range: colorRange,
-          sortText: `2_color_${item.label}`,
-        })),
-        ...Q_BUILTIN_FUNCTIONS.map((label) => ({
-          label,
-          kind: monaco.languages.CompletionItemKind.Function,
-          detail: 'q built-in',
-          documentation: { value: 'Built-in q function.' },
-          insertText: label,
-          range: wordRange,
-          sortText: `3_${label}`,
-        })),
-        ...Q_KEYWORDS.map((label) => ({
-          label,
-          kind: monaco.languages.CompletionItemKind.Keyword,
-          detail: 'q keyword',
-          documentation: { value: 'Core q keyword or query word.' },
-          insertText: label,
-          range: wordRange,
-          sortText: `4_${label}`,
-        })),
-      ]);
-
-      return { suggestions };
-    },
-  });
-
-  monaco.editor.defineTheme('qanvas-warm', {
-    base: 'vs',
-    inherit: true,
-    rules: [
-      { token: 'comment', foreground: 'A89B8E', fontStyle: 'italic' },
-      { token: 'qanvas', foreground: 'C06B2C' },
-      { token: 'builtin', foreground: '2F7A6D' },
-      { token: 'keyword', foreground: '7D4E2D' },
-      { token: 'number', foreground: '5B6FE8' },
-      { token: 'string', foreground: 'B35B3F' },
-      { token: 'string.escape', foreground: 'B35B3F' },
-      { token: 'string.invalid', foreground: 'C45C5C' },
-      { token: 'symbol', foreground: '8B674B' },
-      { token: 'variable', foreground: '2C2520' },
-      { token: 'delimiter', foreground: '5C534C' },
-      { token: 'date', foreground: '5B6FE8' },
-      { token: 'time', foreground: '5B6FE8' },
-      { token: 'type', foreground: '8B674B' },
-    ],
-    colors: {
-      'editor.background': '#FFFDF9',
-      'editor.foreground': '#2C2520',
-      'editorLineNumber.foreground': '#B5A799',
-      'editorLineNumber.activeForeground': '#7A6E62',
-      'editorCursor.foreground': '#5B6FE8',
-      'editor.selectionBackground': '#DDE2FF',
-      'editor.inactiveSelectionBackground': '#EEE8DD',
-      'editor.lineHighlightBackground': '#F7F1E9',
-      'editorIndentGuide.background1': '#EAE0D2',
-      'editorWhitespace.foreground': '#D6CABB',
-      'editorWidget.background': '#FFFDF9',
-      'editorWidget.border': '#E0D8CC',
-      'scrollbarSlider.background': '#C9BDABAA',
-      'scrollbarSlider.hoverBackground': '#B8AA96CC',
-    },
-  });
-}
