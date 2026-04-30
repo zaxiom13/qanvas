@@ -192,8 +192,8 @@
       startX: touch.clientX,
       startY: touch.clientY,
     };
-    event.preventDefault();
-    event.stopPropagation();
+    // Do not preventDefault on touchstart: iOS/Android need the default touch
+    // path on the contenteditable surface so the virtual keyboard can open.
     currentView.focus();
     selectEditorRange(pos, pos);
   }
@@ -203,12 +203,14 @@
     const touch = getTouchByIdentifier(event.changedTouches, touchSelection.identifier);
     if (!touch) return;
 
-    event.preventDefault();
-    event.stopPropagation();
-
     const deltaX = Math.abs(touch.clientX - touchSelection.startX);
     const deltaY = Math.abs(touch.clientY - touchSelection.startY);
     if (!touchSelection.moved && Math.max(deltaX, deltaY) < touchSelectMoveThreshold) return;
+
+    // Only preventDefault once the finger moves past the tap threshold so the
+    // browser can still run default touch handling on a simple tap (soft keyboard).
+    event.preventDefault();
+    event.stopPropagation();
 
     const pos = currentView.posAtCoords({ x: touch.clientX, y: touch.clientY });
     if (pos == null) return;
