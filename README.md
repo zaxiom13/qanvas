@@ -4,11 +4,11 @@ A p5.js-style creative coding environment where your sketches are written in
 **q/kdb+**. Runs three ways — pick the one you have:
 
 
-| Backend     | q license?  | Network?  | What runs your code                                               |
-| ----------- | ----------- | --------- | ----------------------------------------------------------------- |
-| **Browser** | No          | No        | `[jqport](./packages/q-engine)` — a q interpreter in a Web Worker |
-| **Local q** | Yes         | localhost | Your own `q` process over WebSocket (`server/q-bridge.js`)        |
-| **Cloud q** | Server-side | Yes       | A hosted `q` (see `deploy/docker-cloud-q/`)                       |
+| Backend     | q license?  | Network?  | What runs your code                                                          |
+| ----------- | ----------- | --------- | ---------------------------------------------------------------------------- |
+| **Browser** | No          | No        | **[jqport](./packages/q-engine)** — q interpreter in a Web Worker |
+| **Local q** | Yes         | localhost | Your own `q` process over WebSocket (`server/q-bridge.js`)                   |
+| **Cloud q** | Server-side | Yes       | A hosted `q` (see `deploy/docker-cloud-q/`)                                  |
 
 
 All three backends speak the **same JSON-over-WebSocket protocol**, so a sketch
@@ -17,6 +17,14 @@ you just get more speed, bigger data, and the full q stdlib.
 
 Qanvas is tuned for array-heavy creative coding: heatmaps, particle systems,
 tabular visualizations, and anything that benefits from q's vectorization.
+
+---
+
+## Requirements
+
+- **Node.js** 20 or newer (recommended for Vite 7 and the workspace tooling).
+- **npm** with workspaces (install from the repository root).
+- **Local q** or **cloud q** paths above only when you use those backends; the browser backend needs no `q` binary.
 
 ---
 
@@ -45,7 +53,7 @@ npm run dev:local-q    # starts the app + node WS bridge that spawns q
 
 In the app's Settings → **Runtime**, pick *Local q (kdb+)* and point it at
 `ws://127.0.0.1:5042` (the default). The bridge will boot
-`[server/qanvas-boot.q](./server/qanvas-boot.q)` for you.
+[`server/qanvas-boot.q`](./server/qanvas-boot.q) for you.
 
 If you'd rather run q yourself (or on another port):
 
@@ -55,7 +63,7 @@ npm run q:direct       # q server/qanvas-boot.q -p 5042
 
 ### 3. Cloud q
 
-See `[deploy/docker-cloud-q/README.md](./deploy/docker-cloud-q/README.md)` —
+See [`deploy/docker-cloud-q/README.md`](./deploy/docker-cloud-q/README.md) —
 one `docker compose up` gets you `qanvas-boot.q` behind a WebSocket on a
 public host. Then point Settings → Runtime → *Cloud q* at
 `wss://your-host/ws`.
@@ -91,7 +99,7 @@ instead of separate `x`/`y` scalar columns.
 `Color.YELLOW`, `Color.CREAM`, `Color.INK`, and friends. They work anywhere a
 24-bit color long is expected and autocomplete in the editor.
 
-See `[examples/](./examples/)` for array-heatmap, table-bars, and a
+See [`examples/`](./examples/) for array-heatmap, table-bars, and a
 QSQL-driven particle system.
 
 ---
@@ -118,11 +126,10 @@ QSQL-driven particle system.
                     q              q
 ```
 
-Packages:
+Monorepo packages:
 
-- `app/` — Svelte UI, CodeMirror editor with q highlighting, runtime adapters.
-- `packages/q-core`, `q-engine`, `q-language` — vendored
-`[jqport](https://github.com/…)` for browser execution.
+- `app/` — Svelte UI, CodeMirror editor with q highlighting, runtime adapters. Optional **Capacitor** wrappers live under `app/ios/` and `app/android/` for native shells (`npm run mobile:ios` / `mobile:android` from `app/` after a build).
+- `packages/q-core` (`@qpad/core`), `packages/q-engine` (`@qpad/engine`), `packages/q-language` (`@qpad/language`) — TypeScript jqport engine, shared core, and editor language support for browser execution.
 - `server/qanvas-boot.q` — q script implementing the protocol.
 - `server/q-bridge.js` — Node WS server; optionally spawns q and proxies.
 - `deploy/docker-cloud-q/` — Dockerized cloud deployment.
@@ -144,15 +151,21 @@ Packages:
 
 ## Scripts
 
+Root `package.json`:
+
 ```bash
 npm run dev           # app only (browser backend)
 npm run dev:web       # same
 npm run dev:local-q   # app + q bridge
 npm run build         # build app
-npm run static        # build zero-install static site
+npm run preview       # preview production build (see app dev server host/port)
+npm run static        # build zero-install static site to ./dist-static
+npm run typecheck     # Svelte/TS check for the app workspace
 npm run q:serve       # node server/q-bridge.js
 npm run q:direct      # q server/qanvas-boot.q -p 5042
 ```
+
+App workspace (`app/`): `npm run test`, `npm run test:browser`, `npm run mobile:sync`, etc. See [`app/package.json`](./app/package.json).
 
 ## End-to-end test
 
@@ -160,4 +173,4 @@ npm run q:direct      # q server/qanvas-boot.q -p 5042
 node scripts/smoke-local-q.mjs
 ```
 
-Boots q, opens a WebSocket, runs `start` → `frame` → `query` → `stop`.
+Boots q, opens a WebSocket, runs `start` → `frame` → `query` → `stop`. Override the q binary with `QANVAS_Q_BIN` if it is not at `$HOME/.kx/bin/q`.
