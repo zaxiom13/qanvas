@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
   import FileTabs from '$lib/components/FileTabs.svelte';
   import { formatDisplayValue } from '$lib/formatting/value-format';
@@ -196,6 +196,18 @@
     appState.setPracticeChallenge(id);
     setActiveTab('editor');
   }
+
+  onMount(() => {
+    const handler = ((event: CustomEvent<MobileTab>) => {
+      const nextTab = event.detail;
+      const allowed = new Set<MobileTab>(['editor', 'canvas', 'examples', 'settings']);
+      if (allowed.has(nextTab)) {
+        setActiveTab(nextTab);
+      }
+    }) as EventListener;
+    window.addEventListener('qanvas:mobile-tour-tab', handler);
+    return () => window.removeEventListener('qanvas:mobile-tour-tab', handler);
+  });
 </script>
 
 <div class="mobile-shell">
@@ -206,12 +218,37 @@
       </div>
       <p>kdb+/q creative coding</p>
     </div>
-    <button class="mobile-action mobile-info-action" type="button" aria-label="About Qanvas5" onclick={() => (appState.activeModal = 'info')}>
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
-        <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
-      </svg>
-    </button>
+    <div class="mobile-header-actions">
+      <div class="mobile-info-cluster" data-nudge-visible={!appState.infoModalPreviouslyOpened ? 'true' : undefined}>
+        <button
+          id="mobile-btn-info"
+          class="mobile-action mobile-info-action"
+          type="button"
+          aria-label="About Qanvas5"
+          onclick={() => (appState.activeModal = 'info')}
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </button>
+        {#if !appState.infoModalPreviouslyOpened}
+          <div class="info-btn-nudge info-btn-nudge--mobile" aria-hidden="true">
+            <span class="info-btn-nudge__text">Try me</span>
+            <svg class="info-btn-nudge__arrow" viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M4 12h13M13 8l4 4-4 4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+        {/if}
+      </div>
+    </div>
   </header>
 
   <main class="mobile-main">
@@ -537,7 +574,7 @@
 
         <div class="mobile-settings-section">
           <h2>Workspace</h2>
-          <div class="mobile-segmented" role="group" aria-label="Workspace mode">
+          <div id="mobile-workspace-switch" class="mobile-segmented" role="group" aria-label="Workspace mode">
             <button type="button" class:active={appState.workspaceMode === 'studio'} onclick={() => void chooseWorkspaceMode('studio')}>Studio</button>
             <button type="button" class:active={appState.workspaceMode === 'practice'} onclick={() => void chooseWorkspaceMode('practice')}>Practice</button>
           </div>
@@ -631,6 +668,33 @@
     padding: calc(env(safe-area-inset-top) + 14px) 18px 12px;
     background: var(--bg-toolbar);
     border-bottom: 1px solid var(--mobile-border);
+  }
+
+  .mobile-header-actions {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+    flex-shrink: 0;
+    max-width: min(55vw, 260px);
+  }
+
+  .mobile-info-cluster {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .info-btn-nudge--mobile {
+    flex-direction: column;
+    align-items: flex-end;
+    font-size: 9.5px;
+  }
+
+  .info-btn-nudge--mobile .info-btn-nudge__arrow {
+    width: 30px;
+    height: 18px;
+    transform: rotate(90deg);
   }
 
   .mobile-brand {

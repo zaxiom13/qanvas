@@ -41,6 +41,7 @@ const STORAGE_KEYS = {
   editorPanelWidth: 'qanvas5:editorPanelWidth',
   lastExampleId: 'qanvas5:lastExampleId',
   tourCompleted: 'qanvas5:tourCompleted',
+  infoModalOpened: 'qanvas5:infoModalOpened',
 };
 
 const PRACTICE_FILE_NAME = 'practice.q';
@@ -171,6 +172,10 @@ class AppState {
   exampleCategory = $state('All');
   renamingProject = $state(false);
   runNonce = $state(0);
+
+  infoModalPreviouslyOpened = $state(readStored(STORAGE_KEYS.infoModalOpened) === '1');
+  uxTourActive = $state(false);
+  uxTourStepIndex = $state(0);
 
   private booted = false;
   private autoRunAttempted = false;
@@ -511,6 +516,45 @@ class AppState {
   closeModal(name?: ModalName) {
     if (!name || this.activeModal === name) {
       this.activeModal = null;
+    }
+  }
+
+  markInfoModalOpened() {
+    if (readStored(STORAGE_KEYS.infoModalOpened) === '1') return;
+    writeStored(STORAGE_KEYS.infoModalOpened, '1');
+    this.infoModalPreviouslyOpened = true;
+  }
+
+  startUxTourFromModal() {
+    this.activeModal = null;
+    this.uxTourStepIndex = 0;
+    this.uxTourActive = true;
+    const focusBody = typeof document !== 'undefined' ? document.body : undefined;
+    requestAnimationFrame(() => focusBody?.focus?.());
+  }
+
+  advanceUxTourStep(totalSteps: number) {
+    if (!this.uxTourActive) return;
+
+    const lastIndex = Math.max(0, totalSteps - 1);
+    if (this.uxTourStepIndex >= lastIndex) {
+      this.finishUxTour();
+      return;
+    }
+
+    this.uxTourStepIndex++;
+  }
+
+  finishUxTour() {
+    if (!this.uxTourActive) return;
+    this.uxTourActive = false;
+    this.uxTourStepIndex = 0;
+
+    try {
+      document.documentElement.classList.remove('ux-tour-active');
+      document.documentElement.classList.remove('ux-tour-pointer-lock');
+    } catch {
+      /* ignore */
     }
   }
 

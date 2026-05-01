@@ -42,6 +42,15 @@ test('uses the real sketch canvas on the mobile canvas tab', async ({ page }) =>
   await expect(page.locator('.mobile-artboard')).toHaveCount(0);
 });
 
+test('sketch canvas disables native touch gestures so drag sketches receive moves', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Canvas' }).click();
+
+  const touchAction = await page.getByLabel('Sketch canvas').evaluate((el) => getComputedStyle(el).touchAction);
+  expect(touchAction).toBe('none');
+});
+
 test('runs the sketch from the mobile canvas controls sheet', async ({ page }) => {
   await page.goto('/');
 

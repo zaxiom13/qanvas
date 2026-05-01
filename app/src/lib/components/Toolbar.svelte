@@ -15,12 +15,22 @@
     <div class="app-brand">
       <span class="brand-q">Q</span><span class="brand-anvas">anvas</span><span class="brand-5">5</span>
     </div>
-    <button id="btn-info" class="btn-icon-only" type="button" title="About Qanvas5" aria-label="About Qanvas5" onclick={() => (appState.activeModal = 'info')}>
-      <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-        <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4" />
-        <path d="M8 7.2v4.2M8 4.8h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
-      </svg>
-    </button>
+    <div class="toolbar-info-cluster">
+      <button id="btn-info" class="btn-icon-only" type="button" title="About Qanvas5" aria-label="About Qanvas5" onclick={() => (appState.activeModal = 'info')}>
+        <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.4" />
+          <path d="M8 7.2v4.2M8 4.8h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
+        </svg>
+      </button>
+      {#if !appState.infoModalPreviouslyOpened}
+        <div class="info-btn-nudge" aria-hidden="true">
+          <span class="info-btn-nudge__text">Try me</span>
+          <svg class="info-btn-nudge__arrow" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M4 12h13M13 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+          </svg>
+        </div>
+      {/if}
+    </div>
     {#if appState.workspaceMode === 'studio'}
       <div class="toolbar-divider"></div>
       <div class="project-info">
@@ -58,7 +68,7 @@
   </div>
 
   <div class="toolbar-center">
-    <div class="workspace-switch" role="tablist" aria-label="Workspace mode">
+    <div id="workspace-mode-switch" class="workspace-switch" role="tablist" aria-label="Workspace mode">
       <button
         class="workspace-switch-btn"
         type="button"

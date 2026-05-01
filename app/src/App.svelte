@@ -12,6 +12,7 @@
   import ExportGifModal from './lib/components/modals/ExportGifModal.svelte';
   import InfoModal from './lib/components/modals/InfoModal.svelte';
   import MobileShell from './lib/mobile/MobileShell.svelte';
+  import UxTour from './lib/components/UxTour.svelte';
   import { appState } from './lib/state/app-state.svelte';
 
   let isMobileLayout = $state(false);
@@ -35,14 +36,6 @@
 
 {#if isMobileLayout}
   <MobileShell />
-
-  <SettingsModal />
-  <NewFileModal />
-  <UnsavedModal />
-  <ExamplesModal />
-  <ProjectsModal />
-  <ExportGifModal />
-  <InfoModal />
 {:else}
   <div class="app-root">
     <Toolbar />
@@ -58,13 +51,14 @@
     </main>
 
     <ConsolePanel />
-
-    <SettingsModal />
-    <NewFileModal />
-    <UnsavedModal />
-    <ExamplesModal />
-    <ProjectsModal />
-    <ExportGifModal />
-    <InfoModal />
   </div>
 {/if}
+
+<SettingsModal />
+<NewFileModal />
+<UnsavedModal />
+<ExamplesModal />
+<ProjectsModal />
+<ExportGifModal />
+<InfoModal />
+<UxTour mobile={isMobileLayout} />

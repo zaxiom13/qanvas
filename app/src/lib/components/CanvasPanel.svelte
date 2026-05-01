@@ -103,12 +103,32 @@
   function updateMouse(event: PointerEvent) {
     if (!canvasElement) return;
     const rect = canvasElement.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
-    if (x < 0 || y < 0 || x > rect.width || y > rect.height) {
-      return;
-    }
+    const x = Math.min(Math.max(event.clientX - rect.left, 0), rect.width);
+    const y = Math.min(Math.max(event.clientY - rect.top, 0), rect.height);
     inputState.mouse = [x, y];
+  }
+
+  function tryCaptureSketchPointer(event: PointerEvent) {
+    if (!canvasElement) return;
+    const primary =
+      event.pointerType === 'touch' ||
+      event.pointerType === 'pen' ||
+      (event.pointerType === 'mouse' && event.button === 0);
+    if (!primary) return;
+    try {
+      canvasElement.setPointerCapture(event.pointerId);
+    } catch {
+      /* Element disconnected or capture unsupported */
+    }
+  }
+
+  function tryReleaseSketchPointer(event: PointerEvent) {
+    if (!canvasElement?.hasPointerCapture(event.pointerId)) return;
+    try {
+      canvasElement.releasePointerCapture(event.pointerId);
+    } catch {
+      /* Already released */
+    }
   }
 
   function consumeInput() {
@@ -505,14 +525,25 @@
         if (event.button === 0) inputState.mouseButtons.left = true;
         if (event.button === 1) inputState.mouseButtons.middle = true;
         if (event.button === 2) inputState.mouseButtons.right = true;
+        tryCaptureSketchPointer(event);
       }}
       onpointerup={(event) => {
         updateMouse(event);
         if (event.button === 0) inputState.mouseButtons.left = false;
         if (event.button === 1) inputState.mouseButtons.middle = false;
         if (event.button === 2) inputState.mouseButtons.right = false;
+        tryReleaseSketchPointer(event);
       }}
-      onpointerleave={() => {
+      onpointercancel={(event) => {
+        updateMouse(event);
+        inputState.mouseButtons = { left: false, middle: false, right: false };
+        tryReleaseSketchPointer(event);
+      }}
+      onlostpointercapture={() => {
+        inputState.mouseButtons = { left: false, middle: false, right: false };
+      }}
+      onpointerleave={(event) => {
+        if (canvasElement?.hasPointerCapture(event.pointerId)) return;
         inputState.mouseButtons = { left: false, middle: false, right: false };
       }}
       onwheel={(event) => {

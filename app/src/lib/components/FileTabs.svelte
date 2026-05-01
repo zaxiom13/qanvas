@@ -70,7 +70,14 @@
           </svg>
           <span class="file-tab-name">Practice Editor</span>
         </button>
-        <button class="file-tab-control file-tab-run" type="button" title="Run answer" aria-label="Run answer" onclick={runOrStop}>
+        <button
+          id={mobile ? 'mobile-btn-run' : 'btn-run-sketch'}
+          class="file-tab-control file-tab-run"
+          type="button"
+          title="Run answer"
+          aria-label="Run answer"
+          onclick={runOrStop}
+        >
           <svg viewBox="0 0 16 16" fill="none" aria-hidden="true">
             <polygon points="5,3 13,8 5,13" fill="currentColor"></polygon>
           </svg>
@@ -100,6 +107,7 @@
           {#if file.name === 'sketch.q' && file.name === appState.activeFileName}
             <div class="file-tab-controls" aria-label="Sketch controls">
               <button
+                id={mobile ? 'mobile-btn-run' : 'btn-run-sketch'}
                 class="file-tab-control file-tab-run"
                 type="button"
                 class:running={appState.running && !appState.paused}
