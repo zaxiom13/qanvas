@@ -47,6 +47,8 @@ const PRACTICE_FILE_NAME = 'practice.q';
 const RUNTIME_SOURCE_EXTENSIONS = ['.q'];
 const DEFAULT_STUDIO_EDITOR_WIDTH = 640;
 const DEFAULT_PRACTICE_EDITOR_WIDTH = 820;
+const DEFAULT_CONSOLE_HEIGHT = 160;
+const MIN_CONSOLE_HEIGHT = 160;
 
 export const DEFAULT_SKETCH = `setup:{
   \`size\`bg!(800 600;Color.CREAM)
@@ -156,7 +158,7 @@ class AppState {
   tourLessonExpanded = $state(true);
 
   sidebarCollapsed = $state(readStored(STORAGE_KEYS.sidebarCollapsed) === '1');
-  consoleHeight = $state(readStoredNumber(STORAGE_KEYS.consoleHeight, 160));
+  consoleHeight = $state(readStoredNumber(STORAGE_KEYS.consoleHeight, DEFAULT_CONSOLE_HEIGHT));
   consoleCollapsed = $state(readStored(STORAGE_KEYS.consoleCollapsed) === '1');
   mobileConsoleCollapsed = $state(readStored(STORAGE_KEYS.mobileConsoleCollapsed) === '1');
   mobileCanvasControlsCollapsed = $state(readStored(STORAGE_KEYS.mobileCanvasControlsCollapsed) === '1');
@@ -347,7 +349,7 @@ class AppState {
   setConsoleHeight(height: number) {
     if (this.consoleCollapsed) return;
     const vh = typeof window !== 'undefined' ? window.innerHeight : 900;
-    const minH = 96;
+    const minH = MIN_CONSOLE_HEIGHT;
     const maxH = Math.min(560, Math.max(minH + 40, Math.floor(vh * 0.58)));
     const clamped = Math.max(minH, Math.min(Math.round(height), maxH));
     this.consoleHeight = clamped;
@@ -755,7 +757,13 @@ class AppState {
   async stepSketch() {
     if (this.workspaceMode !== 'studio') return;
 
-    await this.runtimeCoordinator.stepProject(this, this.getRuntimeProjectSource());
+    const restartWithLatestSource = this.running && this.runtimeRefreshWanted;
+    if (restartWithLatestSource) {
+      this.runtimeRefreshWanted = false;
+      this.clearInteractiveRuntimeRefresh();
+    }
+
+    await this.runtimeCoordinator.stepProject(this, this.getRuntimeProjectSource(), { restart: restartWithLatestSource });
   }
 
   startStepHold() {

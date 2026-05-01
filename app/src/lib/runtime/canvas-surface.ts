@@ -131,6 +131,21 @@ export class CanvasSurface {
           });
         }
         break;
+      case 'triangle':
+        for (const row of readRows(command.data)) {
+          this.withStyle(row, () => {
+            const [x1, y1] = readPoint(row.p);
+            const [x2, y2] = readPoint(row.p2, [40, 0]);
+            const [x3, y3] = readPoint(row.p3, [20, 40]);
+            this.ctx?.beginPath();
+            this.ctx?.moveTo(x1, y1);
+            this.ctx?.lineTo(x2, y2);
+            this.ctx?.lineTo(x3, y3);
+            this.ctx?.closePath();
+            paintCurrentPath(this.ctx);
+          });
+        }
+        break;
       case 'pixel':
         for (const row of readRows(command.data)) {
           this.withStyle({ ...row, stroke: undefined }, () => {

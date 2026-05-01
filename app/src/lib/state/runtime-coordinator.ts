@@ -114,15 +114,17 @@ export class RuntimeCoordinator {
     });
   }
 
-  async stepProject(host: RuntimeHost, source: RuntimeProjectSource) {
+  async stepProject(host: RuntimeHost, source: RuntimeProjectSource, options: { restart?: boolean } = {}) {
     await this.withRuntimeLock(async () => {
       if (!host.runtimeOk) {
         await this.primeRuntimePath(host);
         if (!host.runtimeOk) return;
       }
 
-      if (!isRuntimeActive(host.runtimeControl)) {
-        const started = await this.startRuntimeFromProject(host, source, '↦ Setup step', { paused: true });
+      if (!isRuntimeActive(host.runtimeControl) || options.restart) {
+        const started = await this.startRuntimeFromProject(host, source, options.restart ? '↦ Setup step (updated sketch)' : '↦ Setup step', {
+          paused: true,
+        });
         if (started) {
           host.appendConsole('info', 'Setup completed. Press Step again for frame 0.');
         }

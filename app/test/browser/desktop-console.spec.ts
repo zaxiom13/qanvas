@@ -13,3 +13,46 @@ test('collapses and expands the desktop console', async ({ page }) => {
   await expect(page.locator('#console-output')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Collapse console' })).toHaveAttribute('aria-expanded', 'true');
 });
+
+test('resizes the desktop console down to the default height floor', async ({ page }) => {
+  await page.goto('/');
+
+  const panel = page.locator('#console-panel');
+  const handle = page.getByRole('button', { name: 'Resize console' });
+  await expect(handle).toBeVisible();
+
+  const initialHeight = await panel.evaluate((element) => element.getBoundingClientRect().height);
+  const handleBox = await handle.boundingBox();
+  expect(handleBox).not.toBeNull();
+
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y + handleBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(handleBox!.x + handleBox!.width / 2, handleBox!.y - 80);
+  await page.mouse.up();
+
+  const tallerHeight = await panel.evaluate((element) => element.getBoundingClientRect().height);
+  expect(tallerHeight).toBeGreaterThan(initialHeight + 40);
+
+  const tallerHandleBox = await handle.boundingBox();
+  expect(tallerHandleBox).not.toBeNull();
+
+  await page.mouse.move(tallerHandleBox!.x + tallerHandleBox!.width / 2, tallerHandleBox!.y + tallerHandleBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tallerHandleBox!.x + tallerHandleBox!.width / 2, tallerHandleBox!.y + 80);
+  await page.mouse.up();
+
+  const afterDownwardDragHeight = await panel.evaluate((element) => element.getBoundingClientRect().height);
+  expect(afterDownwardDragHeight).toBeLessThan(tallerHeight - 40);
+  expect(afterDownwardDragHeight).toBeGreaterThanOrEqual(initialHeight - 1);
+
+  const finalHandleBox = await handle.boundingBox();
+  expect(finalHandleBox).not.toBeNull();
+
+  await page.mouse.move(finalHandleBox!.x + finalHandleBox!.width / 2, finalHandleBox!.y + finalHandleBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(finalHandleBox!.x + finalHandleBox!.width / 2, finalHandleBox!.y + 200);
+  await page.mouse.up();
+
+  const floorHeight = await panel.evaluate((element) => element.getBoundingClientRect().height);
+  expect(floorHeight).toBeGreaterThanOrEqual(initialHeight - 1);
+});

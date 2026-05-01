@@ -26,6 +26,7 @@ const BOOT_SOURCE = [
   "background:{[fill].qv.append[`kind`fill!(`background;fill)]}",
   "circle:{[data].qv.append[`kind`data!(`circle;data)]}",
   "rect:{[data].qv.append[`kind`data!(`rect;data)]}",
+  "triangle:{[data].qv.append[`kind`data!(`triangle;data)]}",
   "pixel:{[data].qv.append[`kind`data!(`pixel;data)]}",
   "line:{[data].qv.append[`kind`data!(`line;data)]}",
   "text:{[data].qv.append[`kind`data!(`text;data)]}",

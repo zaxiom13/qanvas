@@ -33,7 +33,9 @@ export const COMPILED_BUILTIN_CALLS = new Set([
   'background',
   'circle',
   'rect',
+  'triangle',
   'line',
+  'pixel',
   'text',
   'image',
   'show',
@@ -130,6 +132,8 @@ export function createCompiledRuntimeHelpers(options: CompiledRuntimeHelperOptio
           return args[0];
         case 'circle':
         case 'rect':
+        case 'triangle':
+        case 'pixel':
         case 'line':
         case 'text':
         case 'image':

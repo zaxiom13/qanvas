@@ -31,6 +31,7 @@ append:{[cmd] cmds,:enlist cmd; :cmd}
 background:{[fill]    append `kind`fill!(`background;fill)}
 circle:    {[data]    append `kind`data!(`circle;data)}
 rect:      {[data]    append `kind`data!(`rect;data)}
+triangle:  {[data]    append `kind`data!(`triangle;data)}
 pixel:     {[data]    append `kind`data!(`pixel;data)}
 line:      {[data]    append `kind`data!(`line;data)}
 text:      {[data]    append `kind`data!(`text;data)}

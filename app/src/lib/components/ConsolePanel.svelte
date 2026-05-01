@@ -1,5 +1,8 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { appState } from '$lib/state/app-state.svelte';
+
+  let dragCleanup = () => {};
 
   function formatTimestamp(ts: number) {
     const date = new Date(ts);
@@ -7,6 +10,44 @@
     return `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}.${pad(date.getMilliseconds(), 3)}`;
   }
 
+  function startResize(event: PointerEvent) {
+    if (appState.consoleCollapsed) return;
+
+    event.preventDefault();
+    const target = event.currentTarget as HTMLElement;
+    const pointerId = event.pointerId;
+    target.setPointerCapture(pointerId);
+
+    const startY = event.clientY;
+    const startHeight = appState.consoleHeight;
+    const handleMove = (moveEvent: PointerEvent) => {
+      const nextHeight = startHeight + (startY - moveEvent.clientY);
+      appState.setConsoleHeight(nextHeight);
+    };
+
+    const cleanup = () => {
+      try {
+        target.releasePointerCapture(pointerId);
+      } catch {
+        /* already released */
+      }
+      window.removeEventListener('pointermove', handleMove);
+      window.removeEventListener('pointerup', cleanup);
+      window.removeEventListener('pointercancel', cleanup);
+      document.body.classList.remove('is-resizing-console');
+      dragCleanup = () => {};
+    };
+
+    document.body.classList.add('is-resizing-console');
+    window.addEventListener('pointermove', handleMove);
+    window.addEventListener('pointerup', cleanup);
+    window.addEventListener('pointercancel', cleanup);
+    dragCleanup = cleanup;
+  }
+
+  onDestroy(() => {
+    dragCleanup();
+  });
 </script>
 
 <footer
@@ -16,6 +57,15 @@
     ? 'height:auto;min-height:calc(var(--tab-h) + 1px);'
     : `height: ${appState.consoleHeight}px; min-height: ${appState.consoleHeight}px;`}
 >
+  {#if !appState.consoleCollapsed}
+    <button
+      class="console-resize-handle"
+      type="button"
+      aria-label="Resize console"
+      title="Drag to resize console"
+      onpointerdown={startResize}
+    ></button>
+  {/if}
   <div class="console-toolbar">
     <span class="console-title">Console</span>
     <div class="console-filters">

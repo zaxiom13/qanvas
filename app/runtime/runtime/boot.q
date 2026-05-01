@@ -50,6 +50,10 @@ rect:{[data]
   .qv.append `kind`data!(`rect;data);
 }
 
+triangle:{[data]
+  .qv.append `kind`data!(`triangle;data);
+}
+
 pixel:{[data]
   .qv.append `kind`data!(`pixel;data);
 }

@@ -26,6 +26,7 @@ const BOOT_SOURCE = [
   'background:{[fill].qv.append[`kind`fill!(`background;fill)]}',
   'circle:{[data].qv.append[`kind`data!(`circle;data)]}',
   'rect:{[data].qv.append[`kind`data!(`rect;data)]}',
+  'triangle:{[data].qv.append[`kind`data!(`triangle;data)]}',
   'pixel:{[data].qv.append[`kind`data!(`pixel;data)]}',
   'line:{[data].qv.append[`kind`data!(`line;data)]}',
   'text:{[data].qv.append[`kind`data!(`text;data)]}',
@@ -151,7 +152,7 @@ describe('q editor language catalogs', () => {
   it('offers plural draw snippets with two prefilled rows', () => {
     const snippets = new Map<string, string>(Q_SLASH_SNIPPETS.map((item) => [item.label, item.insertText]));
 
-    for (const label of ['/circles', '/rects', '/pixels', '/lines', '/texts', '/images']) {
+    for (const label of ['/circles', '/rects', '/triangles', '/pixels', '/lines', '/texts', '/images']) {
       const insertText = snippets.get(label);
 
       expect(insertText).toBeTruthy();
@@ -163,7 +164,7 @@ describe('q editor language catalogs', () => {
   it('offers plain plural draw completions with two prefilled rows', () => {
     const completions = new Map<string, string>(Q_CANVAS_FUNCTIONS.map((item) => [item.label, item.insertText]));
 
-    for (const label of ['circles', 'rects', 'pixels', 'lines', 'texts', 'images']) {
+    for (const label of ['circles', 'rects', 'triangles', 'pixels', 'lines', 'texts', 'images']) {
       const insertText = completions.get(label);
 
       expect(insertText).toBeTruthy();
@@ -178,6 +179,7 @@ describe('q editor language catalogs', () => {
     for (const [label, kind] of [
       ['/circles', 'circle'],
       ['/rects', 'rect'],
+      ['/triangles', 'triangle'],
       ['/pixels', 'pixel'],
       ['/lines', 'line'],
       ['/texts', 'text'],
