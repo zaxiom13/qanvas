@@ -77,19 +77,24 @@ Every sketch defines two functions:
 ```q
 setup:{`size`bg!(800 600; 0)}
 
-draw:{[state; frame; input; document]
-  background 10;
+draw:{[state;frameInfo;input;canvas]
+  background[10];
   / vectorized — one call per 500 particles
   n:500;
   t:"f"$til n;
-  p:(400 300f) + flip(300 * sin frame % 30 + t; 200 * cos frame % 25 + t);
-  circle ([] p:p; r:n # 3f; fill:n # 255);
+  f:frameInfo`frameNum;
+  p:(400 300f) + flip(300 * sin (f mod 30)+t; 200 * cos (f mod 25)+t);
+  circle[([]
+    p:p;
+    r:n#3f;
+    fill:n#255
+  )];
   state
  }
 ```
 
 - `setup[]` returns config (`size`, `bg`, …) and the initial state.
-- `draw[state;frame;input;document]` is called per frame; return the next state.
+- `draw[state;frameInfo;input;canvas]` is called per frame; return the next state.
 - Drawing primitives (`background`, `circle`, `rect`, `line`, `text`, `image`,
 `pixel`, `generic`) append **tables** of commands — one row per primitive
 — so you can paint thousands of shapes in a single vectorized call. In the
@@ -100,7 +105,7 @@ instead of separate `x`/`y` scalar columns.
 24-bit color long is expected and autocomplete in the editor.
 
 See [`examples/`](./examples/) for array-heatmap, table-bars, and a
-QSQL-driven particle system.
+QSQL-driven particle system. The jqport test suite loads those `.q` files each run (`npm test --workspace @qpad/engine`).
 
 ---
 
@@ -158,7 +163,7 @@ npm run dev           # app only (browser backend)
 npm run dev:web       # same
 npm run dev:local-q   # app + q bridge
 npm run build         # build app
-npm run preview       # preview production build (see app dev server host/port)
+npm run preview       # same host/port as dev: 127.0.0.1:4173
 npm run static        # build zero-install static site to ./dist-static
 npm run typecheck     # Svelte/TS check for the app workspace
 npm run q:serve       # node server/q-bridge.js

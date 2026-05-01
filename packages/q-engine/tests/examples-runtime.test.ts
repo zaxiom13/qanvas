@@ -1,6 +1,11 @@
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { createSession } from "../src/index";
 import { EXAMPLES } from "../../../app/src/lib/examples";
+
+const REPO_EXAMPLES_DIR = resolve(dirname(fileURLToPath(import.meta.url)), "../../../examples");
 
 const BOOT_SOURCE = [
   ".qv.cmds:enlist 0N",
@@ -117,17 +122,25 @@ const FRAME_INFO = { frameNum: 12, timeMs: 200 };
 const INPUT = { mouse: [320, 240], mouseButtons: { left: false, right: false } };
 const CANVAS = { size: [800, 600], pixelRatio: 1 };
 
+/** Interpreter path can exceed the default 5s for compute-heavy sketches. */
+const SLOW_EXAMPLE_TIMEOUT_MS = 20_000;
+const SLOW_EXAMPLE_IDS = new Set<string>(["mandelbrot-static"]);
+
 describe("guided examples runtime", () => {
   for (const example of EXAMPLES) {
-    it(`runs ${example.id}`, () => {
-      const session = createSession();
+    it(
+      `runs ${example.id}`,
+      () => {
+        const session = createSession();
 
-      session.evaluate(BOOT_SOURCE);
-      session.evaluate(normalizeForEngine(example.code));
+        session.evaluate(BOOT_SOURCE);
+        session.evaluate(normalizeForEngine(example.code));
 
-      expect(() => session.evaluate(".qv.result:.qv.init[]")).not.toThrow();
-      expect(() => session.evaluate(`.qv.frame[${toQLiteral(FRAME_INFO)};${toQLiteral(INPUT)};${toQLiteral(CANVAS)}]`)).not.toThrow();
-    });
+        expect(() => session.evaluate(".qv.result:.qv.init[]")).not.toThrow();
+        expect(() => session.evaluate(`.qv.frame[${toQLiteral(FRAME_INFO)};${toQLiteral(INPUT)};${toQLiteral(CANVAS)}]`)).not.toThrow();
+      },
+      SLOW_EXAMPLE_IDS.has(example.id) ? SLOW_EXAMPLE_TIMEOUT_MS : undefined
+    );
   }
 
   it("keeps pulse-grid on an evenly spaced grid instead of collapsing from operator precedence drift", () => {
@@ -157,4 +170,17 @@ describe("guided examples runtime", () => {
     ]);
     expect(firstColumnYs).toEqual([20, 60, 100, 140, 180, 220, 260, 300, 340, 380, 420, 460, 500, 540, 580]);
   });
+});
+
+describe("examples/ sketches referenced from README", () => {
+  for (const file of ["array-heatmap.q", "table-bars.q", "particles-qsql.q"]) {
+    it(`interpreter runs ${file}`, () => {
+      const source = readFileSync(resolve(REPO_EXAMPLES_DIR, file), "utf8");
+      const session = createSession();
+      session.evaluate(BOOT_SOURCE);
+      session.evaluate(normalizeForEngine(source));
+      expect(() => session.evaluate(".qv.result:.qv.init[]")).not.toThrow();
+      expect(() => session.evaluate(`.qv.frame[${toQLiteral(FRAME_INFO)};${toQLiteral(INPUT)};${toQLiteral(CANVAS)}]`)).not.toThrow();
+    });
+  }
 });

@@ -23,7 +23,7 @@ draw:{[state;frameInfo;input;canvas]
   background[Color.INK];
   rect[([]
     p:t`p;
-    size:flip (w-2;t`h);
+    size:flip ((n)#enlist w-2;t`h);
     fill:t`fill
   )];
   state
