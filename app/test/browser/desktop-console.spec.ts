@@ -1,5 +1,14 @@
 import { expect, test } from '@playwright/test';
 
+test('examples modal shows the grid after opening', async ({ page }) => {
+  await page.setViewportSize({ width: 1200, height: 800 });
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Browse examples' }).click();
+  await expect(page.getByRole('heading', { name: 'Examples' })).toBeVisible();
+  await expect(page.locator('#examples-grid .example-card').first()).toBeVisible();
+});
+
 test('collapses and expands the desktop console', async ({ page }) => {
   await page.goto('/');
 

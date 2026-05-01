@@ -12,7 +12,7 @@
 <div id="modal-examples" class="modal" hidden={appState.activeModal !== 'examples'}>
   <button class="modal-backdrop" type="button" aria-label="Close examples" onclick={() => appState.closeModal('examples')}></button>
   <div class="modal-box modal-box--examples">
-    <div class="modal-header">
+    <div class="modal-header modal-header--examples">
       <h2 class="modal-title">{appState.workspaceMode === 'practice' ? 'Lessons' : 'Examples'}</h2>
       {#if appState.workspaceMode === 'studio'}
         <div class="examples-category-filters" id="examples-filters">

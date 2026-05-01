@@ -334,10 +334,13 @@ class AppState {
 
     if (!this.autoRunAttempted) {
       this.autoRunAttempted = true;
-      queueMicrotask(() => {
-        if (this.workspaceMode === 'studio' && !this.running && !this.runtimeTransitioning) {
-          void this.runSketch();
-        }
+      // Defer first run so the shell and modals can paint; avoids a long blank refresh.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          if (this.workspaceMode === 'studio' && !this.running && !this.runtimeTransitioning) {
+            void this.runSketch();
+          }
+        });
       });
     }
   }
@@ -965,7 +968,7 @@ class AppState {
     return candidate;
   }
 
-  private async refreshProjectLibrary() {
+  async refreshProjectLibrary() {
     await this.projectSession.refreshProjectLibrary(this);
   }
 

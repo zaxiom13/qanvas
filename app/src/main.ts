@@ -6,17 +6,9 @@ import { loadBackendSettings, settingsToConfig } from '$lib/runtime/backend';
 installQanvasAPI();
 switchBackend(settingsToConfig(loadBackendSettings()));
 
-function warmInitialLayout() {
-  const isMobile = window.matchMedia('(max-width: 760px), (pointer: coarse) and (max-width: 1024px)').matches;
-  if (isMobile) {
-    void import('./lib/mobile/MobileShell.svelte');
-    return;
-  }
-
-  void import('./lib/components/DesktopShell.svelte');
-}
-
-warmInitialLayout();
+void import('./lib/components/modals/ExamplesModal.svelte');
+void import('./lib/components/modals/ProjectsModal.svelte');
+void import('./lib/components/modals/SettingsModal.svelte');
 
 window.addEventListener(
   'qanvas:app-ready',

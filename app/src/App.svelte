@@ -1,14 +1,10 @@
 <script lang="ts">
   import { onMount, tick, type Component } from 'svelte';
+  import DesktopShell from './lib/components/DesktopShell.svelte';
+  import MobileShell from './lib/mobile/MobileShell.svelte';
   import { appState } from './lib/state/app-state.svelte';
 
-  type LayoutName = 'mobile' | 'desktop';
   type ModalName = Exclude<typeof appState.activeModal, null>;
-
-  const layoutLoaders = {
-    mobile: () => import('./lib/mobile/MobileShell.svelte'),
-    desktop: () => import('./lib/components/DesktopShell.svelte'),
-  } satisfies Record<LayoutName, () => Promise<{ default: Component }>>;
 
   const modalLoaders = {
     settings: () => import('./lib/components/modals/SettingsModal.svelte'),
@@ -20,22 +16,18 @@
     info: () => import('./lib/components/modals/InfoModal.svelte'),
   } satisfies Record<ModalName, () => Promise<{ default: Component }>>;
 
-  let isMobileLayout = $state(false);
-  let activeLayout = $state<LayoutName | null>(null);
-  let LayoutComponent = $state<Component | null>(null);
+  const layoutQuery = '(max-width: 760px), (pointer: coarse) and (max-width: 1024px)';
+
+  let isMobileLayout = $state(
+    typeof window !== 'undefined' && window.matchMedia(layoutQuery).matches,
+  );
+
+  let LayoutComponent = $derived(isMobileLayout ? MobileShell : DesktopShell);
+
   let ModalComponent = $state<Component | null>(null);
   let UxTourComponent = $state<Component | null>(null);
-  let layoutLoadToken = 0;
   let modalLoadToken = 0;
   let bootFallbackRemoved = false;
-
-  async function loadLayout(layout: LayoutName) {
-    const token = ++layoutLoadToken;
-    activeLayout = layout;
-    LayoutComponent = null;
-    const module = await layoutLoaders[layout]();
-    if (token === layoutLoadToken) LayoutComponent = module.default;
-  }
 
   async function loadModal(modal: ModalName | null) {
     const token = ++modalLoadToken;
@@ -48,24 +40,20 @@
     if (token === modalLoadToken && appState.activeModal === modal) ModalComponent = module.default;
   }
 
-  async function signalBootReady() {
-    if (bootFallbackRemoved || !LayoutComponent) return;
-    bootFallbackRemoved = true;
-    await tick();
-    window.dispatchEvent(new CustomEvent('qanvas:app-ready'));
-  }
-
   onMount(() => {
-    const media = window.matchMedia('(max-width: 760px), (pointer: coarse) and (max-width: 1024px)');
+    const media = window.matchMedia(layoutQuery);
     const update = () => {
-      const nextMobile = media.matches;
-      const nextLayout: LayoutName = nextMobile ? 'mobile' : 'desktop';
-      isMobileLayout = nextMobile;
-      if (activeLayout !== nextLayout) void loadLayout(nextLayout);
+      isMobileLayout = media.matches;
     };
 
-    update();
     media.addEventListener('change', update);
+
+    void tick().then(() => {
+      if (!bootFallbackRemoved) {
+        bootFallbackRemoved = true;
+        window.dispatchEvent(new CustomEvent('qanvas:app-ready'));
+      }
+    });
 
     return () => {
       media.removeEventListener('change', update);
@@ -85,13 +73,17 @@
   });
 
   $effect(() => {
-    void signalBootReady();
+    const base = 'Qanvas5';
+    if (appState.workspaceMode === 'practice') {
+      document.title = `${appState.activePracticeChallenge.title} · Practice · ${base}`;
+      return;
+    }
+    const dirty = appState.unsaved ? ' (unsaved)' : '';
+    document.title = `${appState.projectName}${dirty} · ${base}`;
   });
 </script>
 
-{#if LayoutComponent}
-  <LayoutComponent />
-{/if}
+<LayoutComponent />
 
 {#if ModalComponent}
   <ModalComponent />
