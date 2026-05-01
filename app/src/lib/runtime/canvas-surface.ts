@@ -114,6 +114,7 @@ export class CanvasSurface {
           this.withStyle(row, () => {
             const [x, y] = readPoint(row.p);
             const radius = Number(row.r ?? 20);
+            if (!Number.isFinite(radius) || radius < 0) return;
             this.ctx?.beginPath();
             this.ctx?.arc(x, y, radius, 0, Math.PI * 2);
             paintCurrentPath(this.ctx);

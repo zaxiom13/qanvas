@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount, tick } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
   import FileTabs from '$lib/components/FileTabs.svelte';
   import { formatDisplayValue } from '$lib/formatting/value-format';
-  import { getExamplePreviewSrc } from '$lib/example-previews';
+  import { getAllExamplePreviewSrcs, getExamplePreviewSrc } from '$lib/example-previews';
   import { appState } from '$lib/state/app-state.svelte';
   import { pretextFit } from '$lib/text/pretext-fit';
   import InlineCopy from '$lib/components/InlineCopy.svelte';
@@ -19,9 +19,10 @@
   let backgroundFrameHandle = 0;
   let backgroundFrameInFlight = false;
   let backgroundRunNonce = -1;
-  let backgroundFrameNumber = 0;
   let backgroundStartTime = 0;
   let backgroundLastTime = 0;
+  let examplePreviewPreloadHandle = 0;
+  const preloadedExamplePreviews: HTMLImageElement[] = [];
 
   let bottomTabs = $derived<{ id: MobileTab; label: string; icon: string }[]>([
     { id: 'editor', label: 'Editor', icon: 'code' },
@@ -69,7 +70,6 @@
 
   function resetBackgroundFrameLoop(now: number) {
     backgroundRunNonce = appState.runNonce;
-    backgroundFrameNumber = appState.runtimeControl.frameNumber;
     backgroundStartTime = now;
     backgroundLastTime = now;
   }
@@ -99,9 +99,9 @@
 
       await browserGateway.runtime.frame({
         frameInfo: {
-          frameNum: backgroundFrameNumber,
+          frameNum: appState.debugFrameNumber,
           time: now - backgroundStartTime,
-          dt: backgroundFrameNumber === 0 ? 16 : now - backgroundLastTime,
+          dt: appState.debugFrameNumber === 0 ? 16 : now - backgroundLastTime,
         },
         /* Same shape as CanvasPanel consumeInput — sketches index input`mouseButtons etc. */
         input: {
@@ -118,7 +118,6 @@
         debugConsole: appState.debugConsole,
       });
 
-      backgroundFrameNumber += 1;
       backgroundLastTime = now;
       appState.recordRenderedFrame('continuous');
     } catch (error) {
@@ -204,6 +203,16 @@
     setActiveTab('editor');
   }
 
+  function preloadExamplePreviews() {
+    for (const src of getAllExamplePreviewSrcs()) {
+      const image = new Image();
+      image.decoding = 'async';
+      image.loading = 'eager';
+      image.src = src;
+      preloadedExamplePreviews.push(image);
+    }
+  }
+
   onMount(() => {
     const handler = ((event: CustomEvent<MobileTab>) => {
       const nextTab = event.detail;
@@ -214,6 +223,23 @@
     }) as EventListener;
     window.addEventListener('qanvas:mobile-tour-tab', handler);
     return () => window.removeEventListener('qanvas:mobile-tour-tab', handler);
+  });
+
+  onMount(() => {
+    const schedule = 'requestIdleCallback' in window
+      ? window.requestIdleCallback
+      : (callback: IdleRequestCallback) => window.setTimeout(() => callback({ didTimeout: false, timeRemaining: () => 0 } as IdleDeadline), 250);
+
+    examplePreviewPreloadHandle = schedule(() => {
+      preloadExamplePreviews();
+      examplePreviewPreloadHandle = 0;
+    });
+  });
+
+  onDestroy(() => {
+    if (!examplePreviewPreloadHandle) return;
+    if ('cancelIdleCallback' in window) window.cancelIdleCallback(examplePreviewPreloadHandle);
+    else clearTimeout(examplePreviewPreloadHandle);
   });
 </script>
 
@@ -565,7 +591,7 @@
               >
                 <span class="example-thumb">
                   {#if previewSrc}
-                    <img src={previewSrc} alt="" loading="lazy" decoding="async" />
+                    <img src={previewSrc} alt="" loading="eager" decoding="async" fetchpriority="low" />
                   {/if}
                 </span>
                 <strong use:pretextFit={{ min: 10, max: 13 }}>{example.name}</strong>
@@ -587,32 +613,30 @@
           </div>
         </div>
 
-        {#if appState.workspaceMode === 'studio'}
-          <div class="mobile-settings-section">
-            <h2>Canvas & console</h2>
-            <button class="mobile-setting-row" type="button" onclick={() => appState.toggleFps()}>
-              <span>
-                <strong>FPS overlay</strong>
-                <small>Show frame rate on the sketch canvas.</small>
-              </span>
-              <span class:active={appState.showFps} class="mobile-toggle">{appState.showFps ? 'On' : 'Off'}</span>
-            </button>
-            <button class="mobile-setting-row" type="button" onclick={() => appState.toggleDebugConsole()}>
-              <span>
-                <strong>Debug console</strong>
-                <small>Emit runtime debug output while queries run.</small>
-              </span>
-              <span class:active={appState.debugConsole} class="mobile-toggle">{appState.debugConsole ? 'On' : 'Off'}</span>
-            </button>
-            <button class="mobile-setting-row" type="button" onclick={() => appState.setCanvasPanelTab(appState.canvasPanelTab === 'canvas' ? 'compiled' : 'canvas')}>
-              <span>
-                <strong>Canvas output</strong>
-                <small>Switch between rendered canvas and output.</small>
-              </span>
-              <span class="mobile-toggle active">{appState.canvasPanelTab === 'compiled' ? 'Output' : 'Canvas'}</span>
-            </button>
-          </div>
-        {/if}
+        <div class="mobile-settings-section">
+          <h2>Canvas & console</h2>
+          <button class="mobile-setting-row" type="button" onclick={() => appState.toggleFps()}>
+            <span>
+              <strong>FPS overlay</strong>
+              <small>Show frame rate on the sketch canvas.</small>
+            </span>
+            <span class:active={appState.showFps} class="mobile-toggle">{appState.showFps ? 'On' : 'Off'}</span>
+          </button>
+          <button class="mobile-setting-row" type="button" onclick={() => appState.toggleDebugConsole()}>
+            <span>
+              <strong>Debug console</strong>
+              <small>Emit runtime debug output while queries run.</small>
+            </span>
+            <span class:active={appState.debugConsole} class="mobile-toggle">{appState.debugConsole ? 'On' : 'Off'}</span>
+          </button>
+          <button class="mobile-setting-row" type="button" onclick={() => appState.setCanvasPanelTab(appState.canvasPanelTab === 'canvas' ? 'compiled' : 'canvas')}>
+            <span>
+              <strong>Canvas output</strong>
+              <small>Switch between rendered canvas and output.</small>
+            </span>
+            <span class="mobile-toggle active">{appState.canvasPanelTab === 'compiled' ? 'Output' : 'Canvas'}</span>
+          </button>
+        </div>
       </section>
     {/if}
   </main>

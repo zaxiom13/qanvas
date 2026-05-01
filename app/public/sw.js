@@ -1,4 +1,4 @@
-const CACHE_NAME = 'qanvas5-pwa-v2';
+const CACHE_NAME = 'qanvas5-pwa-v3';
 const APP_SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 const OPTIONAL_SHELL = ['/qanvas-default-backend.json'];
 
@@ -28,7 +28,13 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
+    event.respondWith(
+      fetch(request).catch(async () => {
+        const cachedIndex = await caches.match('/index.html');
+        if (cachedIndex) return cachedIndex;
+        throw new Error('Qanvas app shell is not cached.');
+      }),
+    );
     return;
   }
 
@@ -36,14 +42,16 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       caches.open(CACHE_NAME).then(async (cache) => {
         const cached = await cache.match(request);
-        const fetched = fetch(request)
-          .then((response) => {
-            if (response.ok) cache.put(request, response.clone());
-            return response;
-          })
-          .catch(() => cached);
+        if (cached) {
+          void fetch(request).then((response) => {
+            if (response.ok) void cache.put(request, response.clone());
+          });
+          return cached;
+        }
 
-        return cached || fetched;
+        const fetched = await fetch(request);
+        if (fetched.ok) await cache.put(request, fetched.clone());
+        return fetched;
       }),
     );
   }

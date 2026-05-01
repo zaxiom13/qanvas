@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { EXAMPLES } from '../../src/lib/examples';
 
 test.use({
   viewport: { width: 390, height: 844 },
@@ -241,6 +242,37 @@ test('loads an example from the mobile examples tab', async ({ page }) => {
   await page.getByRole('button', { name: /hello circle/i }).click();
 
   await expect(page.getByLabel('q sketch editor')).toContainText(/circle/);
+});
+
+test('keeps every example running across mobile editor and canvas tab switches', async ({ page }) => {
+  test.setTimeout(90_000);
+  const pageErrors: string[] = [];
+  page.on('pageerror', (error) => pageErrors.push(error.message));
+
+  const nav = page.getByRole('navigation', { name: 'Mobile workspace' });
+  const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  await page.goto('/');
+
+  for (const example of EXAMPLES) {
+    await nav.getByRole('button', { name: 'Examples' }).click();
+    await page.getByRole('button', { name: new RegExp(escapeRegExp(example.name), 'i') }).click();
+    await page.getByRole('button', { name: 'Discard' }).click({ timeout: 750 }).catch(() => {});
+
+    await nav.getByRole('button', { name: 'Canvas' }).click();
+    await expect(page.getByLabel('Sketch canvas')).toBeVisible();
+    await page.waitForTimeout(120);
+
+    await nav.getByRole('button', { name: 'Editor', exact: true }).click();
+    await expect(page.getByLabel('q sketch editor')).toBeVisible();
+    await page.waitForTimeout(80);
+
+    await nav.getByRole('button', { name: 'Canvas' }).click();
+    await expect(page.getByLabel('Sketch canvas')).toBeVisible();
+    await expect(page.locator('.sketch-overlay--error'), example.id).toHaveCount(0);
+  }
+
+  expect(pageErrors).toEqual([]);
 });
 
 test('exposes working controls in the mobile settings tab', async ({ page }) => {

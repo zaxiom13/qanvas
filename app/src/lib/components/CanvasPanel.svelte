@@ -55,7 +55,6 @@
   });
   let containerElement = $state<HTMLDivElement | null>(null);
   let frameHandle = 0;
-  let frameNumber = 0;
   let startTime = 0;
   let lastTime = 0;
   let activeRunNonce = -1;
@@ -260,6 +259,7 @@
 
       const size = surface.getSize();
       appState.setCanvasSize(size as [number, number]);
+      const frameNumber = appState.debugFrameNumber;
 
       const commands = await browserGateway.runtime.frame({
         frameInfo: {
@@ -285,7 +285,6 @@
       }
 
       appState.setFps(surface.updateFps(now));
-      frameNumber += 1;
       appState.recordRenderedFrame(allowPaused ? 'manual' : 'continuous');
       lastTime = now;
     } catch (error) {
@@ -316,7 +315,6 @@
     if (!appState.running || appState.paused) return;
 
     if (reset) {
-      frameNumber = 0;
       startTime = 0;
       lastTime = 0;
       activeRunNonce = appState.runNonce;
@@ -400,7 +398,6 @@
     if (nonce !== activeRunNonce && appState.running) {
       renderCommands(appState.runtimeStartCommands);
       if (appState.paused) {
-        frameNumber = 0;
         startTime = 0;
         lastTime = 0;
         activeRunNonce = nonce;

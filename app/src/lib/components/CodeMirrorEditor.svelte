@@ -21,8 +21,7 @@
     type Completion,
     type CompletionContext,
   } from '@codemirror/autocomplete';
-  import Pickr from '@simonwep/pickr';
-  import '@simonwep/pickr/dist/themes/nano.min.css';
+  import type Pickr from '@simonwep/pickr';
   import {
     findInlineControlLiteral,
     formatInlineControlValue,
@@ -66,6 +65,7 @@
   let inlineColorPickr: Pickr | null = null;
   let inlineColorPickrAnchor = '';
   let inlineColorPickrIsSyncing = false;
+  let pickrModulePromise: Promise<typeof import('@simonwep/pickr')> | null = null;
   let touchSelection:
     | {
         identifier: number;
@@ -578,7 +578,15 @@
     }
   }
 
-  function ensureColorPickr(node: HTMLButtonElement, literal: ColorInlineControlLiteral & { lineNumber: number }) {
+  function loadPickr() {
+    pickrModulePromise ??= Promise.all([
+      import('@simonwep/pickr'),
+      import('@simonwep/pickr/dist/themes/nano.min.css'),
+    ]).then(([module]) => module);
+    return pickrModulePromise;
+  }
+
+  async function ensureColorPickr(node: HTMLButtonElement, literal: ColorInlineControlLiteral & { lineNumber: number }) {
     const anchor = getLiteralAnchor(literal);
     if (inlineColorPickr && inlineColorPickrAnchor === anchor) {
       inlineColorPickrIsSyncing = true;
@@ -588,8 +596,11 @@
     }
 
     teardownColorPickr();
+    const PickrModule = await loadPickr();
+    if (!activeInlineLiteral || activeInlineLiteral.kind !== 'color' || getLiteralAnchor(activeInlineLiteral) !== anchor || !node.isConnected) return;
+
     inlineColorPickrAnchor = anchor;
-    inlineColorPickr = Pickr.create({
+    inlineColorPickr = PickrModule.default.create({
       el: node,
       theme: 'nano',
       useAsButton: true,
@@ -862,7 +873,7 @@
   $effect(() => {
     if (!activeInlineLiteral) return;
     const triggerNode = inlineControlHost?.querySelector<HTMLButtonElement>('.qanvas-inline-control__pickr-trigger');
-    if (triggerNode) ensureColorPickr(triggerNode, activeInlineLiteral);
+    if (triggerNode) void ensureColorPickr(triggerNode, activeInlineLiteral);
   });
 </script>
 

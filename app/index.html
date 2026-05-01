@@ -18,8 +18,273 @@
       href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
       rel="stylesheet"
     />
+    <style>
+      body {
+        margin: 0;
+        background: #f7f1e9;
+      }
+
+      #qanvas-boot-fallback {
+        display: flex;
+        flex-direction: column;
+        height: 100dvh;
+        min-height: 0;
+        overflow: hidden;
+        background: #f7f1e9;
+        color: #2c2520;
+        font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      }
+
+      #qanvas-boot-fallback .boot-mobile-header {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: max(16px, env(safe-area-inset-top)) 18px 12px;
+        border-bottom: 1px solid rgba(44, 37, 32, 0.12);
+        background: #ede6da;
+      }
+
+      #qanvas-boot-fallback .boot-brand {
+        font-size: 26px;
+        font-weight: 800;
+        line-height: 1;
+      }
+
+      #qanvas-boot-fallback .boot-brand-q {
+        color: #d95f3d;
+      }
+
+      #qanvas-boot-fallback .boot-brand-5 {
+        color: #5b6fe8;
+      }
+
+      #qanvas-boot-fallback .boot-subtitle,
+      #qanvas-boot-fallback .boot-line {
+        color: #7a6e62;
+        font-size: 12px;
+        margin: 4px 0 0;
+      }
+
+      #qanvas-boot-fallback .boot-action {
+        display: grid;
+        place-items: center;
+        width: 48px;
+        height: 48px;
+        border: 1px solid rgba(44, 37, 32, 0.14);
+        border-radius: 8px;
+        background: #f8f4ec;
+        color: #2c2520;
+        box-shadow: 0 2px 5px rgba(70, 50, 34, 0.12);
+      }
+
+      #qanvas-boot-fallback .boot-action svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      #qanvas-boot-fallback .boot-main {
+        position: relative;
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      #qanvas-boot-fallback .boot-editor-panel {
+        display: flex;
+        flex-direction: column;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      #qanvas-boot-fallback .boot-filebar {
+        flex: 0 0 auto;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 48px;
+        padding: 6px 10px;
+        border-bottom: 1px solid rgba(44, 37, 32, 0.12);
+        background: #f4ede3;
+      }
+
+      #qanvas-boot-fallback .boot-file-tab,
+      #qanvas-boot-fallback .boot-run,
+      #qanvas-boot-fallback .boot-file-tool {
+        border: 1px solid rgba(44, 37, 32, 0.12);
+        border-radius: 7px;
+        background: #fffdf9;
+        box-shadow: 0 1px 2px rgba(70, 50, 34, 0.08);
+      }
+
+      #qanvas-boot-fallback .boot-file-tab {
+        flex: 1 1 auto;
+        min-width: 0;
+        height: 36px;
+        max-width: 156px;
+      }
+
+      #qanvas-boot-fallback .boot-run,
+      #qanvas-boot-fallback .boot-file-tool {
+        flex: 0 0 auto;
+        width: 38px;
+        height: 36px;
+      }
+
+      #qanvas-boot-fallback .boot-editor {
+        flex: 1 1 auto;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 44px 1fr;
+        overflow: hidden;
+        background: #fffdf9;
+        font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 13px;
+        line-height: 1.65;
+      }
+
+      #qanvas-boot-fallback .boot-gutter {
+        padding: 18px 0;
+        border-right: 1px solid #e0d8cc;
+        background: #f7f1e9;
+        color: #b5a799;
+        text-align: right;
+      }
+
+      #qanvas-boot-fallback .boot-gutter div {
+        padding-right: 8px;
+      }
+
+      #qanvas-boot-fallback .boot-code {
+        padding: 18px 16px 18px 10px;
+        overflow: hidden;
+        white-space: pre-wrap;
+      }
+
+      #qanvas-boot-fallback .boot-console {
+        flex: 0 0 auto;
+        min-height: 140px;
+        padding: 8px 12px 12px;
+        border-top: 1px solid rgba(44, 37, 32, 0.12);
+        background: #ebe3d8;
+        box-shadow: 0 -12px 26px rgba(70, 50, 34, 0.12);
+      }
+
+      #qanvas-boot-fallback .boot-console-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 5px;
+        min-height: 40px;
+        padding: 0 8px;
+        border: 1px solid rgba(44, 37, 32, 0.12);
+        border-radius: 6px;
+        background: #ede6da;
+        color: #2c2520;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      #qanvas-boot-fallback .boot-pill {
+        height: 26px;
+        min-width: 42px;
+        border: 1px solid rgba(44, 37, 32, 0.12);
+        border-radius: 6px;
+        background: #fffdf9;
+      }
+
+      #qanvas-boot-fallback .boot-console-lines {
+        margin-top: 8px;
+        color: #7a6e62;
+        font-size: 12px;
+      }
+
+      #qanvas-boot-fallback .boot-nav {
+        flex: 0 0 auto;
+        z-index: 5;
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        padding: 10px 10px calc(env(safe-area-inset-bottom) + 10px);
+        border-top: 1px solid rgba(44, 37, 32, 0.12);
+        background: #f0e8dd;
+        box-shadow: 0 -10px 24px rgba(70, 50, 34, 0.13);
+      }
+
+      #qanvas-boot-fallback .boot-nav-item {
+        display: grid;
+        place-items: center;
+        gap: 5px;
+        min-height: 62px;
+        border-radius: 8px;
+        color: #7a6e62;
+        font-size: 11px;
+      }
+
+      #qanvas-boot-fallback .boot-nav-item.active {
+        background: #e6e9fb;
+        color: #3f53c8;
+      }
+
+      #qanvas-boot-fallback .boot-nav-icon {
+        width: 24px;
+        height: 24px;
+        border-radius: 6px;
+        border: 1px solid currentColor;
+        opacity: 0.55;
+      }
+
+      @media (min-width: 761px) and (pointer: fine) {
+        #qanvas-boot-fallback {
+          display: none;
+        }
+      }
+    </style>
   </head>
   <body>
+    <div id="qanvas-boot-fallback" aria-hidden="true">
+      <header class="boot-mobile-header">
+        <div>
+          <div class="boot-brand"><span class="boot-brand-q">q</span>anvas<span class="boot-brand-5">5</span></div>
+          <p class="boot-subtitle">kdb+/q creative coding</p>
+        </div>
+        <div class="boot-action">
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+            <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+          </svg>
+        </div>
+      </header>
+      <main class="boot-main">
+        <section class="boot-editor-panel">
+          <div class="boot-filebar">
+            <div class="boot-file-tab"></div>
+            <div class="boot-run"></div>
+            <div class="boot-file-tool"></div>
+          </div>
+          <div class="boot-editor">
+            <div class="boot-gutter"></div>
+            <div class="boot-code"></div>
+          </div>
+          <div class="boot-console">
+            <div class="boot-console-toolbar">
+              <span>Console</span>
+              <span class="boot-pill"></span>
+              <span class="boot-pill"></span>
+              <span class="boot-pill"></span>
+            </div>
+            <div class="boot-console-lines">Qanvas5 ready.</div>
+          </div>
+        </section>
+      </main>
+      <nav class="boot-nav">
+        <div class="boot-nav-item active"><span class="boot-nav-icon"></span><span>Editor</span></div>
+        <div class="boot-nav-item"><span class="boot-nav-icon"></span><span>Canvas</span></div>
+        <div class="boot-nav-item"><span class="boot-nav-icon"></span><span>Examples</span></div>
+        <div class="boot-nav-item"><span class="boot-nav-icon"></span><span>Settings</span></div>
+      </nav>
+    </div>
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

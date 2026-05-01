@@ -1,28 +1,67 @@
 <script lang="ts">
-  import Toolbar from './lib/components/Toolbar.svelte';
-  import EditorPanel from './lib/components/EditorPanel.svelte';
-  import CanvasPanel from './lib/components/CanvasPanel.svelte';
-  import PracticePanel from './lib/components/PracticePanel.svelte';
-  import ConsolePanel from './lib/components/ConsolePanel.svelte';
-  import SettingsModal from './lib/components/modals/SettingsModal.svelte';
-  import NewFileModal from './lib/components/modals/NewFileModal.svelte';
-  import UnsavedModal from './lib/components/modals/UnsavedModal.svelte';
-  import ExamplesModal from './lib/components/modals/ExamplesModal.svelte';
-  import ProjectsModal from './lib/components/modals/ProjectsModal.svelte';
-  import ExportGifModal from './lib/components/modals/ExportGifModal.svelte';
-  import InfoModal from './lib/components/modals/InfoModal.svelte';
-  import MobileShell from './lib/mobile/MobileShell.svelte';
-  import UxTour from './lib/components/UxTour.svelte';
+  import { onMount, tick, type Component } from 'svelte';
   import { appState } from './lib/state/app-state.svelte';
 
+  type LayoutName = 'mobile' | 'desktop';
+  type ModalName = Exclude<typeof appState.activeModal, null>;
+
+  const layoutLoaders = {
+    mobile: () => import('./lib/mobile/MobileShell.svelte'),
+    desktop: () => import('./lib/components/DesktopShell.svelte'),
+  } satisfies Record<LayoutName, () => Promise<{ default: Component }>>;
+
+  const modalLoaders = {
+    settings: () => import('./lib/components/modals/SettingsModal.svelte'),
+    'new-file': () => import('./lib/components/modals/NewFileModal.svelte'),
+    unsaved: () => import('./lib/components/modals/UnsavedModal.svelte'),
+    examples: () => import('./lib/components/modals/ExamplesModal.svelte'),
+    projects: () => import('./lib/components/modals/ProjectsModal.svelte'),
+    'export-gif': () => import('./lib/components/modals/ExportGifModal.svelte'),
+    info: () => import('./lib/components/modals/InfoModal.svelte'),
+  } satisfies Record<ModalName, () => Promise<{ default: Component }>>;
+
   let isMobileLayout = $state(false);
+  let activeLayout = $state<LayoutName | null>(null);
+  let LayoutComponent = $state<Component | null>(null);
+  let ModalComponent = $state<Component | null>(null);
+  let UxTourComponent = $state<Component | null>(null);
+  let layoutLoadToken = 0;
+  let modalLoadToken = 0;
+  let bootFallbackRemoved = false;
 
-  $effect(() => {
-    if (typeof window === 'undefined') return;
+  async function loadLayout(layout: LayoutName) {
+    const token = ++layoutLoadToken;
+    activeLayout = layout;
+    LayoutComponent = null;
+    const module = await layoutLoaders[layout]();
+    if (token === layoutLoadToken) LayoutComponent = module.default;
+  }
 
+  async function loadModal(modal: ModalName | null) {
+    const token = ++modalLoadToken;
+    if (!modal) {
+      ModalComponent = null;
+      return;
+    }
+
+    const module = await modalLoaders[modal]();
+    if (token === modalLoadToken && appState.activeModal === modal) ModalComponent = module.default;
+  }
+
+  async function signalBootReady() {
+    if (bootFallbackRemoved || !LayoutComponent) return;
+    bootFallbackRemoved = true;
+    await tick();
+    window.dispatchEvent(new CustomEvent('qanvas:app-ready'));
+  }
+
+  onMount(() => {
     const media = window.matchMedia('(max-width: 760px), (pointer: coarse) and (max-width: 1024px)');
     const update = () => {
-      isMobileLayout = media.matches;
+      const nextMobile = media.matches;
+      const nextLayout: LayoutName = nextMobile ? 'mobile' : 'desktop';
+      isMobileLayout = nextMobile;
+      if (activeLayout !== nextLayout) void loadLayout(nextLayout);
     };
 
     update();
@@ -32,33 +71,32 @@
       media.removeEventListener('change', update);
     };
   });
+
+  $effect(() => {
+    void loadModal(appState.activeModal);
+  });
+
+  $effect(() => {
+    if (appState.isOnTour || appState.uxTourActive) {
+      void import('./lib/components/UxTour.svelte').then((module) => {
+        UxTourComponent = module.default;
+      });
+    }
+  });
+
+  $effect(() => {
+    void signalBootReady();
+  });
 </script>
 
-{#if isMobileLayout}
-  <MobileShell />
-{:else}
-  <div class="app-root">
-    <Toolbar />
-
-    <main id="workspace">
-      {#if appState.workspaceMode === 'practice'}
-        <EditorPanel />
-        <PracticePanel />
-      {:else}
-        <EditorPanel />
-        <CanvasPanel />
-      {/if}
-    </main>
-
-    <ConsolePanel />
-  </div>
+{#if LayoutComponent}
+  <LayoutComponent />
 {/if}
 
-<SettingsModal />
-<NewFileModal />
-<UnsavedModal />
-<ExamplesModal />
-<ProjectsModal />
-<ExportGifModal />
-<InfoModal />
-<UxTour mobile={isMobileLayout} />
+{#if ModalComponent}
+  <ModalComponent />
+{/if}
+
+{#if UxTourComponent}
+  <UxTourComponent mobile={isMobileLayout} />
+{/if}

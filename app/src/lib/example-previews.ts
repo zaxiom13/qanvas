@@ -36,3 +36,7 @@ export const examplePreviewSrc = {
 export function getExamplePreviewSrc(exampleId: string) {
   return examplePreviewSrc[exampleId as keyof typeof examplePreviewSrc] ?? null;
 }
+
+export function getAllExamplePreviewSrcs() {
+  return Object.values(examplePreviewSrc);
+}
