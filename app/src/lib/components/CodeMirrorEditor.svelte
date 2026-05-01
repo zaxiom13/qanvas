@@ -274,8 +274,8 @@
     twoFingerPan.lastMidY = midY;
 
     const scroller = currentView.scrollDOM;
-    scroller.scrollLeft += dx;
-    scroller.scrollTop += dy;
+    scroller.scrollLeft -= dx;
+    scroller.scrollTop -= dy;
   }
 
   function clearTwoFingerPanIfNeeded(event: TouchEvent) {

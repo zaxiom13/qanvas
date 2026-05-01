@@ -205,7 +205,7 @@ test('scrolls the mobile editor with two-finger pan on the code surface', async 
   });
 
   expect(scrollDelta).not.toBeNull();
-  expect(scrollDelta!).toBeGreaterThan(scrollBefore + 40);
+  expect(scrollDelta!).toBeLessThan(scrollBefore - 40);
 });
 
 test('highlights q syntax in the mobile editor', async ({ page }) => {
