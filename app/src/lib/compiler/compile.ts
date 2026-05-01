@@ -1,5 +1,6 @@
 import { parse } from '@qpad/engine';
 import { lowerProgram, type LoweredExpression, type LoweredLambda, type LoweredProgram, type LoweredStatement } from './lower';
+import { COMPILED_BUILTIN_CALLS } from '../runtime/compiled-runtime-helpers';
 
 export function compileSketch(source: string): CompiledSketchResult {
   try {
@@ -130,54 +131,12 @@ function emitCallExpression(expression: Extract<LoweredExpression, { kind: 'call
 }
 
 function isBuiltinCall(name: string) {
-  return BUILTIN_CALLS.has(name) || isDerivedPrimitiveAdverb(name);
+  return COMPILED_BUILTIN_CALLS.has(name) || isDerivedPrimitiveAdverb(name);
 }
 
 function isDerivedPrimitiveAdverb(name: string) {
   return /^[+\-*%&|,][/\\]$/.test(name);
 }
-
-const BUILTIN_CALLS = new Set([
-  'background',
-  'circle',
-  'rect',
-  'line',
-  'text',
-  'image',
-  'first',
-  'last',
-  'count',
-  'til',
-  'floor',
-  'ceiling',
-  'flip',
-  'enlist',
-  'raze',
-  'reverse',
-  'sum',
-  'prd',
-  'sums',
-  'prds',
-  'mins',
-  'maxs',
-  'avgs',
-  'avg',
-  'min',
-  'max',
-  'sin',
-  'cos',
-  'tan',
-  'asin',
-  'acos',
-  'atan',
-  'sqrt',
-  'abs',
-  'exp',
-  'log',
-  'neg',
-  'reciprocal',
-  'signum',
-]);
 
 function indent(level: number) {
   return '  '.repeat(level);

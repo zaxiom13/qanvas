@@ -1,4 +1,10 @@
+import { formatDisplayValue } from '../formatting/value-format';
+
 export type CompiledRuntimeHelpers = ReturnType<typeof createCompiledRuntimeHelpers>;
+
+type CompiledRuntimeHelperOptions = {
+  onStdout?: (text: string) => void;
+};
 
 export const QANVAS_COLORS = {
   INK: 0x0D0D1F,
@@ -23,7 +29,50 @@ export function isPlainObject(value: unknown): value is Record<string, unknown> 
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
 
-export function createCompiledRuntimeHelpers() {
+export const COMPILED_BUILTIN_CALLS = new Set([
+  'background',
+  'circle',
+  'rect',
+  'line',
+  'text',
+  'image',
+  'show',
+  'first',
+  'last',
+  'count',
+  'til',
+  'floor',
+  'ceiling',
+  'flip',
+  'enlist',
+  'raze',
+  'reverse',
+  'sum',
+  'prd',
+  'sums',
+  'prds',
+  'mins',
+  'maxs',
+  'avgs',
+  'avg',
+  'min',
+  'max',
+  'sin',
+  'cos',
+  'tan',
+  'asin',
+  'acos',
+  'atan',
+  'sqrt',
+  'abs',
+  'exp',
+  'log',
+  'neg',
+  'reciprocal',
+  'signum',
+]);
+
+export function createCompiledRuntimeHelpers(options: CompiledRuntimeHelperOptions = {}) {
   let commands: Record<string, unknown>[] = [];
 
   function mapBinary(left: unknown, right: unknown, fn: (leftValue: unknown, rightValue: unknown) => unknown): unknown {
@@ -85,6 +134,9 @@ export function createCompiledRuntimeHelpers() {
         case 'text':
         case 'image':
           commands.push({ kind: name, data: args[0] });
+          return args[0];
+        case 'show':
+          options.onStdout?.(formatDisplayValue(args[0]));
           return args[0];
         case 'first':
           return Array.isArray(args[0]) ? args[0][0] : null;

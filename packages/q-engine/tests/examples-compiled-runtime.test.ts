@@ -124,6 +124,42 @@ describe("compiled example runtime", () => {
     expect(commands.some((c) => c.kind === "circle")).toBe(true);
   });
 
+  it("broadcasts point vectors over general lists in compiled draw tables", () => {
+    const source = `setup:{
+  \`size\`bg!(539 1048;0)
+}
+draw:{[state;frameInfo;input;canvas]
+  circle[([]
+    p:(2#enlist 0.5*canvas\`size)+(0 0;72 72);
+    r:44 28;
+    fill:(Color.BLUE;Color.CORAL);
+    alpha:0.92 0.82
+  )];
+  state
+}`;
+    const compiled = compileSketch(source);
+    expect(compiled.status).toBe("compiled");
+    const module = new Function(`return ${compiled.code};`)() as {
+      setup: (rt: ReturnType<typeof createCompiledRuntimeHelpers>) => unknown;
+      draw: (
+        state: unknown,
+        frameInfo: Record<string, unknown>,
+        input: Record<string, unknown>,
+        canvas: Record<string, unknown>,
+        rt: ReturnType<typeof createCompiledRuntimeHelpers>
+      ) => unknown;
+    };
+    const rt = createCompiledRuntimeHelpers();
+    const state = module.setup(rt);
+    rt.takeCommands();
+    module.draw(state, { frameNum: 1 }, {}, { size: [539, 1048], pixelRatio: 1 }, rt);
+    const circleCommand = rt.takeCommands().find((command) => command.kind === "circle") as { data: Array<{ p: [number, number] }> } | undefined;
+
+    expect(circleCommand?.data).toHaveLength(2);
+    expect(circleCommand!.data[0]!.p).toEqual([269.5, 524]);
+    expect(circleCommand!.data[1]!.p).toEqual([341.5, 596]);
+  });
+
   it("supports compiled reduction families and derived primitive over/scan forms", () => {
     const source = `setup:{\`size\`bg!(800 600;0)}
 draw:{[state;frameInfo;input;canvas]
@@ -151,6 +187,41 @@ draw:{[state;frameInfo;input;canvas]
     const rt = createCompiledRuntimeHelpers();
     const state = module.setup(rt);
     expect(module.draw(state, { frameNum: 1 }, {}, { size: [800, 600] }, rt)).toEqual([300, 300, 300, 300, 6, 4]);
+  });
+
+  it("emits show output from compiled setup and draw while returning the shown value", () => {
+    const source = `setup:{
+  show \`size\`bg!(800 600;0)
+}
+draw:{[state;frameInfo;input;canvas]
+  show 0.5*canvas\`size;
+  show 44+18*sin 0.05*frameInfo\`frameNum
+}`;
+    const compiled = compileSketch(source);
+    expect(compiled.status).toBe("compiled");
+    expect(compiled.code).toContain('rt.callBuiltin("show"');
+
+    const module = new Function(`return ${compiled.code};`)() as {
+      setup: (rt: ReturnType<typeof createCompiledRuntimeHelpers>) => unknown;
+      draw: (
+        state: unknown,
+        frameInfo: Record<string, unknown>,
+        input: Record<string, unknown>,
+        canvas: Record<string, unknown>,
+        rt: ReturnType<typeof createCompiledRuntimeHelpers>
+      ) => unknown;
+    };
+    const stdout: string[] = [];
+    const rt = createCompiledRuntimeHelpers({ onStdout: (text) => stdout.push(text) });
+    const state = module.setup(rt);
+    const result = module.draw(state, { frameNum: 1 }, {}, { size: [800, 600] }, rt);
+
+    expect(state).toEqual({ size: [800, 600], bg: 0 });
+    expect(result).toBeCloseTo(44.89962503124896);
+    expect(stdout[0]).toContain('"size": [800 600]');
+    expect(stdout[0]).toContain('"bg": 0');
+    expect(stdout[1]).toBe('[400 300]');
+    expect(Number(stdout[2])).toBeCloseTo(44.89962503124896);
   });
 
   it("keeps text-poster centered instead of collapsing to the corner", () => {

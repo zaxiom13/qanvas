@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSession } from "../src/index";
+import { createSession, parse, type AstNode } from "../src/index";
 import { EXAMPLES } from "../../../app/src/lib/examples";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
@@ -203,6 +203,129 @@ function normalizeRealQJson(value: unknown): unknown {
   );
 }
 
+type ParseShape = {
+  root: string | null;
+  assignments: string[];
+};
+
+function realQParseShape(tree: unknown): ParseShape {
+  const assignments: string[] = [];
+
+  let root = (() => {
+    if (Array.isArray(tree)) return typeof tree[0] === "string" ? tree[0] : null;
+    if (typeof tree === "string") return "lambda";
+    if (tree && typeof tree === "object") return "object";
+    return null;
+  })();
+
+  const visit = (node: unknown) => {
+    if (!Array.isArray(node)) return;
+    if (node[0] === ":" && typeof node[1] === "string") {
+      assignments.push(node[1]);
+    }
+    for (const child of node.slice(1)) visit(child);
+  };
+
+  visit(tree);
+  if (assignments.length > 1) root = "program";
+  return { root, assignments };
+}
+
+function localParseShape(ast: AstNode): ParseShape {
+  const assignments: string[] = [];
+
+  const rootOf = (node: AstNode): string | null => {
+    switch (node.kind) {
+      case "program":
+        return node.statements.length > 0 ? rootOf(node.statements[node.statements.length - 1]!) : null;
+      case "assign":
+      case "assignGlobal":
+        return ":";
+      case "binary":
+        return node.op;
+      case "call":
+        return rootOf(node.callee);
+      case "identifier":
+        return node.name;
+      case "lambda":
+        return "lambda";
+      case "select":
+      case "exec":
+        return "?";
+      case "update":
+        return "!";
+      case "delete":
+        return "_";
+      case "cond":
+        return "$";
+      case "if":
+        return "if";
+      case "while":
+        return "while";
+      case "do":
+        return "do";
+      case "return":
+        return ":";
+      case "group":
+        return rootOf(node.value);
+      default:
+        return node.kind;
+    }
+  };
+
+  const visit = (node: AstNode) => {
+    switch (node.kind) {
+      case "program":
+        node.statements.forEach(visit);
+        break;
+      case "assign":
+      case "assignGlobal":
+        assignments.push(node.name);
+        visit(node.value);
+        break;
+      default:
+        break;
+    }
+  };
+
+  visit(ast);
+  return { root: assignments.length > 1 ? "program" : rootOf(ast), assignments };
+}
+
+function runRealQParse(exampleCode: string): ParseShape {
+  const dir = mkdtempSync(join(tmpdir(), "qanvas-qparse-"));
+  const sourcePath = join(dir, "source.q");
+  const outputPath = join(dir, "parse.json");
+  const runnerPath = join(dir, "runner.q");
+
+  try {
+    writeFileSync(sourcePath, normalizeForEngine(exampleCode).replace(/\r\n/g, "\n"), "utf8");
+    writeFileSync(
+      runnerPath,
+      [
+        `source:"\\n" sv read0 \`:source.q`,
+        `(\`$":${outputPath}") 0: enlist .j.j parse source`,
+        "\\\\"
+      ].join("\n"),
+      "utf8"
+    );
+
+    const result = spawnSync(Q_BIN, [runnerPath], {
+      cwd: dir,
+      encoding: "utf8",
+      env: { ...process.env, QHOME: process.env.QHOME || `${process.env.HOME}/.kx` },
+    });
+
+    if (result.status !== 0) {
+      throw new Error(result.stderr || result.stdout || `q exited with code ${result.status}`);
+    }
+
+    return realQParseShape(JSON.parse(readFileSync(outputPath, "utf8")));
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+}
+
 function runInterpreter(exampleCode: string) {
   const session = createSession();
   session.evaluate(INTERPRETER_BOOT);
@@ -336,5 +459,12 @@ describe.skipIf(!hasRealQ)("guided examples real-q differential", () => {
       },
       20_000
     );
+
+    it(`has a q parse shape for ${example.id} that matches the client parser`, () => {
+      const clientShape = localParseShape(parse(normalizeForEngine(example.code)));
+      const realQShape = runRealQParse(example.code);
+
+      expect(clientShape).toEqual(realQShape);
+    });
   }
 });

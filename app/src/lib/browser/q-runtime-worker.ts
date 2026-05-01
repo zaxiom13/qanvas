@@ -442,7 +442,7 @@ function createCompiledRuntimeSession(files: SketchFile[], code: string): Compil
     throw new Error('Generated JS did not expose setup(rt) and draw(state, frameInfo, input, canvas, rt).');
   }
 
-  const helpers = createCompiledRuntimeHelpers();
+  const helpers = createCompiledRuntimeHelpers({ onStdout: emitStdout });
   helpers.resetCommands();
   const state = module.setup(helpers);
   const commands = helpers.takeCommands();

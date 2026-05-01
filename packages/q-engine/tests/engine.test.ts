@@ -167,6 +167,24 @@ describe("q engine smoke tests", () => {
     expect(formatValue(session.evaluate("key ([k:`a`b] v:10 20)").value)).toBe("k\n-\na\nb\n");
   });
 
+  it("matches real q for point-list table columns", () => {
+    const session = createSession();
+
+    expect(formatValue(session.evaluate("([] p:(400 300;472 372); r:44 28)").value)).toBe(
+      "p       r\n---------\n400 300 44\n472 372 28\n"
+    );
+    expect(
+      formatValue(
+        session.evaluate("canvas:(enlist `size)!enlist 800 600; ([] p:(0.5*canvas`size)+(0;72); r:44 28)").value
+      )
+    ).toBe("p    r\n------\n400f 44\n372f 28\n");
+    expect(
+      formatValue(
+        session.evaluate("canvas:(enlist `size)!enlist 800 600; ([] p:(2#enlist 0.5*canvas`size)+(0 0;72 72); r:44 28)").value
+      )
+    ).toBe("p        r\n----------\n400 300f 44\n472 372f 28\n");
+  });
+
   it("supports q reshape with variadic take and matrix indexing", () => {
     const session = createSession();
     expect(formatValue(session.evaluate("4 5#\"abcdefghijklmnopqrst\"").value)).toBe(
