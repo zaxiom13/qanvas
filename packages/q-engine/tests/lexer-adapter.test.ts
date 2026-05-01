@@ -44,4 +44,13 @@ describe("KDBLex adapter", () => {
         { kind: "eof" }
       ]);
   });
+
+  it("keeps adverb slashes before closing delimiters as operators, not comments", () => {
+    expect(lexKdbLex("({y+.cx.mul[x;x]}/)each").some((token) => token.kind === "comment")).toBe(false);
+    expect(lexKdbLex("({y+.cx.mul[x;x]} /)each").some((token) => token.kind === "comment")).toBe(false);
+    expect(lexKdbLex("(.cx.new/)each").some((token) => token.kind === "comment")).toBe(false);
+    expect(lexKdbLex("(.cx.new /)each").some((token) => token.kind === "comment")).toBe(false);
+    expect(tokenize("(.cx.new /)each").filter((token) => token.kind === "operator").map((token) => token.value))
+      .toContain("/");
+  });
 });

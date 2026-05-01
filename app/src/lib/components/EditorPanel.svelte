@@ -8,10 +8,16 @@
   let dragCleanup = () => {};
 
   function handleGlobalShortcuts() {
-    const saveHandler = () => void appState.saveProject(false);
+    const saveHandler = () => {
+      if (appState.workspaceMode === 'studio') void appState.saveProject(false);
+    };
     const exampleHandler = () => (appState.activeModal = appState.activeModal === 'examples' ? null : 'examples');
-    const projectsHandler = () => appState.openProjectsModal();
-    const newHandler = () => void appState.createNewSketch();
+    const projectsHandler = () => {
+      if (appState.workspaceMode === 'studio') appState.openProjectsModal();
+    };
+    const newHandler = () => {
+      if (appState.workspaceMode === 'studio') void appState.createNewSketch();
+    };
 
     window.addEventListener('qanvas:save', saveHandler as EventListener);
     window.addEventListener('qanvas:toggle-examples', exampleHandler as EventListener);

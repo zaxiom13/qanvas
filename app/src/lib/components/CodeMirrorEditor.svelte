@@ -36,6 +36,7 @@
     Q_COLOR_SYMBOLS,
     Q_CONTEXT_SYMBOLS,
     Q_KEYWORDS,
+    Q_NAMESPACE_SYMBOLS,
     Q_SLASH_SNIPPETS,
   } from '$lib/editor/q-language';
   import { qMobileEditorHighlightStyle } from '$lib/mobile/q-highlight-html';
@@ -546,6 +547,15 @@
     } satisfies Completion)
   );
 
+  const mobileNamespaceCompletions = Q_NAMESPACE_SYMBOLS.map((item) =>
+    mergeCompletionDocumentationIntoDetail({
+      label: item.label,
+      detail: item.detail,
+      info: item.documentation,
+      type: item.type,
+    } satisfies Completion)
+  );
+
   const mobileBuiltinCompletions = Q_BUILTIN_FUNCTIONS.map((label) =>
     mergeCompletionDocumentationIntoDetail({
       label,
@@ -578,6 +588,7 @@
     ...mobileQanvasCompletions,
     ...mobileContextCompletions,
     ...mobileColorCompletions,
+    ...mobileNamespaceCompletions,
     ...mobileBuiltinCompletions,
     ...mobileKeywordCompletions,
   ]);

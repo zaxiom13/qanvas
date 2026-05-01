@@ -232,6 +232,78 @@ export const Q_BUILTIN_FUNCTIONS = [
   'use',
 ];
 
+export const Q_NAMESPACE_SYMBOLS = [
+  { label: '.cx._usage', detail: 'complex helper', documentation: 'Usage notes for the built-in complex-number helper namespace.', type: 'variable' },
+  { label: '.cx.abs', detail: 'complex helper', documentation: 'Magnitude of a complex value.', type: 'function' },
+  { label: '.cx.add', detail: 'complex helper', documentation: 'Add two complex values.', type: 'function' },
+  { label: '.cx.arg', detail: 'complex helper', documentation: 'Phase angle of a complex value.', type: 'function' },
+  { label: '.cx.ceil', detail: 'complex helper', documentation: 'Ceiling of the real and imaginary parts.', type: 'function' },
+  { label: '.cx.conj', detail: 'complex helper', documentation: 'Complex conjugate.', type: 'function' },
+  { label: '.cx.cos', detail: 'complex helper', documentation: 'Complex cosine.', type: 'function' },
+  { label: '.cx.div', detail: 'complex helper', documentation: 'Divide two complex values.', type: 'function' },
+  { label: '.cx.exp', detail: 'complex helper', documentation: 'Complex exponential.', type: 'function' },
+  { label: '.cx.floor', detail: 'complex helper', documentation: 'Floor of the real and imaginary parts.', type: 'function' },
+  { label: '.cx.frac', detail: 'complex helper', documentation: 'Fractional part of a complex value.', type: 'function' },
+  { label: '.cx.from', detail: 'complex helper', documentation: 'Coerce a q value into a complex value.', type: 'function' },
+  { label: '.cx.fromPolar', detail: 'complex helper', documentation: 'Build a complex value from radius and angle.', type: 'function' },
+  { label: '.cx.i', detail: 'complex constant', documentation: 'The imaginary unit.', type: 'constant' },
+  { label: '.cx.im', detail: 'complex helper', documentation: 'Imaginary component of a complex value.', type: 'function' },
+  { label: '.cx.log', detail: 'complex helper', documentation: 'Complex natural logarithm.', type: 'function' },
+  { label: '.cx.mod', detail: 'complex helper', documentation: 'Complex modulo.', type: 'function' },
+  { label: '.cx.modulus', detail: 'complex helper', documentation: 'Magnitude of a complex value.', type: 'function' },
+  { label: '.cx.mul', detail: 'complex helper', documentation: 'Multiply two complex values.', type: 'function' },
+  { label: '.cx.neg', detail: 'complex helper', documentation: 'Negate a complex value.', type: 'function' },
+  { label: '.cx.new', detail: 'complex helper', documentation: 'Build a complex value from real and imaginary parts.', type: 'function' },
+  { label: '.cx.normalize', detail: 'complex helper', documentation: 'Normalize a complex value to unit magnitude.', type: 'function' },
+  { label: '.cx.one', detail: 'complex constant', documentation: 'Complex one.', type: 'constant' },
+  { label: '.cx.polar', detail: 'complex helper', documentation: 'Return radius and angle for a complex value.', type: 'function' },
+  { label: '.cx.pow', detail: 'complex helper', documentation: 'Raise a complex value to a power.', type: 'function' },
+  { label: '.cx.powEach', detail: 'complex helper', documentation: 'Element-wise complex power helper.', type: 'function' },
+  { label: '.cx.re', detail: 'complex helper', documentation: 'Real component of a complex value.', type: 'function' },
+  { label: '.cx.recip', detail: 'complex helper', documentation: 'Reciprocal of a complex value.', type: 'function' },
+  { label: '.cx.round', detail: 'complex helper', documentation: 'Round the real and imaginary parts.', type: 'function' },
+  { label: '.cx.sin', detail: 'complex helper', documentation: 'Complex sine.', type: 'function' },
+  { label: '.cx.sqrt', detail: 'complex helper', documentation: 'Complex square root.', type: 'function' },
+  { label: '.cx.str', detail: 'complex helper', documentation: 'Format a complex value as text.', type: 'function' },
+  { label: '.cx.sub', detail: 'complex helper', documentation: 'Subtract two complex values.', type: 'function' },
+  { label: '.cx.tan', detail: 'complex helper', documentation: 'Complex tangent.', type: 'function' },
+  { label: '.cx.z', detail: 'complex helper', documentation: 'Alias for .cx.new.', type: 'function' },
+  { label: '.cx.zero', detail: 'complex constant', documentation: 'Complex zero.', type: 'constant' },
+  { label: '.Q.A', detail: '.Q constant', documentation: 'Uppercase alphabet string.', type: 'constant' },
+  { label: '.Q.K', detail: '.Q constant', documentation: 'Null date constant.', type: 'constant' },
+  { label: '.Q.M', detail: '.Q constant', documentation: 'Maximum long/infinity helper.', type: 'constant' },
+  { label: '.Q.a', detail: '.Q constant', documentation: 'Lowercase alphabet string.', type: 'constant' },
+  { label: '.Q.addmonths', detail: '.Q built-in', documentation: 'Add months to date values.', type: 'function' },
+  { label: '.Q.an', detail: '.Q constant', documentation: 'Alphanumeric identifier characters.', type: 'constant' },
+  { label: '.Q.atob', detail: '.Q built-in', documentation: 'Decode base64 text.', type: 'function' },
+  { label: '.Q.b6', detail: '.Q constant', documentation: 'Base64 alphabet string.', type: 'constant' },
+  { label: '.Q.btoa', detail: '.Q built-in', documentation: 'Encode text as base64.', type: 'function' },
+  { label: '.Q.cols', detail: '.Q constant', documentation: 'Current console column count.', type: 'constant' },
+  { label: '.Q.def', detail: '.Q built-in', documentation: 'Apply defaults to parsed command-line options.', type: 'function' },
+  { label: '.Q.f', detail: '.Q built-in', documentation: 'Format floating values with fixed decimals.', type: 'function' },
+  { label: '.Q.fmt', detail: '.Q built-in', documentation: 'Format numbers with width and decimal precision.', type: 'function' },
+  { label: '.Q.id', detail: '.Q built-in', documentation: 'Sanitize symbols, dictionaries, or table column names into valid q identifiers.', type: 'function' },
+  { label: '.Q.j10', detail: '.Q built-in', documentation: 'Decode a base-10 fixed-width encoded string.', type: 'function' },
+  { label: '.Q.j12', detail: '.Q built-in', documentation: 'Decode a base-12 fixed-width encoded string.', type: 'function' },
+  { label: '.Q.k', detail: '.Q constant', documentation: 'q version number.', type: 'constant' },
+  { label: '.Q.n', detail: '.Q constant', documentation: 'Digit string.', type: 'constant' },
+  { label: '.Q.nA', detail: '.Q constant', documentation: 'Base-36 alphabet string.', type: 'constant' },
+  { label: '.Q.opt', detail: '.Q built-in', documentation: 'Parse argv-style option values.', type: 'function' },
+  { label: '.Q.res', detail: '.Q constant', documentation: 'Reserved q words as symbols.', type: 'constant' },
+  { label: '.Q.rows', detail: '.Q constant', documentation: 'Current console row count.', type: 'constant' },
+  { label: '.Q.s', detail: '.Q built-in', documentation: 'Render a value using q formatting.', type: 'function' },
+  { label: '.Q.x10', detail: '.Q built-in', documentation: 'Encode a value with the base-10 fixed-width alphabet.', type: 'function' },
+  { label: '.Q.x12', detail: '.Q built-in', documentation: 'Encode a value with the base-12 fixed-width alphabet.', type: 'function' },
+  { label: '.z.D', detail: '.z value', documentation: 'Current date.', type: 'constant' },
+  { label: '.z.K', detail: '.z value', documentation: 'q version number.', type: 'constant' },
+  { label: '.z.P', detail: '.z value', documentation: 'Current timestamp.', type: 'constant' },
+  { label: '.z.T', detail: '.z value', documentation: 'Current time.', type: 'constant' },
+  { label: '.z.Z', detail: '.z value', documentation: 'Current timezone.', type: 'constant' },
+  { label: '.z.e', detail: '.z value', documentation: 'Environment variables.', type: 'constant' },
+  { label: '.z.o', detail: '.z value', documentation: 'Runtime/user-agent descriptor.', type: 'constant' },
+  { label: '.z.x', detail: '.z value', documentation: 'Command-line arguments.', type: 'constant' },
+] as const;
+
 export const Q_CANVAS_FUNCTIONS = [
   {
     label: 'background',
@@ -427,7 +499,7 @@ const Q_QANVAS_IDENTIFIERS = [
 ];
 
 const Q_KEYWORD_SET = new Set(Q_KEYWORDS.map((w) => w.toLowerCase()));
-const Q_BUILTIN_SET = new Set(Q_BUILTIN_FUNCTIONS.map((w) => w.toLowerCase()));
+const Q_BUILTIN_SET = new Set([...Q_BUILTIN_FUNCTIONS, ...Q_NAMESPACE_SYMBOLS.map((item) => item.label)].map((w) => w.toLowerCase()));
 const Q_QANVAS_SET = new Set(Q_QANVAS_IDENTIFIERS.map((w) => w.toLowerCase()));
 
 /**

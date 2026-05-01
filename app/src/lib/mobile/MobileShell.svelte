@@ -543,30 +543,32 @@
           </div>
         </div>
 
-        <div class="mobile-settings-section">
-          <h2>Canvas & console</h2>
-          <button class="mobile-setting-row" type="button" onclick={() => appState.toggleFps()}>
-            <span>
-              <strong>FPS overlay</strong>
-              <small>Show frame rate on the sketch canvas.</small>
-            </span>
-            <span class:active={appState.showFps} class="mobile-toggle">{appState.showFps ? 'On' : 'Off'}</span>
-          </button>
-          <button class="mobile-setting-row" type="button" onclick={() => appState.toggleDebugConsole()}>
-            <span>
-              <strong>Debug console</strong>
-              <small>Emit runtime debug output while queries run.</small>
-            </span>
-            <span class:active={appState.debugConsole} class="mobile-toggle">{appState.debugConsole ? 'On' : 'Off'}</span>
-          </button>
-          <button class="mobile-setting-row" type="button" onclick={() => appState.setCanvasPanelTab(appState.canvasPanelTab === 'canvas' ? 'compiled' : 'canvas')}>
-            <span>
-              <strong>Canvas output</strong>
-              <small>Switch between rendered canvas and output.</small>
-            </span>
-            <span class="mobile-toggle active">{appState.canvasPanelTab === 'compiled' ? 'Output' : 'Canvas'}</span>
-          </button>
-        </div>
+        {#if appState.workspaceMode === 'studio'}
+          <div class="mobile-settings-section">
+            <h2>Canvas & console</h2>
+            <button class="mobile-setting-row" type="button" onclick={() => appState.toggleFps()}>
+              <span>
+                <strong>FPS overlay</strong>
+                <small>Show frame rate on the sketch canvas.</small>
+              </span>
+              <span class:active={appState.showFps} class="mobile-toggle">{appState.showFps ? 'On' : 'Off'}</span>
+            </button>
+            <button class="mobile-setting-row" type="button" onclick={() => appState.toggleDebugConsole()}>
+              <span>
+                <strong>Debug console</strong>
+                <small>Emit runtime debug output while queries run.</small>
+              </span>
+              <span class:active={appState.debugConsole} class="mobile-toggle">{appState.debugConsole ? 'On' : 'Off'}</span>
+            </button>
+            <button class="mobile-setting-row" type="button" onclick={() => appState.setCanvasPanelTab(appState.canvasPanelTab === 'canvas' ? 'compiled' : 'canvas')}>
+              <span>
+                <strong>Canvas output</strong>
+                <small>Switch between rendered canvas and output.</small>
+              </span>
+              <span class="mobile-toggle active">{appState.canvasPanelTab === 'compiled' ? 'Output' : 'Canvas'}</span>
+            </button>
+          </div>
+        {/if}
       </section>
     {/if}
   </main>

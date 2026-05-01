@@ -248,7 +248,8 @@ function qLanguageTokens() {
   return {
     tokenizer: {
       root: [
-        [/\/.*$/, 'comment'],
+        [/(?:(?<=^)|(?<=[;\n]))[ \t]*\/(?!:)[^\n]*/, 'comment'],
+        [/(?<=[ \t])\/(?=[ \t])(?!:)[^\n]*/, 'comment'],
         [/^\\[a-z]+/, 'keyword'],
         [/\{/, 'delimiter.curly'],
         [/\}/, 'delimiter.curly'],
@@ -256,6 +257,7 @@ function qLanguageTokens() {
         [/`[a-zA-Z0-9._]*/, 'type'],
         [/"([^"\\]|\\.)*"/, 'string'],
         [/"\\?."/, 'string'],
+        [/\.(?:cx|Q|z)\.[a-zA-Z][a-zA-Z0-9_.]*/, 'keyword'],
         [/\b(select|from|where|by|update|delete|exec|insert|upsert|each|over|scan|prior|flip|enlist|count|first|last|avg|sum|min|max|all|any|not|neg|abs|sqrt|exp|log|sin|cos|tan|string|value|key|type|null|inf|asc|desc|iasc|idesc|distinct|group|ungroup|cols|meta|tables|views|load|save|get|set|til|do|while|if|and|or|like|ss|sv|vs|in|within|bin|binr|asof|aj|aj0|lj|lj0|ij|ij0|pj|uj|wj|wj1|fby|xasc|xdesc|xgroup|xcols|xcept|inter|union|diff|except)\b/, 'keyword'],
         [/[a-zA-Z_][a-zA-Z0-9_.]*/, 'identifier'],
         [/[+\-*%!@#$&|^~<>=?_,;:.]/, 'operator'],

@@ -114,6 +114,12 @@ describe("q engine smoke tests", () => {
     expect(formatValue(session.evaluate("n:(10;30);over[*;n]").value)).toBe("300\n");
   });
 
+  it("keeps comma-appended simple vectors reducible by primitive adverbs", () => {
+    const session = createSession();
+    expect(formatValue(session.evaluate("x:1 1,2; (+/) -2#x").value)).toBe("3\n");
+    expect(formatValue(session.evaluate("answer:{x,(+/) -2#x}/[8;1 1]; answer").value)).toBe("1 1 2 3 5 8 13 21 34 55\n");
+  });
+
   it("preserves dotted namespace members across lambda execution", () => {
     const session = createSession();
     const program = [

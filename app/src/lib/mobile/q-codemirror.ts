@@ -101,10 +101,9 @@ export const qLanguage = StreamLanguage.define<QStreamState>({
 
     if (stream.eatSpace()) return null;
 
-    const slice = line.slice(stream.pos);
-    if (!slice.length) return null;
+    if (stream.pos >= line.length) return null;
 
-    if (slice[0] === '"') {
+    if (line[stream.pos] === '"') {
       stream.start = stream.pos;
       let escaped = false;
       while (!stream.eol()) {
@@ -120,7 +119,7 @@ export const qLanguage = StreamLanguage.define<QStreamState>({
 
     let tokens: KdbLexToken[];
     try {
-      tokens = lexKdbLex(slice);
+      tokens = lexKdbLex(line);
     } catch {
       stream.next();
       return null;
@@ -133,9 +132,13 @@ export const qLanguage = StreamLanguage.define<QStreamState>({
       if (tok.kind === 'eof') break;
       if (tok.kind === 'whitespace' || tok.kind === 'newline') continue;
 
-      const absStart = stream.pos + tok.start;
-      const absEnd = stream.pos + tok.end;
+      const absStart = tok.start;
+      const absEnd = tok.end;
       if (absEnd <= stream.pos) continue;
+      if (absStart > stream.pos) {
+        stream.pos = absStart;
+        return null;
+      }
 
       stream.start = absStart;
       stream.pos = absEnd;

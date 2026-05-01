@@ -2482,18 +2482,30 @@ export const concatValues = (left: QValue, right: QValue): QValue => {
     return concatTables(left, right);
   }
   if (left.kind === "list" && right.kind === "list") {
-    return qList([...left.items, ...right.items], left.homogeneous && right.homogeneous);
+    const items = [...left.items, ...right.items];
+    return qList(items, concatItemsAreHomogeneous(items, left, right));
   }
   if (left.kind === "string" && right.kind === "string") {
     return qString(`${left.value}${right.value}`);
   }
   if (left.kind === "list") {
-    return qList([...left.items, right], false);
+    const items = [...left.items, right];
+    return qList(items, concatItemsAreHomogeneous(items, left));
   }
   if (right.kind === "list") {
-    return qList([left, ...right.items], false);
+    const items = [left, ...right.items];
+    return qList(items, concatItemsAreHomogeneous(items, right));
   }
-  return qList([left, right]);
+  const items = [left, right];
+  return qList(items, concatItemsAreHomogeneous(items));
+};
+
+const concatItemsAreHomogeneous = (items: QValue[], ...sources: QValue[]) => {
+  if (items.length === 0) return true;
+  if (sources.some((source) => source.kind === "list" && source.items.length > 0 && !(source.homogeneous ?? false))) {
+    return false;
+  }
+  return items.every((item) => item.kind === items[0]!.kind);
 };
 
 export const concatTables = (left: QTable, right: QTable): QTable => {

@@ -501,6 +501,7 @@ class AppState {
   }
 
   openProjectsModal() {
+    if (this.workspaceMode !== 'studio') return;
     this.activeModal = 'projects';
     void this.refreshProjectLibrary();
   }
@@ -580,6 +581,8 @@ class AppState {
   }
 
   async createNewSketch(template = DEFAULT_SKETCH, name = this.generateSketchName()) {
+    if (this.workspaceMode !== 'studio') return false;
+
     const decision = await this.confirmUnsaved();
     if (decision === 'cancel') return false;
 
@@ -721,6 +724,8 @@ class AppState {
   }
 
   async saveProject(forceChoosePath: boolean, options: { silent?: boolean } = {}) {
+    if (this.workspaceMode !== 'studio') return false;
+
     const revisionAtStart = this.dirtyRevision;
     const snapshot = await this.projectSession.saveProject(this, forceChoosePath, {
       silent: options.silent,

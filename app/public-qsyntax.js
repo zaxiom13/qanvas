@@ -7,7 +7,8 @@ window.BOOTHROYD_Q_SYNTAX = {
   symbols: /[_=><!~?:&|+\-*\/\^%@,;\\]+/,
   tokenizer: {
     root: [
-      [/[a-zA-Z]\w*/, { cases: { '@keywords': 'keyword', '@default': 'variable' } }],
+      [/\.(?:cx|Q|z)\.[a-zA-Z][a-zA-Z0-9_.]*/, 'keyword'],
+      [/[a-zA-Z_.][a-zA-Z0-9_.]*/, { cases: { '@keywords': 'keyword', '@default': 'variable' } }],
       [/`\w*/, 'symbol'],
       { include: '@whitespace' },
       [/[{}()\[\]]/, '@brackets'],
@@ -26,7 +27,8 @@ window.BOOTHROYD_Q_SYNTAX = {
     ],
     whitespace: [
       [/[ \t\r\n]+/, ''],
-      [/\/[^:].*$/, 'comment']
+      [/(?:(?<=^)|(?<=[;\n]))[ \t]*\/(?!:)[^\n]*/, 'comment'],
+      [/(?<=[ \t])\/(?=[ \t])(?!:)[^\n]*/, 'comment']
     ]
   }
 };
