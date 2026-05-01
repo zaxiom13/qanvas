@@ -38,6 +38,12 @@ export const COMPILED_BUILTIN_CALLS = new Set([
   'pixel',
   'text',
   'image',
+  'generic',
+  'push',
+  'pop',
+  'translate',
+  'scale',
+  'cursor',
   'show',
   'first',
   'last',
@@ -138,6 +144,38 @@ export function createCompiledRuntimeHelpers(options: CompiledRuntimeHelperOptio
         case 'text':
         case 'image':
           commands.push({ kind: name, data: args[0] });
+          return args[0];
+        case 'generic': {
+          const cmds = args[0];
+          const rows = normalizeGenericCommandRows(cmds);
+          for (const row of rows) {
+            commands.push({ ...row });
+          }
+          return cmds;
+        }
+        case 'push':
+          commands.push({ kind: 'push' });
+          return null;
+        case 'pop':
+          commands.push({ kind: 'pop' });
+          return null;
+        case 'translate': {
+          const xy = toArray(args[0]);
+          const x = xy[0];
+          const y = xy.length ? xy[xy.length - 1] : x;
+          commands.push({ kind: 'translate', x, y });
+          return args[0];
+        }
+        case 'scale': {
+          let xy = toArray(args[0]);
+          if (xy.length === 1) {
+            xy = [xy[0], xy[0]];
+          }
+          commands.push({ kind: 'scale', x: xy[0], y: xy.length ? xy[xy.length - 1] : xy[0] });
+          return args[0];
+        }
+        case 'cursor':
+          commands.push({ kind: 'cursor', cursor: args[0] });
           return args[0];
         case 'show':
           options.onStdout?.(formatDisplayValue(args[0]));
@@ -434,4 +472,21 @@ function isTruthy(value: unknown) {
     return value.length > 0;
   }
   return Boolean(value);
+}
+
+/** Matches q `generic:{[cmds].qv.cmds,:$[0h=type cmds;cmds;enlist cmds];:cmds}` — append inner command dicts directly. */
+function normalizeGenericCommandRows(cmds: unknown): Record<string, unknown>[] {
+  if (Array.isArray(cmds)) {
+    const rows: Record<string, unknown>[] = [];
+    for (const entry of cmds) {
+      if (entry != null && typeof entry === 'object' && !Array.isArray(entry)) {
+        rows.push(entry as Record<string, unknown>);
+      }
+    }
+    return rows;
+  }
+  if (cmds != null && typeof cmds === 'object') {
+    return [cmds as Record<string, unknown>];
+  }
+  return [];
 }

@@ -248,6 +248,39 @@ draw:{[state;frameInfo;input;canvas]
     expect(lineA!.data.map((row) => row.p2[1])).not.toEqual(lineB!.data.map((row) => row.p2[1]));
   });
 
+  it("splices generic inner commands like q boot (push/translate/generic rotate)", () => {
+    const source = `setup:{\`size\`bg!(800 600;0)}
+draw:{[state;frameInfo;input;canvas]
+  push[];
+  translate[0.5*canvas\`size];
+  generic[enlist \`kind\`angle!(\`rotate;0.25)];
+  state
+}`;
+    const compiled = compileSketch(source);
+    expect(compiled.status).toBe("compiled");
+    expect(compiled.code).toContain('rt.callBuiltin("generic"');
+    expect(compiled.code).not.toMatch(/rt\.call\(generic/);
+
+    const module = new Function(`return ${compiled.code};`)() as {
+      setup: (rt: ReturnType<typeof createCompiledRuntimeHelpers>) => unknown;
+      draw: (
+        state: unknown,
+        frameInfo: Record<string, unknown>,
+        input: Record<string, unknown>,
+        canvas: Record<string, unknown>,
+        rt: ReturnType<typeof createCompiledRuntimeHelpers>
+      ) => unknown;
+    };
+    const rt = createCompiledRuntimeHelpers();
+    const state = module.setup(rt);
+    rt.takeCommands();
+    module.draw(state, { frameNum: 1 }, {}, { size: [800, 600], pixelRatio: 1 }, rt);
+    const commands = rt.takeCommands();
+    expect(commands.map((c) => c.kind)).toEqual(["push", "translate", "rotate"]);
+    const rotate = commands[2] as { kind: string; angle?: unknown };
+    expect(rotate.angle).toBe(0.25);
+  });
+
   it("keeps lissajous-dots moving between frames on the interpreter path", () => {
     const compiled = compileSketch(EXAMPLES.find((entry) => entry.id === "lissajous-dots")!.code);
     expect(compiled.status).toBe("unsupported");
