@@ -103,7 +103,14 @@
           time: now - backgroundStartTime,
           dt: backgroundFrameNumber === 0 ? 16 : now - backgroundLastTime,
         },
-        input: { mouse: [0, 0], mouseDown: false, key: '', keys: [] },
+        /* Same shape as CanvasPanel consumeInput — sketches index input`mouseButtons etc. */
+        input: {
+          mouse: [0, 0],
+          mouseButtons: { left: false, middle: false, right: false },
+          scroll: [0, 0],
+          key: '',
+          keys: [],
+        },
         canvas: {
           size,
           pixelRatio: window.devicePixelRatio || 1,
