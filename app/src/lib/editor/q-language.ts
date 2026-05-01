@@ -723,6 +723,20 @@ export const Q_SLASH_SNIPPETS = [
       'image[([]\n  src:${1:2#enlist "assets/example.png"};\n  p:${2:(2#enlist 0.5*canvas`size)+(-96 32;-64 -64)};\n  s:${3:2#enlist 128 128};\n  alpha:${4:1 0.82}\n)];',
   },
   {
+    label: '/generic',
+    detail: 'Snippet',
+    documentation: 'Inserts a generic mixed-command scaffold for ordered low-level drawing.',
+    insertText:
+      'generic[enlist (enlist `kind)!enlist `push];\ngeneric[enlist `kind`x`y!(`translate;first ${1:0.5*canvas`size};last ${1:0.5*canvas`size})];\ngeneric[enlist `kind`angle!(`rotate;${2:0.25})];\n${3:circle[([] p:enlist 0 0; r:enlist 48; fill:enlist Color.BLUE; alpha:enlist 0.9)];}\ngeneric[enlist (enlist `kind)!enlist `pop];',
+  },
+  {
+    label: '/geneics',
+    detail: 'Snippet',
+    documentation: 'Typo-friendly alias for /generic.',
+    insertText:
+      'generic[enlist (enlist `kind)!enlist `push];\ngeneric[enlist `kind`x`y!(`translate;first ${1:0.5*canvas`size};last ${1:0.5*canvas`size})];\ngeneric[enlist `kind`angle!(`rotate;${2:0.25})];\n${3:circle[([] p:enlist 0 0; r:enlist 48; fill:enlist Color.BLUE; alpha:enlist 0.9)];}\ngeneric[enlist (enlist `kind)!enlist `pop];',
+  },
+  {
     label: '/translate',
     detail: 'Snippet',
     documentation: 'Inserts a translate transform command.',

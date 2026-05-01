@@ -199,4 +199,18 @@ describe('q editor language catalogs', () => {
       expect(command?.data, label).toHaveLength(2);
     }
   });
+
+  it('offers generic slash snippets that render mixed ordered commands', () => {
+    const snippets = new Map<string, string>(Q_SLASH_SNIPPETS.map((item) => [item.label, item.insertText]));
+
+    for (const label of ['/generic', '/geneics']) {
+      const insertText = snippets.get(label);
+
+      expect(insertText).toBeTruthy();
+      const commands = renderSnippet(insertText!);
+
+      expect(commands, label).toHaveLength(5);
+      expect(commands.find((entry) => entry.kind === 'circle'), label).toBeTruthy();
+    }
+  });
 });
