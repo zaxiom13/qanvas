@@ -267,7 +267,7 @@ test('renders a canvas still on mobile example thumbnails', async ({ page }) => 
   await page.getByRole('button', { name: 'Examples' }).click();
   const helloCard = page.getByRole('button', { name: /hello circle/i });
   await expect(helloCard.locator('.example-thumb img')).toBeVisible({ timeout: 20_000 });
-  await expect(helloCard.locator('.example-thumb img')).toHaveAttribute('src', /\/example-previews\/hello-circle\.svg$/);
+  await expect(helloCard.locator('.example-thumb img')).toHaveAttribute('src', /example-previews\/hello-circle\.svg$/);
 });
 
 test('does not show Quick Tools on the mobile canvas tab', async ({ page }) => {

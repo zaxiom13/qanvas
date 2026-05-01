@@ -1,4 +1,18 @@
-const PREVIEW_ASSET_BASE = '/example-previews';
+/**
+ * Example grid thumbnails live under `public/example-previews/`. The app uses
+ * `vite.config.ts` `base: './'` so builds work from subfolders and in Capacitor
+ * (`capacitor://localhost/...`). Absolute `/example-previews/...` URLs break in
+ * those cases (they resolve from the host root, not the app). Join with Vite's
+ * `import.meta.env.BASE_URL` so previews load on mobile Safari and bundled WebViews.
+ */
+export function resolveExamplePreviewAssetBase(baseUrl: string | undefined): string {
+  const base = baseUrl ?? '/';
+  if (base === '/') return '/example-previews';
+  const normalized = base.replace(/\/+$/, '');
+  return `${normalized}/example-previews`;
+}
+
+const PREVIEW_ASSET_BASE = resolveExamplePreviewAssetBase(import.meta.env.BASE_URL);
 
 export const examplePreviewSrc = {
   'hello-circle': `${PREVIEW_ASSET_BASE}/hello-circle.svg`,
