@@ -318,10 +318,24 @@ export const Q_CANVAS_FUNCTIONS = [
     insertText: 'circle[${1:data}];',
   },
   {
+    label: 'circles',
+    detail: 'Qanvas draw snippet',
+    documentation: 'Draws two circles from a prefilled q table.',
+    insertText:
+      'circle[([]\n  p:${1:2#enlist 0.5*canvas`size};\n  r:${2:44 28};\n  fill:${3:2#enlist Color.BLUE};\n  alpha:${4:0.92 0.82}\n)];',
+  },
+  {
     label: 'rect',
     detail: 'Qanvas draw helper',
     documentation: 'Draws rectangles from a q table of positions, sizes, and styles.',
     insertText: 'rect[${1:data}];',
+  },
+  {
+    label: 'rects',
+    detail: 'Qanvas draw snippet',
+    documentation: 'Draws two rectangles from a prefilled q table.',
+    insertText:
+      'rect[([]\n  p:${1:2#enlist 0 0};\n  s:${2:2#enlist 120 80};\n  fill:${3:2#enlist Color.GOLD};\n  alpha:${4:1 0.82}\n)];',
   },
   {
     label: 'pixel',
@@ -330,10 +344,24 @@ export const Q_CANVAS_FUNCTIONS = [
     insertText: 'pixel[${1:data}];',
   },
   {
+    label: 'pixels',
+    detail: 'Qanvas draw snippet',
+    documentation: 'Draws two pixels from a prefilled q table.',
+    insertText:
+      'pixel[([]\n  p:${1:2#enlist 0 0};\n  fill:${2:2#enlist Color.BLUE};\n  alpha:${3:1 0.82}\n)];',
+  },
+  {
     label: 'line',
     detail: 'Qanvas draw helper',
     documentation: 'Draws lines from a q table with p and p2 coordinates.',
     insertText: 'line[${1:data}];',
+  },
+  {
+    label: 'lines',
+    detail: 'Qanvas draw snippet',
+    documentation: 'Draws two lines from a prefilled q table.',
+    insertText:
+      'line[([]\n  p:${1:2#enlist 0 0};\n  p2:${2:2#enlist 100 100};\n  stroke:${3:2#enlist Color.INK};\n  weight:${4:2 4}\n)];',
   },
   {
     label: 'text',
@@ -342,10 +370,24 @@ export const Q_CANVAS_FUNCTIONS = [
     insertText: 'text[${1:data}];',
   },
   {
+    label: 'texts',
+    detail: 'Qanvas draw snippet',
+    documentation: 'Draws two text labels from a prefilled q table.',
+    insertText:
+      'text[([]\n  p:${1:2#enlist 40 40};\n  text:${2:2#enlist "hello"};\n  fill:${3:2#enlist Color.INK};\n  alpha:${4:1 0.82}\n)];',
+  },
+  {
     label: 'image',
     detail: 'Qanvas draw helper',
     documentation: 'Draws images from a q table of source paths and positions.',
     insertText: 'image[${1:data}];',
+  },
+  {
+    label: 'images',
+    detail: 'Qanvas draw snippet',
+    documentation: 'Draws two images from a prefilled q table.',
+    insertText:
+      'image[([]\n  src:${1:2#enlist "assets/example.png"};\n  p:${2:2#enlist 0 0};\n  s:${3:2#enlist 128 128};\n  alpha:${4:1 0.82}\n)];',
   },
   {
     label: 'generic',
@@ -577,11 +619,25 @@ export const Q_SLASH_SNIPPETS = [
       'circle[([]\n  p:enlist ${1:0.5*canvas`size};\n  r:enlist ${2:44};\n  fill:enlist ${3:Color.BLUE};\n  alpha:enlist ${4:0.92}\n)];',
   },
   {
+    label: '/circles',
+    detail: 'Snippet',
+    documentation: 'Inserts a circle command scaffold with two rows.',
+    insertText:
+      'circle[([]\n  p:${1:2#enlist 0.5*canvas`size};\n  r:${2:44 28};\n  fill:${3:2#enlist Color.BLUE};\n  alpha:${4:0.92 0.82}\n)];',
+  },
+  {
     label: '/rect',
     detail: 'Snippet',
     documentation: 'Inserts a rectangle command scaffold.',
     insertText:
       'rect[([]\n  p:enlist ${1:0 0};\n  s:enlist ${2:120 80};\n  fill:enlist ${3:Color.GOLD};\n  alpha:enlist ${4:1}\n)];',
+  },
+  {
+    label: '/rects',
+    detail: 'Snippet',
+    documentation: 'Inserts a rectangle command scaffold with two rows.',
+    insertText:
+      'rect[([]\n  p:${1:2#enlist 0 0};\n  s:${2:2#enlist 120 80};\n  fill:${3:2#enlist Color.GOLD};\n  alpha:${4:1 0.82}\n)];',
   },
   {
     label: '/pixel',
@@ -591,11 +647,25 @@ export const Q_SLASH_SNIPPETS = [
       'pixel[([]\n  p:enlist ${1:0 0};\n  fill:enlist ${2:Color.BLUE};\n  alpha:enlist ${3:1}\n)];',
   },
   {
+    label: '/pixels',
+    detail: 'Snippet',
+    documentation: 'Inserts a pixel command scaffold with two rows.',
+    insertText:
+      'pixel[([]\n  p:${1:2#enlist 0 0};\n  fill:${2:2#enlist Color.BLUE};\n  alpha:${3:1 0.82}\n)];',
+  },
+  {
     label: '/line',
     detail: 'Snippet',
     documentation: 'Inserts a line command scaffold.',
     insertText:
-      'line[([]\n  p:enlist ${1:0 0};\n  p2:enlist ${2:100 100};\n  stroke:enlist ${3:Color.INK};\n  width:enlist ${4:2}\n)];',
+      'line[([]\n  p:enlist ${1:0 0};\n  p2:enlist ${2:100 100};\n  stroke:enlist ${3:Color.INK};\n  weight:enlist ${4:2}\n)];',
+  },
+  {
+    label: '/lines',
+    detail: 'Snippet',
+    documentation: 'Inserts a line command scaffold with two rows.',
+    insertText:
+      'line[([]\n  p:${1:2#enlist 0 0};\n  p2:${2:2#enlist 100 100};\n  stroke:${3:2#enlist Color.INK};\n  weight:${4:2 4}\n)];',
   },
   {
     label: '/text',
@@ -605,11 +675,25 @@ export const Q_SLASH_SNIPPETS = [
       'text[([]\n  p:enlist ${1:40 40};\n  text:enlist ${2:"hello"};\n  fill:enlist ${3:Color.INK};\n  alpha:enlist ${4:1}\n)];',
   },
   {
+    label: '/texts',
+    detail: 'Snippet',
+    documentation: 'Inserts a text command scaffold with two rows.',
+    insertText:
+      'text[([]\n  p:${1:2#enlist 40 40};\n  text:${2:2#enlist "hello"};\n  fill:${3:2#enlist Color.INK};\n  alpha:${4:1 0.82}\n)];',
+  },
+  {
     label: '/image',
     detail: 'Snippet',
     documentation: 'Inserts an image command scaffold.',
     insertText:
       'image[([]\n  src:enlist ${1:"assets/example.png"};\n  p:enlist ${2:0 0};\n  s:enlist ${3:128 128};\n  alpha:enlist ${4:1}\n)];',
+  },
+  {
+    label: '/images',
+    detail: 'Snippet',
+    documentation: 'Inserts an image command scaffold with two rows.',
+    insertText:
+      'image[([]\n  src:${1:2#enlist "assets/example.png"};\n  p:${2:2#enlist 0 0};\n  s:${3:2#enlist 128 128};\n  alpha:${4:1 0.82}\n)];',
   },
   {
     label: '/translate',
