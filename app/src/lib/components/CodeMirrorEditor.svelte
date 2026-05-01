@@ -15,7 +15,12 @@
   import { bracketMatching, indentOnInput, syntaxHighlighting } from '@codemirror/language';
   import { EditorState } from '@codemirror/state';
   import { EditorView, keymap, lineNumbers } from '@codemirror/view';
-  import { autocompletion, snippetCompletion, type Completion, type CompletionContext } from '@codemirror/autocomplete';
+  import {
+    autocompletion,
+    snippetCompletion,
+    type Completion,
+    type CompletionContext,
+  } from '@codemirror/autocomplete';
   import Pickr from '@simonwep/pickr';
   import '@simonwep/pickr/dist/themes/nano.min.css';
   import {
@@ -24,6 +29,7 @@
     type ColorInlineControlLiteral,
     type InlineControlLiteral,
   } from '$lib/editor/inline-controls';
+  import { mergeCompletionDocumentationIntoDetail } from '$lib/editor/merge-completion-documentation';
   import {
     Q_BUILTIN_FUNCTIONS,
     Q_CANVAS_FUNCTIONS,
@@ -70,6 +76,61 @@
     | null = null;
 
   const touchSelectMoveThreshold = 6;
+
+  const completionUiTheme = EditorView.theme({
+    '.cm-tooltip.cm-tooltip-autocomplete > ul': {
+      minWidth: '300px',
+      maxWidth: 'min(820px, 96vw)',
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li': {
+      display: 'flex',
+      flexWrap: 'wrap',
+      alignItems: 'flex-start',
+      columnGap: '4px',
+      rowGap: '1px',
+      whiteSpace: 'normal',
+      overflowX: 'visible',
+      textOverflow: 'clip',
+      lineHeight: 1.2,
+      borderBottom: '1px solid rgba(44, 37, 32, 0.12)',
+      padding: '1px 6px',
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > li:last-child': {
+      borderBottom: 'none',
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete > ul > completion-section': {
+      display: 'list-item',
+      borderBottom: '1px solid rgba(44, 37, 32, 0.12)',
+      padding: '2px 6px 1px',
+      lineHeight: 1.2,
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete .cm-completionLabel': {
+      flex: '0 1 auto',
+      minWidth: 0,
+      whiteSpace: 'normal',
+      wordBreak: 'break-word',
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete .cm-completionDetail': {
+      flex: '1 1 100%',
+      marginLeft: 0,
+      marginTop: 0,
+      whiteSpace: 'pre-wrap',
+      wordBreak: 'break-word',
+      fontStyle: 'normal',
+      opacity: 0.82,
+      fontSize: '10px',
+      lineHeight: 1.25,
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete .cm-completionIcon': {
+      flex: '0 0 auto',
+      marginTop: '0.08em',
+      paddingRight: '0.35em',
+      fontSize: '82%',
+    },
+    '.cm-tooltip.cm-tooltip-autocomplete .cm-completionInfo': {
+      display: 'none',
+    },
+  });
 
   const editorTheme = EditorView.theme({
     '&': {
@@ -435,69 +496,72 @@
   }
 
   const mobileSlashSnippets = Q_SLASH_SNIPPETS.map((item) =>
-    snippetCompletion(item.insertText, {
-      label: item.label,
-      detail: item.detail,
-      info: item.documentation,
-      type: 'keyword',
-    })
-  );
-
-  const mobileQanvasCompletions = Q_CANVAS_FUNCTIONS.map((item) =>
-    snippetCompletion(item.insertText, {
-      label: item.label,
-      detail: item.detail,
-      info: item.documentation,
-      type: 'function',
-    })
-  );
-
-  const mobileContextCompletions = Q_CONTEXT_SYMBOLS.map((item) =>
-    item.insertText.includes('${')
-      ? snippetCompletion(item.insertText, {
-          label: item.label,
-          detail: item.detail,
-          info: item.documentation,
-          type: 'variable',
-        })
-      : ({
-          label: item.label,
-          detail: item.detail,
-          info: item.documentation,
-          apply: item.insertText,
-          type: 'variable',
-        } satisfies Completion)
-  );
-
-  const mobileColorCompletions = Q_COLOR_SYMBOLS.map(
-    (item) =>
-      ({
+    mergeCompletionDocumentationIntoDetail(
+      snippetCompletion(item.insertText, {
         label: item.label,
         detail: item.detail,
         info: item.documentation,
-        apply: item.insertText,
-        type: 'constant',
-      }) satisfies Completion
-  );
-
-  const mobileBuiltinCompletions = Q_BUILTIN_FUNCTIONS.map(
-    (label) =>
-      ({
-        label,
-        detail: 'q built-in',
-        info: 'Built-in q function.',
-        type: 'function',
-      }) satisfies Completion
-  );
-
-  const mobileKeywordCompletions = Q_KEYWORDS.map(
-    (label) =>
-      ({
-        label,
-        detail: 'q keyword',
-        info: 'Core q keyword or query word.',
         type: 'keyword',
-      }) satisfies Completion
+      })
+    )
+  );
+
+  const mobileQanvasCompletions = Q_CANVAS_FUNCTIONS.map((item) =>
+    mergeCompletionDocumentationIntoDetail(
+      snippetCompletion(item.insertText, {
+        label: item.label,
+        detail: item.detail,
+        info: item.documentation,
+        type: 'function',
+      })
+    )
+  );
+
+  const mobileContextCompletions = Q_CONTEXT_SYMBOLS.map((item) =>
+    mergeCompletionDocumentationIntoDetail(
+      item.insertText.includes('${')
+        ? snippetCompletion(item.insertText, {
+            label: item.label,
+            detail: item.detail,
+            info: item.documentation,
+            type: 'variable',
+          })
+        : ({
+            label: item.label,
+            detail: item.detail,
+            info: item.documentation,
+            apply: item.insertText,
+            type: 'variable',
+          } satisfies Completion)
+    )
+  );
+
+  const mobileColorCompletions = Q_COLOR_SYMBOLS.map((item) =>
+    mergeCompletionDocumentationIntoDetail({
+      label: item.label,
+      detail: item.detail,
+      info: item.documentation,
+      apply: item.insertText,
+      type: 'constant',
+    } satisfies Completion)
+  );
+
+  const mobileBuiltinCompletions = Q_BUILTIN_FUNCTIONS.map((label) =>
+    mergeCompletionDocumentationIntoDetail({
+      label,
+      detail: 'q built-in',
+      info: 'Built-in q function.',
+      type: 'function',
+    } satisfies Completion)
+  );
+
+  const mobileKeywordCompletions = Q_KEYWORDS.map((label) =>
+    mergeCompletionDocumentationIntoDetail({
+      label,
+      detail: 'q keyword',
+      info: 'Core q keyword or query word.',
+      type: 'keyword',
+    } satisfies Completion)
   );
 
   function dedupeMobileCompletions(items: Completion[]) {
@@ -556,7 +620,9 @@
           autocompletion({
             override: [mobileQCompletions],
             activateOnTyping: true,
+            closeOnBlur: false,
           }),
+          completionUiTheme,
           syntaxHighlighting(qMobileEditorHighlightStyle),
           editorTheme,
           bracketMatching(),
