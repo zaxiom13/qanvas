@@ -85,6 +85,9 @@
       }
     | null = null;
 
+  /** True while the user is in a scroll-oriented touch gesture; keeps the virtual keyboard closed. */
+  let suppressKeyboardForScroll = false;
+
   const touchSelectMoveThreshold = 6;
 
   const completionUiTheme = EditorView.theme({
@@ -227,6 +230,34 @@
     return Boolean(target.closest('.cm-content')) && !Boolean(target.closest('.qanvas-inline-control'));
   }
 
+  /** Gutter or scroller chrome (not `.cm-content`): native one-finger pan scroll. */
+  function isScrollerChromeTarget(target: EventTarget | null) {
+    if (!(target instanceof HTMLElement)) return false;
+    if (!target.closest('.cm-scroller')) return false;
+    if (target.closest('.cm-content')) return false;
+    if (target.closest('.qanvas-inline-control')) return false;
+    return true;
+  }
+
+  function setContentInputMode(currentView: EditorView, mode: 'none' | 'text') {
+    if (mode === 'none') currentView.contentDOM.setAttribute('inputmode', 'none');
+    else currentView.contentDOM.removeAttribute('inputmode');
+  }
+
+  function beginScrollGestureKeyboardSuppression(currentView: EditorView) {
+    suppressKeyboardForScroll = true;
+    setContentInputMode(currentView, 'none');
+    if (currentView.hasFocus) currentView.contentDOM.blur();
+  }
+
+  /** When every touch has ended, restore normal keyboard behavior for the next tap. */
+  function clearScrollKeyboardSuppressionIfIdle(event: TouchEvent) {
+    if (event.touches.length !== 0) return;
+    if (!suppressKeyboardForScroll) return;
+    suppressKeyboardForScroll = false;
+    if (view) setContentInputMode(view, 'text');
+  }
+
   function getTouchByIdentifier(touches: TouchList, identifier: number) {
     for (let index = 0; index < touches.length; index += 1) {
       const touch = touches.item(index);
@@ -300,7 +331,13 @@
   function startTouchSelection(event: TouchEvent, currentView: EditorView) {
     if (event.touches.length >= 2 && isEditorTarget(event.target)) {
       touchSelection = null;
+      beginScrollGestureKeyboardSuppression(currentView);
       initTwoFingerPanFromTouches(event.touches);
+      return;
+    }
+
+    if (event.touches.length === 1 && isScrollerChromeTarget(event.target)) {
+      beginScrollGestureKeyboardSuppression(currentView);
       return;
     }
 
@@ -339,6 +376,8 @@
     const deltaY = Math.abs(touch.clientY - touchSelection.startY);
     if (!touchSelection.moved && Math.max(deltaX, deltaY) < touchSelectMoveThreshold) return;
 
+    beginScrollGestureKeyboardSuppression(currentView);
+
     // Only preventDefault once the finger moves past the tap threshold so the
     // browser can still run default touch handling on a simple tap (soft keyboard).
     event.preventDefault();
@@ -352,6 +391,7 @@
   }
 
   function endTouchSelection(event: TouchEvent) {
+    clearScrollKeyboardSuppressionIfIdle(event);
     clearTwoFingerPanIfNeeded(event);
 
     if (!touchSelection) return;
