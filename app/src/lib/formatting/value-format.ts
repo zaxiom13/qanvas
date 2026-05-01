@@ -59,6 +59,11 @@ export class StructuredConsoleFormatter {
     // Not JSON — attempt to detect a q-native rectangular array and upgrade
     // it to the Uiua-style grid. Falls back to raw text when the shape is
     // ambiguous (prose, tables with `|` dividers, etc.).
+    const scalarLines = splitQNativeScalarLines(text);
+    if (scalarLines) {
+      return scalarLines;
+    }
+
     const reformatted = formatQNativeStdoutBlock(text);
     if (reformatted !== null) {
       return [reformatted];
@@ -403,6 +408,16 @@ function parseQSymbolLine(line: string): string[] | null {
   // Each part should be a symbol (alphanumeric, dot, underscore).
   if (!parts.every((p) => /^[A-Za-z_][A-Za-z0-9_.]*$/.test(p))) return null;
   return parts.map((p) => `\`${p}`);
+}
+
+function splitQNativeScalarLines(text: string): string[] | null {
+  const lines = text.replace(/\n+$/, '').split('\n').map((line) => line.trim()).filter(Boolean);
+  if (lines.length < 2) return null;
+
+  const parsed = lines.map((line) => parseQNumericLine(line) ?? parseQSymbolLine(line));
+  if (!parsed.every((entry) => entry?.length === 1)) return null;
+
+  return lines;
 }
 
 // Attempt to reformat q-native stdout into a Uiua-style grid.
