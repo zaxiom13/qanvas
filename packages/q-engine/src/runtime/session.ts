@@ -98,6 +98,7 @@ export class Session {
       return value;
     }
 
+    const dottedPathStartsWithDot = name.startsWith(".");
     const parts = name.replace(/^\./, "").split(".");
     const last = parts.pop()!;
     if (parts.length === 0) {
@@ -105,7 +106,7 @@ export class Session {
       return value;
     }
 
-    let current = this.getRootValue(parts[0]!);
+    let current = this.getRootValue(parts[0]!, dottedPathStartsWithDot);
 
     if (!current) {
       current = {
@@ -1180,8 +1181,12 @@ export class Session {
     return names;
   }
 
-  private getRootValue(name: string): QValue | undefined {
-    return this.lookup(`.${name}`) ?? this.lookup(name);
+  /** Leading-dot paths treat the first segment as a dotted root (e.g. `.cx.new` → `.cx`). */
+  private getRootValue(firstSegment: string, dottedPathStartsWithDot: boolean): QValue | undefined {
+    if (dottedPathStartsWithDot) {
+      return this.lookup(`.${firstSegment}`) ?? this.lookup(firstSegment);
+    }
+    return this.lookup(firstSegment);
   }
 
   private refreshDynamicNamespaces() {
@@ -1196,8 +1201,9 @@ export class Session {
   }
 
   private getDotted(name: string): QValue {
+    const dottedPathStartsWithDot = name.startsWith(".");
     const parts = name.replace(/^\./, "").split(".");
-    let current: QValue | undefined = this.getRootValue(parts[0]!);
+    let current: QValue | undefined = this.getRootValue(parts[0]!, dottedPathStartsWithDot);
     if (!current) {
       throw new QRuntimeError("name", `Unknown identifier: ${name}`);
     }

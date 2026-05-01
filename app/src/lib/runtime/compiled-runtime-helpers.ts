@@ -266,6 +266,14 @@ export function createCompiledRuntimeHelpers(options: CompiledRuntimeHelperOptio
         if (Array.isArray(indexValue)) {
           return indexValue.map((entry) => callee[normalizeIndex(entry, callee.length)]);
         }
+        if (
+          typeof indexValue === 'string' &&
+          callee.length > 0 &&
+          isPlainObject(callee[0]) &&
+          Object.prototype.hasOwnProperty.call(callee[0] as object, indexValue)
+        ) {
+          return callee.map((row) => (row as Record<string, unknown>)[indexValue]);
+        }
         return callee[normalizeIndex(indexValue, callee.length)];
       }
 

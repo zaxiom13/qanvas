@@ -161,6 +161,19 @@ draw:{[state;frameInfo;input;canvas]
     expect(circleCommand!.data[1]!.p).toEqual([341.5, 596]);
   });
 
+  it("plucks columns from rt.table rows so orbit-dance planets sit on distinct orbits", () => {
+    const commands = runCompiledExample("orbit-dance");
+    const circles = commands.filter((command) => command.kind === "circle") as Array<{
+      kind: string;
+      data: Array<{ p: [number, number] }>;
+    }>;
+    expect(circles).toHaveLength(3);
+    const planets = circles[2]!;
+    expect(planets.data).toHaveLength(4);
+    const keys = new Set(planets.data.map((row) => `${row.p[0].toFixed(4)},${row.p[1].toFixed(4)}`));
+    expect(keys.size).toBe(4);
+  });
+
   it("supports compiled reduction families and derived primitive over/scan forms", () => {
     const source = `setup:{\`size\`bg!(800 600;0)}
 draw:{[state;frameInfo;input;canvas]
@@ -290,5 +303,14 @@ draw:{[state;frameInfo;input;canvas]
     expect(frameA).toContain("kind");
     expect(frameA).toContain("circle");
     expect(frameA).not.toEqual(frameB);
+  });
+
+  it("does not emit invalid JavaScript for leading-dot q identifiers", () => {
+    const source = `setup:{[] \`size\`bg!(800 600;Color.INK);:()}
+draw:{[s].cx.new[1;2];:s}`;
+    const compiled = compileSketch(source);
+    expect(compiled.status).toBe("unsupported");
+    expect(compiled.unsupported).toContain("dotted-root-identifier");
+    expect(compiled.code).toBeNull();
   });
 });

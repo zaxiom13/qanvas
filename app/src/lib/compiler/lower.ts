@@ -139,8 +139,19 @@ function lowerExpression(node: ParserNode, diagnostics: CompileDiagnostic[], uns
       return { kind: 'string', value: String(node.value ?? '') };
     case 'symbol':
       return { kind: 'symbol', value: String(node.value ?? '') };
-    case 'identifier':
-      return node.name === 'null' ? { kind: 'null' } : { kind: 'identifier', name: String(node.name ?? '') };
+    case 'identifier': {
+      const name = String(node.name ?? '');
+      if (name !== 'null' && name.startsWith('.')) {
+        pushUnsupported(
+          diagnostics,
+          unsupported,
+          'dotted-root-identifier',
+          `Leading-dot names like \`${name}\` are not supported by the JS compiler (invalid JavaScript); use the interpreter or rewrite (e.g. drop the leading dot only where q allows it).`
+        );
+        return { kind: 'null' };
+      }
+      return name === 'null' ? { kind: 'null' } : { kind: 'identifier', name };
+    }
     case 'group':
       return lowerExpression(node.value, diagnostics, unsupported);
     case 'vector':
@@ -190,6 +201,15 @@ function lowerExpression(node: ParserNode, diagnostics: CompileDiagnostic[], uns
     case 'each':
       if (node.callee?.kind !== 'identifier') {
         pushUnsupported(diagnostics, unsupported, node.kind, 'Only identifier-based each calls are supported.');
+        return { kind: 'null' };
+      }
+      if (String(node.callee.name ?? '').startsWith('.')) {
+        pushUnsupported(
+          diagnostics,
+          unsupported,
+          'each-dotted-root',
+          'Each targets cannot be leading-dot q names in compiled mode.'
+        );
         return { kind: 'null' };
       }
       return {

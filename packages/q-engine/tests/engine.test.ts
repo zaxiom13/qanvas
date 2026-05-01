@@ -56,6 +56,7 @@ describe("q engine smoke tests", () => {
       "re| -5f\nim| 10f\n"
     );
     expect(formatValue(session.evaluate(".cx.abs .cx.new[3;4]").value)).toBe("5f\n");
+    expect(() => session.evaluate("cx.new[1;2]")).toThrowError(/Unknown identifier: cx\.new/);
     expect(formatValue(session.evaluate(".Q.s ([h:1 2 3] m:4 5 6)").value)).toBe(
       "\"h| m\\n-| -\\n1| 4\\n2| 5\\n3| 6\\n\"\n"
     );

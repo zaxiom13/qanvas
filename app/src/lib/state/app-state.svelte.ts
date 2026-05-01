@@ -604,8 +604,11 @@ class AppState {
 
     await this.resetStudioProject(example.code, example.name, { unsaved: false, dirtyRevision: 0 });
     this.setLastExampleId(example.id);
-    this.appendConsole('info', `Loaded example: ${example.name}`);
     this.activeModal = null;
+    if (this.workspaceMode === 'studio') {
+      await this.runSketch();
+    }
+    this.appendConsole('info', `Loaded example: ${example.name}`);
   }
 
   private setLastExampleId(id: string | null) {
@@ -673,14 +676,12 @@ class AppState {
     const next = this.nextTourExample;
     if (!next) return;
     await this.loadExample(next.id);
-    await this.runSketch();
   }
 
   /** Start the tour, advance to the next tutorial, or restart after completion — used by the canvas toolbar control. */
   async startOrContinueGuidedTour() {
     if (this.tourFinished) {
       await this.restartTour();
-      await this.runSketch();
       return;
     }
     if (this.nextTourExample) {
@@ -688,14 +689,12 @@ class AppState {
       return;
     }
     await this.restartTour();
-    await this.runSketch();
   }
 
   async loadPreviousTourExample() {
     const previous = this.previousTourExample;
     if (!previous) return;
     await this.loadExample(previous.id);
-    await this.runSketch();
   }
 
   async restartTour() {
