@@ -203,7 +203,7 @@ describe('q editor language catalogs', () => {
   it('offers generic slash snippets that render mixed ordered commands', () => {
     const snippets = new Map<string, string>(Q_SLASH_SNIPPETS.map((item) => [item.label, item.insertText]));
 
-    for (const label of ['/generic', '/geneics']) {
+    for (const label of ['/generic', '/generics']) {
       const insertText = snippets.get(label);
 
       expect(insertText).toBeTruthy();

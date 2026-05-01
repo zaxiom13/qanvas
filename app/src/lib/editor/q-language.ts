@@ -730,9 +730,9 @@ export const Q_SLASH_SNIPPETS = [
       'generic[enlist (enlist `kind)!enlist `push];\ngeneric[enlist `kind`x`y!(`translate;first ${1:0.5*canvas`size};last ${1:0.5*canvas`size})];\ngeneric[enlist `kind`angle!(`rotate;${2:0.25})];\n${3:circle[([] p:enlist 0 0; r:enlist 48; fill:enlist Color.BLUE; alpha:enlist 0.9)];}\ngeneric[enlist (enlist `kind)!enlist `pop];',
   },
   {
-    label: '/geneics',
+    label: '/generics',
     detail: 'Snippet',
-    documentation: 'Typo-friendly alias for /generic.',
+    documentation: 'Same scaffold as /generic (plural alias).',
     insertText:
       'generic[enlist (enlist `kind)!enlist `push];\ngeneric[enlist `kind`x`y!(`translate;first ${1:0.5*canvas`size};last ${1:0.5*canvas`size})];\ngeneric[enlist `kind`angle!(`rotate;${2:0.25})];\n${3:circle[([] p:enlist 0 0; r:enlist 48; fill:enlist Color.BLUE; alpha:enlist 0.9)];}\ngeneric[enlist (enlist `kind)!enlist `pop];',
   },
