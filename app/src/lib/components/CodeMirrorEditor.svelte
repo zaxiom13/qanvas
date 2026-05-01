@@ -247,7 +247,9 @@
   function beginScrollGestureKeyboardSuppression(currentView: EditorView) {
     suppressKeyboardForScroll = true;
     setContentInputMode(currentView, 'none');
-    if (currentView.hasFocus) currentView.contentDOM.blur();
+    // Always blur the content surface: some browsers keep a soft keyboard up
+    // while a non-empty selection is active even if hasFocus is briefly false.
+    currentView.contentDOM.blur();
   }
 
   /** After all fingers lift, restore normal keyboard behavior unless we finish with a no-move tap (caller may focus). */
@@ -328,25 +330,25 @@
     host.dataset.selectionLength = String(Math.abs(range.head - range.anchor));
   }
 
-  function startTouchSelection(event: TouchEvent, currentView: EditorView) {
+  function startTouchSelection(event: TouchEvent, currentView: EditorView): boolean {
     if (event.touches.length >= 2 && isEditorTarget(event.target)) {
       touchSelection = null;
       beginScrollGestureKeyboardSuppression(currentView);
       initTwoFingerPanFromTouches(event.touches);
-      return;
+      return false;
     }
 
     if (event.touches.length === 1 && isScrollerChromeTarget(event.target)) {
       beginScrollGestureKeyboardSuppression(currentView);
-      return;
+      return false;
     }
 
-    if (event.touches.length !== 1 || !isEditorContentTarget(event.target)) return;
+    if (event.touches.length !== 1 || !isEditorContentTarget(event.target)) return false;
 
     const touch = event.touches.item(0);
-    if (!touch) return;
+    if (!touch) return false;
     const pos = currentView.posAtCoords({ x: touch.clientX, y: touch.clientY });
-    if (pos == null) return;
+    if (pos == null) return false;
 
     touchSelection = {
       identifier: touch.identifier,
@@ -355,67 +357,77 @@
       startX: touch.clientX,
       startY: touch.clientY,
     };
-    // Do not preventDefault on touchstart: iOS/Android need the default touch
-    // path on the contenteditable surface for a simple tap (caret + keyboard).
-    // Suppress keyboard until touchend; selection updates do not require focus.
+    // Block the native contenteditable focus path on touchstart; otherwise the
+    // browser can focus (and raise the soft keyboard) even while we blur and
+    // drive selection ourselves. A simple caret tap finishes with view.focus()
+    // on touchend when the selection stayed collapsed.
     beginScrollGestureKeyboardSuppression(currentView);
     selectEditorRange(pos, pos);
+    return true;
   }
 
-  function moveTouchSelection(event: TouchEvent, currentView: EditorView) {
+  function moveTouchSelection(event: TouchEvent, currentView: EditorView): boolean {
     if (event.touches.length >= 2 && isEditorTarget(event.target)) {
       touchSelection = null;
       applyTwoFingerPan(event, currentView);
-      return;
+      return false;
     }
 
-    if (!touchSelection) return;
-    const touch = getTouchByIdentifier(event.changedTouches, touchSelection.identifier);
-    if (!touch) return;
+    if (!touchSelection) return false;
+    const touch =
+      getTouchByIdentifier(event.touches, touchSelection.identifier) ??
+      getTouchByIdentifier(event.changedTouches, touchSelection.identifier);
+    if (!touch) return false;
 
     const deltaX = Math.abs(touch.clientX - touchSelection.startX);
     const deltaY = Math.abs(touch.clientY - touchSelection.startY);
-    if (!touchSelection.moved && Math.max(deltaX, deltaY) < touchSelectMoveThreshold) return;
+    if (!touchSelection.moved && Math.max(deltaX, deltaY) < touchSelectMoveThreshold) return false;
 
     beginScrollGestureKeyboardSuppression(currentView);
 
-    // Only preventDefault once the finger moves past the tap threshold so the
-    // browser can still run default touch handling on a simple tap (soft keyboard).
-    event.preventDefault();
-    event.stopPropagation();
+    touchSelection.moved = true;
 
     const pos = currentView.posAtCoords({ x: touch.clientX, y: touch.clientY });
-    if (pos == null) return;
-
-    touchSelection.moved = true;
-    selectEditorRange(touchSelection.anchor, pos, true);
+    if (pos != null) selectEditorRange(touchSelection.anchor, pos, true);
+    // Returning true makes CodeMirror call preventDefault (non-passive listener).
+    return true;
   }
 
-  function endTouchSelection(event: TouchEvent) {
+  function endTouchSelection(event: TouchEvent): boolean {
     const activeTouchSelection = touchSelection;
+    // Only raise the soft keyboard after a true caret tap: no drag and a
+    // collapsed selection. A non-empty range can still occur without crossing
+    // the move threshold (e.g. a tiny wiggle while selecting); never focus then.
     const shouldFocusAfterTap =
       event.type === 'touchend' &&
       activeTouchSelection !== null &&
       !activeTouchSelection.moved &&
       Boolean(getTouchByIdentifier(event.changedTouches, activeTouchSelection.identifier)) &&
-      event.touches.length === 0;
+      event.touches.length === 0 &&
+      view !== null &&
+      view.state.selection.main.empty;
 
     clearScrollKeyboardSuppressionIfIdle(event);
     clearTwoFingerPanIfNeeded(event);
 
-    if (!touchSelection) return;
+    if (!touchSelection) return false;
     const touch = getTouchByIdentifier(event.changedTouches, touchSelection.identifier);
-    if (!touch) return;
-
-    if (touchSelection.moved) {
-      event.preventDefault();
-      event.stopPropagation();
+    if (!touch) {
+      touchSelection = null;
+      return false;
     }
+
+    const prevent = touchSelection.moved;
     touchSelection = null;
 
     if (shouldFocusAfterTap && view) {
       view.focus();
+    } else if (view) {
+      // Dismiss any focus the browser may still apply after a selection or scroll
+      // gesture (especially when touchstart default was prevented).
+      view.contentDOM.blur();
     }
+    return prevent;
   }
 
   function toggleLineComments() {
@@ -799,16 +811,16 @@
           }),
           EditorView.domEventHandlers({
             touchstart(event, currentView) {
-              startTouchSelection(event, currentView);
+              return startTouchSelection(event, currentView);
             },
             touchmove(event, currentView) {
-              moveTouchSelection(event, currentView);
+              return moveTouchSelection(event, currentView);
             },
             touchend(event) {
-              endTouchSelection(event);
+              return endTouchSelection(event);
             },
             touchcancel(event) {
-              endTouchSelection(event);
+              return endTouchSelection(event);
             },
             mousemove(event, currentView) {
               const pos = currentView.posAtCoords({ x: event.clientX, y: event.clientY });

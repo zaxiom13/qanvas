@@ -77,7 +77,7 @@ test('edits the active sketch from the mobile editor', async ({ page }) => {
   await expect(editor).toContainText(/320 320/);
 });
 
-test('does not cancel default touch handling on editor tap (soft keyboard)', async ({ page }) => {
+test('prevents default touchstart on the editor code surface (no native focus until tap end)', async ({ page }) => {
   await page.goto('/');
 
   const defaultPrevented = await page.locator('.mobile-code-editor .cm-content').evaluate((content) => {
@@ -105,7 +105,7 @@ test('does not cancel default touch handling on editor tap (soft keyboard)', asy
     return event.defaultPrevented;
   });
 
-  expect(defaultPrevented).toBe(false);
+  expect(defaultPrevented).toBe(true);
 });
 
 test('selects code with a touch drag instead of panning the mobile editor', async ({ page }) => {
@@ -143,6 +143,11 @@ test('selects code with a touch drag instead of panning the mobile editor', asyn
   }, { start, end });
 
   await expect(page.locator('.mobile-code-editor')).not.toHaveAttribute('data-selection-length', '0');
+
+  const contentFocused = await page.evaluate(() =>
+    Boolean(document.activeElement?.closest('.mobile-code-editor .cm-content'))
+  );
+  expect(contentFocused).toBe(false);
 });
 
 test('scrolls the mobile editor with two-finger pan on the code surface', async ({ page }) => {
