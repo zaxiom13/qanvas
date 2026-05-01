@@ -2689,7 +2689,9 @@ body.is-resizing-console {
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 10100;
+  /* Above .ux-tour-highlight (10106): a highlighted full-width panel (#editor-panel, #canvas-panel)
+     must not paint the tour card underneath that stacking context. */
+  z-index: 10200;
 }
 
 .ux-tour-dimming {
