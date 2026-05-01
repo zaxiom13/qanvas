@@ -85,7 +85,7 @@
       }
     | null = null;
 
-  /** True while the user is in a scroll-oriented touch gesture; keeps the virtual keyboard closed. */
+  /** True while a touch gesture should not raise the virtual keyboard (scroll or select-drag). */
   let suppressKeyboardForScroll = false;
 
   const touchSelectMoveThreshold = 6;
@@ -250,7 +250,7 @@
     if (currentView.hasFocus) currentView.contentDOM.blur();
   }
 
-  /** When every touch has ended, restore normal keyboard behavior for the next tap. */
+  /** After all fingers lift, restore normal keyboard behavior unless we finish with a no-move tap (caller may focus). */
   function clearScrollKeyboardSuppressionIfIdle(event: TouchEvent) {
     if (event.touches.length !== 0) return;
     if (!suppressKeyboardForScroll) return;
@@ -356,8 +356,9 @@
       startY: touch.clientY,
     };
     // Do not preventDefault on touchstart: iOS/Android need the default touch
-    // path on the contenteditable surface so the virtual keyboard can open.
-    currentView.focus();
+    // path on the contenteditable surface for a simple tap (caret + keyboard).
+    // Suppress keyboard until touchend; selection updates do not require focus.
+    beginScrollGestureKeyboardSuppression(currentView);
     selectEditorRange(pos, pos);
   }
 
@@ -391,6 +392,14 @@
   }
 
   function endTouchSelection(event: TouchEvent) {
+    const activeTouchSelection = touchSelection;
+    const shouldFocusAfterTap =
+      event.type === 'touchend' &&
+      activeTouchSelection !== null &&
+      !activeTouchSelection.moved &&
+      Boolean(getTouchByIdentifier(event.changedTouches, activeTouchSelection.identifier)) &&
+      event.touches.length === 0;
+
     clearScrollKeyboardSuppressionIfIdle(event);
     clearTwoFingerPanIfNeeded(event);
 
@@ -403,6 +412,10 @@
       event.stopPropagation();
     }
     touchSelection = null;
+
+    if (shouldFocusAfterTap && view) {
+      view.focus();
+    }
   }
 
   function toggleLineComments() {
