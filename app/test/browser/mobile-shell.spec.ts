@@ -144,6 +144,70 @@ test('selects code with a touch drag instead of panning the mobile editor', asyn
   await expect(page.locator('.mobile-code-editor')).not.toHaveAttribute('data-selection-length', '0');
 });
 
+test('scrolls the mobile editor with two-finger pan on the code surface', async ({ page }) => {
+  await page.goto('/');
+
+  const editor = page.getByLabel('q sketch editor');
+  await editor.click();
+  await page.keyboard.press('Meta+A');
+  await page.keyboard.type(`${'\n'.repeat(120)}// tail marker\n`);
+
+  const scroller = page.locator('.mobile-code-editor .cm-scroller');
+  await expect(scroller).toBeVisible();
+
+  const scrollBefore = await scroller.evaluate((el) => el.scrollTop);
+
+  const scrollDelta = await page.evaluate(() => {
+    const content = document.querySelector('.mobile-code-editor .cm-content');
+    if (!content) return null;
+    const box = content.getBoundingClientRect();
+    const midX = box.left + box.width / 2;
+    const y0 = box.top + Math.min(120, box.height / 3);
+    const y1 = y0 + 140;
+    const delta = 22;
+
+    const mk = (id: number, x: number, y: number) =>
+      new Touch({
+        identifier: id,
+        target: content,
+        clientX: x,
+        clientY: y,
+        radiusX: 1,
+        radiusY: 1,
+        rotationAngle: 0,
+        force: 0.5,
+      });
+    const fire = (type: 'touchstart' | 'touchmove' | 'touchend', touches: Touch[]) => {
+      content.dispatchEvent(
+        new TouchEvent(type, {
+          bubbles: true,
+          cancelable: true,
+          touches,
+          targetTouches: touches,
+          changedTouches: touches,
+        })
+      );
+    };
+
+    const t0a = mk(201, midX - delta, y0);
+    const t1a = mk(202, midX + delta, y0);
+    fire('touchstart', [t0a, t1a]);
+
+    const t0b = mk(201, midX - delta, y1);
+    const t1b = mk(202, midX + delta, y1);
+    fire('touchmove', [t0b, t1b]);
+
+    fire('touchend', []);
+
+    const scrollerEl = document.querySelector('.mobile-code-editor .cm-scroller');
+    if (!scrollerEl) return null;
+    return scrollerEl.scrollTop;
+  });
+
+  expect(scrollDelta).not.toBeNull();
+  expect(scrollDelta!).toBeGreaterThan(scrollBefore + 40);
+});
+
 test('highlights q syntax in the mobile editor', async ({ page }) => {
   await page.goto('/');
 
