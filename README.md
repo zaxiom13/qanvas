@@ -1,7 +1,8 @@
 # Qanvas
 
-A p5.js-style creative coding environment where your sketches are written in
-**q/kdb+**. Runs three ways — pick the one you have:
+A creative coding environment for the **q** language (**kdb+**). Runs three ways — pick the one you have:
+
+_kdb+ is a trademark of KX Systems. This project is not affiliated with or endorsed by KX._
 
 
 | Backend     | q license?  | Network?  | What runs your code                                                          |

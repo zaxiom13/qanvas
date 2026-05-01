@@ -249,7 +249,10 @@
       <div class="mobile-brand">
         <span class="brand-q">q</span><span>anvas</span><span class="brand-5">5</span>
       </div>
-      <p>kdb+/q creative coding</p>
+      <div class="mobile-header-tagline">
+        <p class="mobile-header-subtitle">Creative coding for q, compatible with kdb+.</p>
+        <p class="mobile-header-disclaimer">kdb+ is a trademark of KX Systems. This project is not affiliated with or endorsed by KX.</p>
+      </div>
     </div>
     <div class="mobile-header-actions">
       <div class="mobile-info-cluster" data-nudge-visible={!appState.infoModalPreviouslyOpened ? 'true' : undefined}>
@@ -742,10 +745,23 @@
     color: var(--brand-5);
   }
 
-  .mobile-header p {
+  .mobile-header-tagline {
     margin-top: 4px;
+  }
+
+  .mobile-header-subtitle {
+    margin: 0;
     color: var(--mobile-muted);
     font-size: 12px;
+    line-height: 1.35;
+  }
+
+  .mobile-header-disclaimer {
+    margin: 4px 0 0;
+    color: var(--mobile-muted);
+    font-size: 10px;
+    line-height: 1.35;
+    max-width: min(280px, 70vw);
   }
 
   .mobile-action {
