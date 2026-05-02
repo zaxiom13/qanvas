@@ -2,7 +2,7 @@
   "name": "qanvas",
   "version": "0.1.0",
   "private": true,
-  "description": "p5.js-like creative coding environment powered by q/kdb+. Runs client-side (jqport), against your local q license, or against a cloud q.",
+  "description": "Creative coding for q, compatible with kdb+. Runs client-side (jqport), against your local q license, or against a cloud q. kdb+ is a trademark of KX Systems; this project is not affiliated with or endorsed by KX.",
   "type": "module",
   "workspaces": [
     "packages/*",

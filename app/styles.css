@@ -2655,6 +2655,13 @@ body.is-resizing-console {
   font-size: 0.92em;
 }
 
+.info-modal-disclaimer {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--text-muted);
+}
+
 .info-tour-invite {
   margin-top: 10px;
   padding: 10px 12px;

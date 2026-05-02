@@ -8,6 +8,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="qanvas5" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta
+      name="description"
+      content="Creative coding for q, compatible with kdb+. kdb+ is a trademark of KX Systems. This project is not affiliated with or endorsed by KX."
+    />
     <title>Qanvas5</title>
     <link rel="manifest" href="/manifest.webmanifest" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
@@ -73,6 +77,14 @@
         color: #7a6e62;
         font-size: 12px;
         margin: 4px 0 0;
+      }
+
+      #qanvas-boot-fallback .boot-disclaimer {
+        color: #7a6e62;
+        font-size: 10px;
+        line-height: 1.35;
+        margin: 6px 0 0;
+        max-width: 280px;
       }
 
       #qanvas-boot-fallback .boot-action {
@@ -255,7 +267,8 @@
       <header class="boot-mobile-header">
         <div>
           <div class="boot-brand"><span class="boot-brand-q">q</span>anvas<span class="boot-brand-5">5</span></div>
-          <p class="boot-subtitle">kdb+/q creative coding</p>
+          <p class="boot-subtitle">Creative coding for q, compatible with kdb+.</p>
+          <p class="boot-disclaimer">kdb+ is a trademark of KX Systems. This project is not affiliated with or endorsed by KX.</p>
         </div>
         <div class="boot-action">
           <svg viewBox="0 0 24 24" aria-hidden="true">

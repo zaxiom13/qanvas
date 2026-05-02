@@ -1,7 +1,7 @@
 {
   "name": "qanvas5",
   "short_name": "qanvas5",
-  "description": "A mobile-friendly q/kdb+ creative coding studio.",
+  "description": "Creative coding for q, compatible with kdb+. kdb+ is a trademark of KX Systems. This project is not affiliated with or endorsed by KX.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
