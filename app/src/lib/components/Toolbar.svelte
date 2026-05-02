@@ -33,6 +33,20 @@
     </div>
     {#if appState.workspaceMode === 'studio'}
       <div class="toolbar-divider"></div>
+      <button
+        id="btn-new-sketch"
+        class="btn-icon-only"
+        type="button"
+        title="New sketch (Cmd+N)"
+        aria-label="New sketch"
+        onclick={() => void appState.createNewSketch()}
+      >
+        <svg class="icon" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+          <path d="M8 3v10M3 8h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+          <rect x="2.5" y="2.5" width="11" height="11" rx="1.5" stroke="currentColor" stroke-width="1.2" fill="none" />
+        </svg>
+      </button>
+      <div class="toolbar-divider"></div>
       <div class="project-info">
         {#if appState.renamingProject}
           <input

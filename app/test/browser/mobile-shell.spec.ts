@@ -34,6 +34,14 @@ test('keeps the bottom navigation out of the active screen content', async ({ pa
   expect(boxes[1]!.y).toBeGreaterThanOrEqual(boxes[0]!.y + boxes[0]!.height - 1);
 });
 
+test('studio bottom nav opens Library with list chrome', async ({ page }) => {
+  await page.goto('/');
+
+  await page.getByRole('button', { name: 'Library' }).click();
+  await expect(page.getByRole('heading', { name: 'Library' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'New' })).toBeVisible();
+});
+
 test('uses the real sketch canvas on the mobile canvas tab', async ({ page }) => {
   await page.goto('/');
 

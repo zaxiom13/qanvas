@@ -9,9 +9,11 @@
   import InlineCopy from '$lib/components/InlineCopy.svelte';
   import { highlightQSnippetHtml } from '$lib/mobile/q-highlight-html';
   import CodeMirrorEditor from '$lib/components/CodeMirrorEditor.svelte';
+  import ProjectLibraryList from '$lib/components/ProjectLibraryList.svelte';
   import { browserGateway } from '$lib/browser';
+  import { projectsLibraryBlurb } from '$lib/projects-display';
 
-  type MobileTab = 'editor' | 'canvas' | 'examples' | 'settings';
+  type MobileTab = 'editor' | 'canvas' | 'examples' | 'library' | 'settings';
   type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
 
   let activeTab = $state<MobileTab>('editor');
@@ -23,13 +25,28 @@
   let backgroundLastTime = 0;
   let examplePreviewPreloadHandle = 0;
   const preloadedExamplePreviews: HTMLImageElement[] = [];
+  let projectNameInput = $state<HTMLInputElement | null>(null);
 
-  let bottomTabs = $derived<{ id: MobileTab; label: string; icon: string }[]>([
-    { id: 'editor', label: 'Editor', icon: 'code' },
-    { id: 'canvas', label: appState.workspaceMode === 'practice' ? 'Output' : 'Canvas', icon: appState.workspaceMode === 'practice' ? 'terminal' : 'palette' },
-    { id: 'examples', label: appState.workspaceMode === 'practice' ? 'Lessons' : 'Examples', icon: 'cube' },
-    { id: 'settings', label: 'Settings', icon: 'sliders' },
-  ]);
+  $effect(() => {
+    if (!appState.renamingProject || !projectNameInput) return;
+    projectNameInput.focus();
+    projectNameInput.select();
+  });
+
+  let bottomTabs = $derived.by(() => {
+    const tabs: { id: MobileTab; label: string; icon: string }[] = [
+      { id: 'editor', label: 'Editor', icon: 'code' },
+      { id: 'canvas', label: appState.workspaceMode === 'practice' ? 'Output' : 'Canvas', icon: appState.workspaceMode === 'practice' ? 'terminal' : 'palette' },
+      { id: 'examples', label: appState.workspaceMode === 'practice' ? 'Lessons' : 'Examples', icon: 'cube' },
+    ];
+    if (appState.workspaceMode === 'studio') {
+      tabs.push({ id: 'library', label: 'Library', icon: 'library' });
+    }
+    tabs.push({ id: 'settings', label: 'Settings', icon: 'sliders' });
+    return tabs;
+  });
+
+  let libraryBlurb = $derived(projectsLibraryBlurb(appState.projectsRoot, appState.projectLibraryLoading));
 
   let examples = $derived(appState.filteredExamples);
   let practiceLessons = $derived(appState.practiceChallenges.slice(0, 12));
@@ -60,6 +77,9 @@
       appState.setCanvasPanelTab(appState.workspaceMode === 'practice' ? 'compiled' : 'canvas');
       if (appState.tourLessonExpanded) appState.toggleTourLessonPanel();
       if (!appState.mobileCanvasControlsCollapsed) appState.toggleMobileCanvasControlsCollapsed();
+    }
+    if (tab === 'library' && appState.workspaceMode === 'studio') {
+      void appState.refreshProjectLibrary();
     }
   }
 
@@ -148,6 +168,12 @@
     }
   });
 
+  $effect(() => {
+    if (appState.workspaceMode === 'practice' && activeTab === 'library') {
+      setActiveTab('editor');
+    }
+  });
+
   async function runOrStop() {
     if (appState.running && appState.paused) {
       setActiveTab('canvas');
@@ -216,13 +242,35 @@
   onMount(() => {
     const handler = ((event: CustomEvent<MobileTab>) => {
       const nextTab = event.detail;
-      const allowed = new Set<MobileTab>(['editor', 'canvas', 'examples', 'settings']);
+      const allowed = new Set<MobileTab>(['editor', 'canvas', 'examples', 'library', 'settings']);
       if (allowed.has(nextTab)) {
         setActiveTab(nextTab);
       }
     }) as EventListener;
     window.addEventListener('qanvas:mobile-tour-tab', handler);
     return () => window.removeEventListener('qanvas:mobile-tour-tab', handler);
+  });
+
+  onMount(() => {
+    const saveHandler = () => {
+      if (appState.workspaceMode === 'studio') void appState.saveProject(false);
+    };
+    const projectsHandler = () => {
+      if (appState.workspaceMode === 'studio') setActiveTab('library');
+    };
+    const newHandler = () => {
+      if (appState.workspaceMode === 'studio') void appState.createNewSketch();
+    };
+
+    window.addEventListener('qanvas:save', saveHandler as EventListener);
+    window.addEventListener('qanvas:toggle-projects', projectsHandler as EventListener);
+    window.addEventListener('qanvas:new-sketch', newHandler as EventListener);
+
+    return () => {
+      window.removeEventListener('qanvas:save', saveHandler as EventListener);
+      window.removeEventListener('qanvas:toggle-projects', projectsHandler as EventListener);
+      window.removeEventListener('qanvas:new-sketch', newHandler as EventListener);
+    };
   });
 
   onMount(() => {
@@ -245,46 +293,80 @@
 
 <div class="mobile-shell">
   <header class="mobile-header">
-    <div>
-      <div class="mobile-brand">
-        <span class="brand-q">q</span><span>anvas</span><span class="brand-5">5</span>
+    <div class="mobile-header-top">
+      <div class="mobile-header-brand-block">
+        <div class="mobile-brand">
+          <span class="brand-q">q</span><span>anvas</span><span class="brand-5">5</span>
+        </div>
+        <div class="mobile-header-tagline">
+          <p class="mobile-header-subtitle">Creative coding for q, compatible with kdb+.</p>
+          <p class="mobile-header-disclaimer">kdb+ is a trademark of KX Systems. This project is not affiliated with or endorsed by KX.</p>
+        </div>
       </div>
-      <div class="mobile-header-tagline">
-        <p class="mobile-header-subtitle">Creative coding for q, compatible with kdb+.</p>
-        <p class="mobile-header-disclaimer">kdb+ is a trademark of KX Systems. This project is not affiliated with or endorsed by KX.</p>
+      <div class="mobile-header-actions">
+        <div class="mobile-info-cluster" data-nudge-visible={!appState.infoModalPreviouslyOpened ? 'true' : undefined}>
+          <button
+            id="mobile-btn-info"
+            class="mobile-action mobile-info-action"
+            type="button"
+            aria-label="About Qanvas5"
+            onclick={() => (appState.activeModal = 'info')}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
+              <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
+            </svg>
+          </button>
+          {#if !appState.infoModalPreviouslyOpened}
+            <div class="info-btn-nudge info-btn-nudge--mobile" aria-hidden="true">
+              <span class="info-btn-nudge__text">Try me</span>
+              <svg class="info-btn-nudge__arrow" viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M4 12h13M13 8l4 4-4 4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </div>
+          {/if}
+        </div>
       </div>
     </div>
-    <div class="mobile-header-actions">
-      <div class="mobile-info-cluster" data-nudge-visible={!appState.infoModalPreviouslyOpened ? 'true' : undefined}>
-        <button
-          id="mobile-btn-info"
-          class="mobile-action mobile-info-action"
-          type="button"
-          aria-label="About Qanvas5"
-          onclick={() => (appState.activeModal = 'info')}
-        >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="9" fill="none" stroke="currentColor" stroke-width="2" />
-            <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
-          </svg>
-        </button>
-        {#if !appState.infoModalPreviouslyOpened}
-          <div class="info-btn-nudge info-btn-nudge--mobile" aria-hidden="true">
-            <span class="info-btn-nudge__text">Try me</span>
-            <svg class="info-btn-nudge__arrow" viewBox="0 0 24 24" aria-hidden="true">
-              <path
-                d="M4 12h13M13 8l4 4-4 4"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-              />
-            </svg>
-          </div>
+    {#if appState.workspaceMode === 'studio'}
+      <div class="mobile-project-strip">
+        {#if appState.renamingProject}
+          <input
+            bind:this={projectNameInput}
+            class="mobile-project-name-input"
+            type="text"
+            spellcheck="false"
+            aria-label="Project name"
+            bind:value={appState.projectNameDraft}
+            onblur={() => appState.finishProjectRename(true)}
+            onkeydown={(event) => {
+              if (event.key === 'Enter') appState.finishProjectRename(true);
+              if (event.key === 'Escape') appState.finishProjectRename(false);
+            }}
+          />
+        {:else}
+          <button
+            class="mobile-project-name-chip"
+            type="button"
+            title="Rename sketch"
+            aria-label={`Sketch ${appState.projectName}. Tap to rename.`}
+            onclick={() => appState.startProjectRename()}
+          >
+            <span class="mobile-project-name-text" use:pretextFit={{ min: 10, max: 22 }}>{appState.projectName}</span>
+            {#if appState.unsaved}
+              <span class="unsaved-dot mobile-unsaved-dot" aria-label="Unsaved changes"></span>
+            {/if}
+          </button>
         {/if}
       </div>
-    </div>
+    {/if}
   </header>
 
   <main class="mobile-main">
@@ -604,6 +686,31 @@
           </div>
         {/if}
       </section>
+    {:else if activeTab === 'library'}
+      <section class="mobile-library" aria-label="Sketch library">
+        <div class="mobile-library-head">
+          <div>
+            <h1>Library</h1>
+            <p class="mobile-library-lead">{libraryBlurb.primary}</p>
+          </div>
+          <button
+            type="button"
+            class="mobile-library-new"
+            onclick={() => {
+              void appState.createNewSketch();
+              setActiveTab('editor');
+            }}
+          >
+            New
+          </button>
+        </div>
+        <div class="mobile-library-scroll">
+          <ProjectLibraryList
+            afterOpen={() => setActiveTab('editor')}
+            emptyDetail="Save from Settings after editing, or the sketch will autosave when you have a library path."
+          />
+        </div>
+      </section>
     {:else}
       <section class="mobile-settings">
         <h1>Settings</h1>
@@ -615,6 +722,49 @@
             <button type="button" class:active={appState.workspaceMode === 'practice'} onclick={() => void chooseWorkspaceMode('practice')}>Practice</button>
           </div>
         </div>
+
+        {#if appState.workspaceMode === 'studio'}
+          <div class="mobile-settings-section">
+            <h2>Save &amp; open</h2>
+            <p class="mobile-settings-hint">Use the Library tab for saved sketches. Save and “Save as new copy” below update your library on this device.</p>
+            <button
+              class="mobile-setting-row"
+              type="button"
+              onclick={() => {
+                void appState.saveProject(false);
+              }}
+            >
+              <span>
+                <strong>Save</strong>
+                <small>Update the current sketch in your library (editor: Cmd or Ctrl+S).</small>
+              </span>
+            </button>
+            <button
+              class="mobile-setting-row"
+              type="button"
+              onclick={() => {
+                void appState.saveProject(true);
+              }}
+            >
+              <span>
+                <strong>Save as new copy</strong>
+                <small>Creates another library entry; the current tab keeps working on the new copy.</small>
+              </span>
+            </button>
+            <button
+              class="mobile-setting-row"
+              type="button"
+              onclick={() => {
+                setActiveTab('library');
+              }}
+            >
+              <span>
+                <strong>Open from library</strong>
+                <small>Browse sketches you have saved before.</small>
+              </span>
+            </button>
+          </div>
+        {/if}
 
         <div class="mobile-settings-section">
           <h2>Canvas & console</h2>
@@ -644,7 +794,7 @@
     {/if}
   </main>
 
-  <nav class="mobile-bottom-nav" aria-label="Mobile workspace">
+  <nav class="mobile-bottom-nav" aria-label="Mobile workspace" style={`grid-template-columns: repeat(${bottomTabs.length}, minmax(0, 1fr))`}>
     {#each bottomTabs as tab}
       <button type="button" class:active={activeTab === tab.id} onclick={() => setActiveTab(tab.id)}>
         <svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true">
@@ -658,13 +808,16 @@
             <rect x="3" y="4" width="18" height="16" rx="3" fill="none" stroke="currentColor" stroke-width="2" />
           {:else if tab.icon === 'cube'}
             <path d="m12 3 7 4v10l-7 4-7-4V7zM12 11l7-4M12 11v10M12 11 5 7" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+          {:else if tab.icon === 'library'}
+            <path d="M5 7h3l1.2 1.6h7.3v7.4a.8.8 0 0 1-.8.8H5a.8.8 0 0 1-.8-.8V7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
+            <path d="M4.2 9.6H14" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           {:else if tab.icon === 'file'}
             <path d="M6 3h6l3 3v12H6zM12 3v3h3" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" />
           {:else}
             <path d="M5 7h14M5 17h14M8 7a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM16 21a2 2 0 1 0 0-4 2 2 0 0 0 0 4Z" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
           {/if}
         </svg>
-        <span use:pretextFit={{ min: 9, max: 11 }}>{tab.label}</span>
+        <span use:pretextFit={{ min: 7, max: 10 }}>{tab.label}</span>
       </button>
     {/each}
   </nav>
@@ -696,12 +849,140 @@
   .mobile-header {
     flex: 0 0 auto;
     display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
     padding: calc(env(safe-area-inset-top) + 14px) 18px 12px;
     background: var(--bg-toolbar);
     border-bottom: 1px solid var(--mobile-border);
+  }
+
+  .mobile-header-top {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .mobile-header-brand-block {
+    min-width: 0;
+  }
+
+  .mobile-project-strip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    padding: 2px 0 0;
+  }
+
+  .mobile-project-name-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1;
+    max-width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--mobile-border);
+    border-radius: 10px;
+    background: color-mix(in srgb, var(--bg-chrome), white 12%);
+    color: var(--mobile-ink);
+    font-size: 14px;
+    font-weight: 700;
+    text-align: left;
+  }
+
+  .mobile-project-name-text {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .mobile-project-name-input {
+    flex: 1;
+    min-width: 0;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    background: var(--bg-editor);
+    color: var(--mobile-ink);
+    font-size: 14px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent), transparent 78%);
+  }
+
+  .mobile-unsaved-dot {
+    flex-shrink: 0;
+  }
+
+  .mobile-library {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 0;
+    background: var(--mobile-panel);
+    overflow: hidden;
+  }
+
+  .mobile-library-head {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 16px 12px;
+    border-bottom: 1px solid var(--mobile-border);
+    background: var(--bg-toolbar);
+  }
+
+  .mobile-library-head h1 {
+    margin: 0 0 6px;
+    font-size: 20px;
+    font-weight: 800;
+  }
+
+  .mobile-library-lead {
+    margin: 0;
+    color: var(--mobile-muted);
+    font-size: 12px;
+    line-height: 1.45;
+    max-width: 56ch;
+  }
+
+  .mobile-library-new {
+    flex-shrink: 0;
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--mobile-hot), white 20%);
+    background: var(--mobile-hot);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 800;
+  }
+
+  .mobile-library-scroll {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 10px 12px 20px;
+    overscroll-behavior: contain;
+  }
+
+  .mobile-library-scroll :global(.project-card) {
+    border-radius: 10px;
+    border: 1px solid var(--mobile-border);
+    background: #fff;
+  }
+
+  .mobile-settings-hint {
+    margin: 0 0 4px;
+    color: var(--mobile-muted);
+    font-size: 12px;
+    line-height: 1.45;
   }
 
   .mobile-header-actions {
@@ -709,7 +990,8 @@
     align-items: flex-start;
     justify-content: flex-end;
     flex-shrink: 0;
-    max-width: min(55vw, 260px);
+    gap: 8px;
+    max-width: min(55vw, 280px);
   }
 
   .mobile-info-cluster {
@@ -1525,9 +1807,8 @@
     flex: 0 0 auto;
     z-index: 5;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    padding: 10px 10px calc(env(safe-area-inset-bottom) + 10px);
+    gap: 4px;
+    padding: 10px 6px calc(env(safe-area-inset-bottom) + 10px);
     border-top: 1px solid var(--mobile-border);
     background: color-mix(in srgb, var(--bg-toolbar), white 8%);
     box-shadow: 0 -10px 24px rgba(70, 50, 34, 0.13);
