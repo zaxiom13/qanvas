@@ -337,6 +337,17 @@
     </div>
     {#if appState.workspaceMode === 'studio'}
       <div class="mobile-project-strip">
+        <button
+          class="mobile-project-save-btn"
+          type="button"
+          title="Save sketch"
+          aria-label="Save sketch"
+          onclick={() => {
+            void appState.saveProject(false);
+          }}
+        >
+          Save
+        </button>
         {#if appState.renamingProject}
           <input
             bind:this={projectNameInput}
@@ -876,6 +887,19 @@
     padding: 2px 0 0;
   }
 
+  .mobile-project-save-btn {
+    flex: 0 0 auto;
+    min-height: 34px;
+    padding: 0 12px;
+    border: 1px solid color-mix(in srgb, var(--mobile-hot), white 16%);
+    border-radius: 10px;
+    background: var(--mobile-hot);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+  }
+
   .mobile-project-name-chip {
     display: inline-flex;
     align-items: center;
@@ -883,14 +907,15 @@
     min-width: 0;
     flex: 1;
     max-width: 100%;
-    padding: 8px 12px;
+    padding: 7px 11px;
     border: 1px solid var(--mobile-border);
     border-radius: 10px;
-    background: color-mix(in srgb, var(--bg-chrome), white 12%);
+    background: color-mix(in srgb, var(--bg-chrome), white 4%);
     color: var(--mobile-ink);
-    font-size: 14px;
-    font-weight: 700;
+    font-size: 12px;
+    font-weight: 600;
     text-align: left;
+    opacity: 0.84;
   }
 
   .mobile-project-name-text {
