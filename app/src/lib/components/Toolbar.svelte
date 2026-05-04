@@ -70,6 +70,16 @@
           </button>
         {/if}
         <span id="unsaved-dot" class="unsaved-dot" hidden={!appState.unsaved}></span>
+        <button
+          id="btn-toolbar-save"
+          class="toolbar-save-btn"
+          type="button"
+          title="Save project (Cmd+S)"
+          aria-label="Save project"
+          onclick={() => void appState.saveProject(false)}
+        >
+          Save
+        </button>
       </div>
       <div class="toolbar-divider"></div>
       <button id="btn-projects" class="btn-icon-only" type="button" title="Project library" onclick={() => appState.openProjectsModal()}>

@@ -33,6 +33,11 @@
     projectNameInput.select();
   });
 
+  $effect(() => {
+    if (activeTab === 'canvas') return;
+    if (appState.renamingProject) appState.finishProjectRename(true);
+  });
+
   let bottomTabs = $derived.by(() => {
     const tabs: { id: MobileTab; label: string; icon: string }[] = [
       { id: 'editor', label: 'Editor', icon: 'code' },
@@ -298,10 +303,7 @@
         <div class="mobile-brand">
           <span class="brand-q">q</span><span>anvas</span><span class="brand-5">5</span>
         </div>
-        <div class="mobile-header-tagline">
-          <p class="mobile-header-subtitle">Creative coding for q, compatible with kdb+.</p>
-          <p class="mobile-header-disclaimer">kdb+ is a trademark of KX Systems. This project is not affiliated with or endorsed by KX.</p>
-        </div>
+        <p class="mobile-header-subtitle">Creative coding for q</p>
       </div>
       <div class="mobile-header-actions">
         <div class="mobile-info-cluster" data-nudge-visible={!appState.infoModalPreviouslyOpened ? 'true' : undefined}>
@@ -335,38 +337,6 @@
         </div>
       </div>
     </div>
-    {#if appState.workspaceMode === 'studio'}
-      <div class="mobile-project-strip">
-        {#if appState.renamingProject}
-          <input
-            bind:this={projectNameInput}
-            class="mobile-project-name-input"
-            type="text"
-            spellcheck="false"
-            aria-label="Project name"
-            bind:value={appState.projectNameDraft}
-            onblur={() => appState.finishProjectRename(true)}
-            onkeydown={(event) => {
-              if (event.key === 'Enter') appState.finishProjectRename(true);
-              if (event.key === 'Escape') appState.finishProjectRename(false);
-            }}
-          />
-        {:else}
-          <button
-            class="mobile-project-name-chip"
-            type="button"
-            title="Rename sketch"
-            aria-label={`Sketch ${appState.projectName}. Tap to rename.`}
-            onclick={() => appState.startProjectRename()}
-          >
-            <span class="mobile-project-name-text" use:pretextFit={{ min: 10, max: 22 }}>{appState.projectName}</span>
-            {#if appState.unsaved}
-              <span class="unsaved-dot mobile-unsaved-dot" aria-label="Unsaved changes"></span>
-            {/if}
-          </button>
-        {/if}
-      </div>
-    {/if}
   </header>
 
   <main class="mobile-main">
@@ -484,7 +454,7 @@
               <div class="mobile-practice-output-header">
                 <div>
                   <p class="mobile-practice-eyebrow">Output</p>
-                  <h2>{appState.activePracticeChallenge.title}</h2>
+                  <p class="mobile-practice-lesson-title">{appState.activePracticeChallenge.title}</p>
                 </div>
               </div>
               {#if appState.practiceVerification}
@@ -524,6 +494,47 @@
             <CanvasPanel hideTourPanel />
           {/if}
         </div>
+        {#if appState.workspaceMode === 'studio'}
+          <div class="mobile-canvas-sketch-bar" aria-label="Sketch">
+            {#if appState.renamingProject}
+              <input
+                bind:this={projectNameInput}
+                class="mobile-sketch-name-input"
+                type="text"
+                spellcheck="false"
+                aria-label="Sketch name"
+                bind:value={appState.projectNameDraft}
+                onblur={() => appState.finishProjectRename(true)}
+                onkeydown={(event) => {
+                  if (event.key === 'Enter') appState.finishProjectRename(true);
+                  if (event.key === 'Escape') appState.finishProjectRename(false);
+                }}
+              />
+            {:else}
+              <button
+                class="mobile-sketch-name"
+                type="button"
+                title="Rename sketch"
+                aria-label={`Sketch ${appState.projectName}. Tap to rename.`}
+                onclick={() => appState.startProjectRename()}
+              >
+                <span class="mobile-sketch-name-text" use:pretextFit={{ min: 8, max: 28 }}>{appState.projectName}</span>
+                {#if appState.unsaved}
+                  <span class="unsaved-dot mobile-unsaved-dot" aria-label="Unsaved changes"></span>
+                {/if}
+              </button>
+            {/if}
+            <button
+              class="mobile-sketch-save"
+              type="button"
+              title="Save sketch (Ctrl or Cmd+S)"
+              aria-label="Save sketch"
+              onclick={() => void appState.saveProject(false)}
+            >
+              Save
+            </button>
+          </div>
+        {/if}
         {#if appState.workspaceMode !== 'practice'}
           <div class="mobile-canvas-meta">
             <span>{appState.currentCanvasSize[0] || 800} x {appState.currentCanvasSize[1] || 600}</span>
@@ -851,67 +862,24 @@
     display: flex;
     flex-direction: column;
     align-items: stretch;
-    gap: 10px;
-    padding: calc(env(safe-area-inset-top) + 14px) 18px 12px;
-    background: var(--bg-toolbar);
-    border-bottom: 1px solid var(--mobile-border);
+    gap: 4px;
+    padding: calc(env(safe-area-inset-top) + 8px) 14px 8px;
+    background: color-mix(in srgb, var(--bg-toolbar), transparent 35%);
+    border-bottom: 1px solid color-mix(in srgb, var(--mobile-border), transparent 40%);
   }
 
   .mobile-header-top {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 10px;
   }
 
   .mobile-header-brand-block {
     min-width: 0;
-  }
-
-  .mobile-project-strip {
     display: flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    padding: 2px 0 0;
-  }
-
-  .mobile-project-name-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    min-width: 0;
-    flex: 1;
-    max-width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--mobile-border);
-    border-radius: 10px;
-    background: color-mix(in srgb, var(--bg-chrome), white 12%);
-    color: var(--mobile-ink);
-    font-size: 14px;
-    font-weight: 700;
-    text-align: left;
-  }
-
-  .mobile-project-name-text {
-    min-width: 0;
-    flex: 1;
-    overflow: hidden;
-  }
-
-  .mobile-project-name-input {
-    flex: 1;
-    min-width: 0;
-    min-height: 40px;
-    padding: 0 12px;
-    border: 1px solid var(--accent);
-    border-radius: 10px;
-    background: var(--bg-editor);
-    color: var(--mobile-ink);
-    font-size: 14px;
-    font-weight: 600;
-    font-family: var(--font-ui);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent), transparent 78%);
+    flex-direction: column;
+    gap: 2px;
   }
 
   .mobile-unsaved-dot {
@@ -987,7 +955,7 @@
 
   .mobile-header-actions {
     display: flex;
-    align-items: flex-start;
+    align-items: center;
     justify-content: flex-end;
     flex-shrink: 0;
     gap: 8px;
@@ -1014,9 +982,10 @@
   }
 
   .mobile-brand {
-    font-size: 26px;
-    font-weight: 800;
-    line-height: 1;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
   }
 
   .brand-q {
@@ -1027,30 +996,20 @@
     color: var(--brand-5);
   }
 
-  .mobile-header-tagline {
-    margin-top: 4px;
-  }
-
   .mobile-header-subtitle {
     margin: 0;
     color: var(--mobile-muted);
-    font-size: 12px;
-    line-height: 1.35;
-  }
-
-  .mobile-header-disclaimer {
-    margin: 4px 0 0;
-    color: var(--mobile-muted);
-    font-size: 10px;
-    line-height: 1.35;
-    max-width: min(280px, 70vw);
+    font-size: 11px;
+    line-height: 1.3;
+    font-weight: 500;
+    max-width: min(220px, 58vw);
   }
 
   .mobile-action {
     display: inline-grid;
     place-items: center;
-    width: 48px;
-    height: 48px;
+    width: 40px;
+    height: 40px;
     border: 1px solid var(--mobile-border);
     border-radius: 8px;
     background: var(--bg-chrome);
@@ -1282,10 +1241,72 @@
     letter-spacing: 0.08em;
   }
 
-  .mobile-practice-output h2 {
+  .mobile-practice-lesson-title {
     margin: 0;
-    font-size: 18px;
-    line-height: 1.2;
+    color: var(--mobile-muted);
+    font-size: 13px;
+    font-weight: 600;
+    line-height: 1.35;
+  }
+
+  .mobile-canvas-sketch-bar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 0;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--mobile-border);
+    background: color-mix(in srgb, var(--mobile-panel), var(--bg-chrome) 45%);
+  }
+
+  .mobile-sketch-name {
+    flex: 1 1 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+    padding: 6px 10px;
+    border: 1px solid color-mix(in srgb, var(--mobile-border), transparent 25%);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--mobile-muted);
+    font-size: 12px;
+    font-weight: 600;
+    text-align: left;
+  }
+
+  .mobile-sketch-name-text {
+    min-width: 0;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .mobile-sketch-name-input {
+    flex: 1 1 auto;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 10px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    background: var(--bg-editor);
+    color: var(--mobile-ink);
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-ui);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent), transparent 78%);
+  }
+
+  .mobile-sketch-save {
+    flex: 0 0 auto;
+    min-height: 36px;
+    padding: 0 14px;
+    border-radius: 8px;
+    border: 1px solid color-mix(in srgb, var(--mobile-hot), white 35%);
+    background: var(--mobile-hot);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
   }
 
   .mobile-panel-switch {
@@ -1472,11 +1493,11 @@
     display: flex;
     justify-content: space-between;
     gap: 10px;
-    padding: 12px 18px;
+    padding: 8px 14px;
     color: var(--mobile-muted);
-    font-size: 12px;
-    background: var(--mobile-panel);
-    border-bottom: 1px solid var(--mobile-border);
+    font-size: 11px;
+    background: color-mix(in srgb, var(--mobile-panel), transparent 12%);
+    border-bottom: 1px solid color-mix(in srgb, var(--mobile-border), transparent 35%);
   }
 
   .mobile-canvas-meta span {
@@ -1837,17 +1858,17 @@
 
   @media (max-width: 390px) {
     .mobile-header {
-      padding-right: 12px;
-      padding-left: 14px;
+      padding-right: 10px;
+      padding-left: 12px;
     }
 
     .mobile-action {
-      height: 44px;
-      width: 44px;
+      height: 38px;
+      width: 38px;
     }
 
     .mobile-brand {
-      font-size: 24px;
+      font-size: 17px;
     }
   }
 </style>
