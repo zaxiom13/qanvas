@@ -16,6 +16,7 @@ import {
   getPracticeSolutionSource,
 } from '$lib/practice-challenges';
 import { DEFAULT_PROJECT_NAME, ProjectSessionController } from '$lib/state/project-session';
+import { shouldAutoRunLoadedExample } from '$lib/state/example-load-policy';
 import { RuntimeCoordinator, type RuntimeProjectSource } from '$lib/state/runtime-coordinator';
 import {
   createRuntimeControlState,
@@ -640,7 +641,10 @@ class AppState {
     return true;
   }
 
-  async loadExample(exampleId: string) {
+  async loadExample(
+    exampleId: string,
+    options: { context?: 'browse' | 'guidedTour' } = {},
+  ) {
     const example = EXAMPLES.find((entry) => entry.id === exampleId);
     if (!example) return;
 
@@ -649,10 +653,13 @@ class AppState {
       if (decision === 'cancel') return;
     }
 
+    const context = options.context ?? 'browse';
+    const autoRun = shouldAutoRunLoadedExample(context);
+
     await this.resetStudioProject(example.code, example.name, { unsaved: false, dirtyRevision: 0 });
     this.setLastExampleId(example.id);
     this.activeModal = null;
-    if (this.workspaceMode === 'studio') {
+    if (this.workspaceMode === 'studio' && autoRun) {
       await this.runSketch();
     }
     this.appendConsole('info', `Loaded example: ${example.name}`);
@@ -722,7 +729,7 @@ class AppState {
     this.markTourLessonComplete(this.lastExampleId);
     const next = this.nextTourExample;
     if (!next) return;
-    await this.loadExample(next.id);
+    await this.loadExample(next.id, { context: 'guidedTour' });
   }
 
   /** Start the tour, advance to the next tutorial, or restart after completion — used by the canvas toolbar control. */
@@ -741,7 +748,7 @@ class AppState {
   async loadPreviousTourExample() {
     const previous = this.previousTourExample;
     if (!previous) return;
-    await this.loadExample(previous.id);
+    await this.loadExample(previous.id, { context: 'guidedTour' });
   }
 
   async restartTour() {
@@ -750,7 +757,7 @@ class AppState {
     const next = new Set<string>();
     this.tourCompletedIds = next;
     writeStoredSet(STORAGE_KEYS.tourCompleted, next);
-    await this.loadExample(first.id);
+    await this.loadExample(first.id, { context: 'guidedTour' });
   }
 
   async openProject(projectPath: string) {
@@ -758,11 +765,12 @@ class AppState {
     if (decision === 'cancel') return;
 
     const snapshot = await this.projectSession.readProject(projectPath);
-    this.loadProject(snapshot);
+    await this.loadProject(snapshot);
     this.activeModal = null;
   }
 
-  loadProject(snapshot: ProjectSnapshot) {
+  async loadProject(snapshot: ProjectSnapshot) {
+    await this.stopSketch(true);
     this.projectSession.loadProject(this, snapshot, DEFAULT_SKETCH);
     this.dirtyRevision = 0;
     this.runtimeRefreshWanted = false;
