@@ -308,6 +308,26 @@ button {
   flex-shrink: 0;
 }
 
+.toolbar-save-btn {
+  flex-shrink: 0;
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--border), var(--text-primary) 8%);
+  background: var(--bg-chrome, #fff);
+  color: var(--text-secondary);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  transition: background var(--transition), color var(--transition), border-color var(--transition);
+}
+
+.toolbar-save-btn:hover {
+  background: var(--surface-hover);
+  color: var(--text-primary);
+  border-color: var(--border);
+}
+
 /* Workspace switch — proper underline tabs */
 
 .workspace-switch {
