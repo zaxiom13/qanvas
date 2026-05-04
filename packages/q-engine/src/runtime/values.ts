@@ -1,10 +1,59 @@
 import { canonicalize, isTruthy, qBool, qDate, qDictionary, qError, qFloat, qInt, qKeyedTable, qList, qLong, qNull, qProjection, qReal, qShort, qString, qSymbol, qTable, type QDictionary, type QError, type QKeyedTable, type QList, type QNumber, type QString, type QSymbol, type QTable, type QValue } from "@qpad/core";
 import { CX_USAGE, Q_INT_MAX, Q_LONG_MAX, Q_RESERVED_SET, Q_SHORT_MAX, type AstNode, type LambdaValue, type StoredFileFormat, type TemporalType, QRuntimeError } from "./types.js";
 import type { Session } from "./session.js";
+import { tryPrimitiveEachPair, tryPrimitiveOver, tryPrimitiveScan } from "./kernel.js";
 
 export const formatValue = (value: QValue, options: { trailingNewline?: boolean } = { trailingNewline: true }): string => {
   const text = formatBare(value);
   return options.trailingNewline === false ? text : `${text}\n`;
+};
+
+const formatNestedListItem = (value: QValue, options: { symbolsAsColumns?: boolean } = {}): string => {
+  if (value.kind === "list" && value.attribute === "tokTuple") {
+    return `(${value.items.map(formatBare).join(";")})`;
+  }
+  if (
+    value.kind === "list" &&
+    value.items.length > 0 &&
+    value.items.every((item) => item.kind === "temporal")
+  ) {
+    const temporalItems = value.items.filter((item): item is Extract<QValue, { kind: "temporal" }> => item.kind === "temporal");
+    if (new Set(temporalItems.map((item) => item.temporalType)).size > 1) {
+      return `(${temporalItems.map((item) => item.value).join(";")})`;
+    }
+  }
+  if (options.symbolsAsColumns && value.kind === "list" && value.items.every((item) => item.kind === "symbol")) {
+    return value.items.map((item) => (item.kind === "symbol" ? item.value : "")).join(" ");
+  }
+  return formatBare(value);
+};
+
+const Q_LONG_MAX_BIGINT = 9223372036854775807n;
+
+const qLongExact = (exact: bigint): QNumber => ({
+  kind: "number",
+  value: Number(exact),
+  numericType: "long",
+  exactText: exact.toString()
+});
+
+export const displayWithoutFloatSuffix = (value: QValue): QValue => {
+  if (
+    value.kind === "number" &&
+    (value.numericType === "float" || value.numericType === "real") &&
+    !value.special &&
+    Number.isInteger(value.value)
+  ) {
+    return { ...value, exactText: formatListNumber(value) };
+  }
+  if (value.kind === "list") {
+    return qList(
+      value.items.map(displayWithoutFloatSuffix),
+      value.homogeneous ?? false,
+      value.attribute
+    );
+  }
+  return value;
 };
 
 export const parseNumericLiteral = (raw: string): QValue => {
@@ -235,15 +284,23 @@ export const numericTypeOf = (value: QValue): string => {
 export const promoteNumericType = (a: string, b: string): string => {
   const ra = NUMERIC_RANK[a] ?? 3;
   const rb = NUMERIC_RANK[b] ?? 3;
-  return ra >= rb ? a : b;
+  const type = ra >= rb ? a : b;
+  return type === "short" ? "int" : type;
 };
 
 export const numericOf = (value: number, type: string): QNumber => {
-  if (type === "float" || !Number.isInteger(value)) return qFloat(value);
+  if (type === "float" || !Number.isInteger(value)) {
+    if (value === Number.POSITIVE_INFINITY) return qFloat(value, "posInf");
+    if (value === Number.NEGATIVE_INFINITY) return qFloat(value, "negInf");
+    return qFloat(value);
+  }
   switch (type) {
     case "short":
       return qShort(value);
     case "int":
+      if (value === Q_INT_MAX) return qInt(value, "intPosInf");
+      if (value === -Q_INT_MAX) return qInt(value, "intNegInf");
+      if (value > Q_INT_MAX || value < -Q_INT_MAX) return qInt(0, "intNull");
       return qInt(value);
     case "real":
       return qReal(value);
@@ -277,6 +334,44 @@ export const isNumericNull = (value: QValue) => {
   if (value.special === "shortNull") return true;
   if (value.special === "realNull") return true;
   return false;
+};
+
+const numericDelta = (value: QValue): number | null => {
+  if (value.kind === "boolean") return value.value ? 1 : 0;
+  if (value.kind !== "number" || value.numericType !== "long" || value.special) return null;
+  return value.value;
+};
+
+const longInfinityBoundaryResult = (a: QValue, b: QValue, sign: 1 | -1): QValue | null => {
+  const leftSpecial = a.kind === "number" && a.numericType === "long" ? a.special : undefined;
+  const rightSpecial = b.kind === "number" && b.numericType === "long" ? b.special : undefined;
+  const rightDelta = numericDelta(b);
+  const leftDelta = numericDelta(a);
+
+  if (leftSpecial === "longPosInf" && rightDelta !== null) {
+    const signedDelta = sign * rightDelta;
+    if (signedDelta === 0) return qLong(Q_LONG_MAX, "longPosInf");
+    if (signedDelta > 0) return qLong(0, "longNull");
+    return qLongExact(Q_LONG_MAX_BIGINT + BigInt(signedDelta));
+  }
+  if (leftSpecial === "longNegInf" && rightDelta !== null) {
+    const signedDelta = sign * rightDelta;
+    if (signedDelta === 0) return qLong(-Q_LONG_MAX, "longNegInf");
+    if (signedDelta < 0) return qLong(0, "longNull");
+    return qLongExact(-Q_LONG_MAX_BIGINT + BigInt(signedDelta));
+  }
+  if (sign === 1 && rightSpecial === "longPosInf" && leftDelta !== null) {
+    if (leftDelta === 0) return qLong(Q_LONG_MAX, "longPosInf");
+    if (leftDelta > 0) return qLong(0, "longNull");
+    return null;
+  }
+  if (sign === 1 && rightSpecial === "longNegInf" && leftDelta !== null) {
+    if (leftDelta === 0) return qLong(-Q_LONG_MAX, "longNegInf");
+    if (leftDelta < 0) return qLong(0, "longNull");
+    return null;
+  }
+
+  return null;
 };
 
 export const unaryNumeric = (value: QValue, mapper: (input: number) => number): QValue =>
@@ -392,7 +487,12 @@ export const arithBinary = (
     return nullForType(type);
   }
   const result = op(toNumber(a), toNumber(b));
-  return forceFloat ? qFloat(result) : numericOf(result, type);
+  if (forceFloat) {
+    if (result === Number.POSITIVE_INFINITY) return qFloat(result, "posInf");
+    if (result === Number.NEGATIVE_INFINITY) return qFloat(result, "negInf");
+    return qFloat(result);
+  }
+  return numericOf(result, type);
 };
 
 export const addTemporal = (a: QValue, b: QValue): QValue | null => {
@@ -410,8 +510,8 @@ export const addTemporal = (a: QValue, b: QValue): QValue | null => {
 export const subtractTemporal = (a: QValue, b: QValue): QValue | null => {
   if (a.kind === "temporal" && b.kind === "temporal") {
     if (a.temporalType === "date" && b.temporalType === "date") {
-      if (a.value === "0Nd" || b.value === "0Nd") return qLong(0, "longNull");
-      return qLong(parseQDateDays(a.value) - parseQDateDays(b.value));
+      if (a.value === "0Nd" || b.value === "0Nd") return qInt(0, "intNull");
+      return qInt(parseQDateDays(a.value) - parseQDateDays(b.value));
     }
     return null;
   }
@@ -428,10 +528,12 @@ export const subtractTemporal = (a: QValue, b: QValue): QValue | null => {
 export const add = (a: QValue, b: QValue): QValue =>
   applyDictionaryBinary(a, b, add) ??
   addTemporal(a, b) ??
+  longInfinityBoundaryResult(a, b, 1) ??
   arithBinary(a, b, (x, y) => x + y);
 export const subtract = (a: QValue, b: QValue): QValue =>
   applyDictionaryBinary(a, b, subtract) ??
   subtractTemporal(a, b) ??
+  longInfinityBoundaryResult(a, b, -1) ??
   arithBinary(a, b, (x, y) => x - y);
 export const multiply = (a: QValue, b: QValue): QValue =>
   applyDictionaryBinary(a, b, multiply) ?? arithBinary(a, b, (x, y) => x * y);
@@ -555,11 +657,23 @@ export const absValue = (value: QValue): QValue => {
   return numeric(Math.abs(toNumber(value)));
 };
 
-export const allValue = (value: QValue): QValue =>
-  qBool(value.kind === "list" ? value.items.every(isTruthy) : isTruthy(value));
+export const allValue = (value: QValue): QValue => {
+  if (value.kind === "table") return tableColumnAggregate(value, allValue);
+  if (value.kind === "dictionary") {
+    const aggregated = dictionaryPositionAggregate(value, allValue);
+    return aggregated ?? allValue(qList(value.values, false));
+  }
+  return qBool(value.kind === "list" ? value.items.every(isTruthy) : isTruthy(value));
+};
 
-export const anyValue = (value: QValue): QValue =>
-  qBool(value.kind === "list" ? value.items.some(isTruthy) : isTruthy(value));
+export const anyValue = (value: QValue): QValue => {
+  if (value.kind === "table") return tableColumnAggregate(value, anyValue);
+  if (value.kind === "dictionary") {
+    const aggregated = dictionaryPositionAggregate(value, anyValue);
+    return aggregated ?? anyValue(qList(value.values, false));
+  }
+  return qBool(value.kind === "list" ? value.items.some(isTruthy) : isTruthy(value));
+};
 
 export const ceilingValue = (value: QValue): QValue => {
   if (value.kind === "list") {
@@ -582,6 +696,13 @@ export const colsValue = (value: QValue): QValue => {
 };
 
 export const firstValue = (value: QValue): QValue => {
+  if (value.kind === "table") {
+    return tableRowCount(value) === 0 ? qDictionary([], []) : rowFromTable(value, 0);
+  }
+  if (value.kind === "keyedTable") {
+    const table = qTable({ ...value.keys.columns, ...value.values.columns });
+    return tableRowCount(table) === 0 ? qDictionary([], []) : rowFromTable(table, 0);
+  }
   if (value.kind === "list") {
     return value.items[0] ?? qNull();
   }
@@ -595,6 +716,15 @@ export const firstValue = (value: QValue): QValue => {
 };
 
 export const lastValue = (value: QValue): QValue => {
+  if (value.kind === "table") {
+    const rowCount = tableRowCount(value);
+    return rowCount === 0 ? qDictionary([], []) : rowFromTable(value, rowCount - 1);
+  }
+  if (value.kind === "keyedTable") {
+    const table = qTable({ ...value.keys.columns, ...value.values.columns });
+    const rowCount = tableRowCount(table);
+    return rowCount === 0 ? qDictionary([], []) : rowFromTable(table, rowCount - 1);
+  }
   if (value.kind === "list") {
     return value.items.at(-1) ?? qNull();
   }
@@ -608,6 +738,21 @@ export const lastValue = (value: QValue): QValue => {
 };
 
 export const ascValue = (value: QValue): QValue => {
+  if (value.kind === "dictionary") {
+    const positions = gradePositions(value.values, true);
+    return qDictionary(
+      positions.map((index) => value.keys[index]!),
+      positions.map((index) => value.values[index]!)
+    );
+  }
+  if (value.kind === "table") {
+    return sortTableByColumns(value, Object.keys(value.columns), true);
+  }
+  if (value.kind === "keyedTable") {
+    const names = Object.keys(value.values.columns);
+    const positions = tableGradePositions(value.values, names, true);
+    return qKeyedTable(selectTableRows(value.keys, positions), sortSelectedTableRows(value.values, positions, names, true));
+  }
   if (value.kind === "list") {
     return qList([...value.items].sort(compareValue), value.homogeneous ?? false, "s");
   }
@@ -618,8 +763,22 @@ export const ascValue = (value: QValue): QValue => {
 };
 
 export const descValue = (value: QValue): QValue => {
+  if (value.kind === "dictionary") {
+    const positions = gradePositions(value.values, false);
+    return qDictionary(
+      positions.map((index) => value.keys[index]!),
+      positions.map((index) => value.values[index]!)
+    );
+  }
+  if (value.kind === "table") {
+    return sortTableByColumns(value, Object.keys(value.columns).slice(0, 1), false);
+  }
+  if (value.kind === "keyedTable") {
+    const positions = tableGradePositions(value.values, Object.keys(value.values.columns).slice(0, 1), false);
+    return qKeyedTable(selectTableRows(value.keys, positions), selectTableRows(value.values, positions));
+  }
   if (value.kind === "list") {
-    return qList([...value.items].sort((a, b) => compareValue(b, a)), value.homogeneous ?? false, "s");
+    return qList([...value.items].sort((a, b) => compareValue(b, a)), value.homogeneous ?? false);
   }
   if (value.kind === "string") {
     return qString([...value.value].sort((a, b) => b.localeCompare(a)).join(""));
@@ -628,14 +787,107 @@ export const descValue = (value: QValue): QValue => {
 };
 
 export const attrValue = (value: QValue): QValue =>
-  value.kind === "list" && value.attribute ? qSymbol(value.attribute) : qSymbol("");
+  value.kind === "list" && value.attribute
+    ? qSymbol(value.attribute)
+    : value.kind === "table" && Object.values(value.columns)[0]?.attribute === "p"
+      ? qSymbol("s")
+      : value.kind === "keyedTable" && Object.values(value.keys.columns)[0]?.attribute === "p"
+        ? qSymbol("s")
+        : qSymbol("");
+
+const setAttributeValue = (left: QSymbol, right: QValue): QValue => {
+  const attribute = left.value;
+  if (!["", "s", "u", "p", "g"].includes(attribute)) {
+    throw new QRuntimeError("type", "set attribute expects `, `s, `u, `p or `g");
+  }
+  if (right.kind === "list") {
+    if (attribute === "s" && !right.items.every((item, index) => index === 0 || compare(right.items[index - 1]!, item) <= 0)) {
+      throw new QRuntimeError("s-fail", "not sorted");
+    }
+    return qList(right.items, right.homogeneous ?? false, attribute || undefined);
+  }
+  if (right.kind === "table") {
+    if (attribute !== "s" && attribute !== "") {
+      throw new QRuntimeError("type", "table attributes support sorted or clear");
+    }
+    const names = Object.keys(right.columns);
+    return qTable(
+      Object.fromEntries(
+        names.map((name, index) => {
+          const column = right.columns[name]!;
+          return [
+            name,
+            qList(column.items, column.homogeneous ?? false, attribute === "s" && index === 0 ? "p" : undefined)
+          ];
+        })
+      )
+    );
+  }
+  if (right.kind === "keyedTable") {
+    return qKeyedTable(setAttributeValue(left, right.keys) as QTable, right.values);
+  }
+  throw new QRuntimeError("type", "set attribute expects a list, table or keyed table");
+};
+
+const tableColumnAggregate = (value: QTable, reducer: (value: QValue) => QValue): QDictionary =>
+  qDictionary(
+    Object.keys(value.columns).map((name) => qSymbol(name)),
+    Object.values(value.columns).map((column) => displayWithoutFloatSuffix(reducer(column)))
+  );
+
+const dictionaryPositionAggregate = (
+  value: QDictionary,
+  reducer: (value: QValue) => QValue
+): QValue | null => {
+  if (!value.values.every((item) => item.kind === "list")) return null;
+  const rows = value.values as QList[];
+  const count = rows[0]?.items.length ?? 0;
+  if (!rows.every((row) => row.items.length === count)) return null;
+  return qList(
+    Array.from({ length: count }, (_, index) =>
+      reducer(qList(rows.map((row) => row.items[index]!), false))
+    ),
+    false
+  );
+};
+
+const mappedDictionary = (value: QDictionary, mapper: (value: QValue) => QValue): QDictionary =>
+  qDictionary(value.keys, value.values.map(mapper));
+
+const mappedTable = (value: QTable, mapper: (value: QValue) => QValue): QTable =>
+  qTable(
+    Object.fromEntries(
+      Object.entries(value.columns).map(([name, column]) => {
+        const mapped = mapper(column);
+        const displayed = displayWithoutFloatSuffix(mapped);
+        return [name, displayed.kind === "list" ? displayed : qList([displayed], false)];
+      })
+    )
+  );
 
 export const sumValue = (value: QValue): QValue => {
+  if (value.kind === "table") return tableColumnAggregate(value, sumValue);
+  if (value.kind === "dictionary") {
+    const aggregated = dictionaryPositionAggregate(value, sumValue);
+    if (aggregated) return aggregated;
+  }
   if (value.kind !== "list") {
     return value;
   }
-  const items = value.items.filter((item) => !isNullish(item));
-  return items.reduce((acc, item) => add(acc, item), qLong(0));
+  const items = (value.homogeneous ?? false)
+    ? value.items.filter((item) => !isNullish(item))
+    : value.items;
+  if (items.every((item) => item.kind === "list")) {
+    const lists = items as QList[];
+    return lists.slice(1).reduce(
+      (acc: QValue, item) => mapBinary(acc, item, (a, b) => add(a, b)),
+      lists[0]!
+    );
+  }
+  const seed = value.items.some((item) => item.kind === "number" && item.numericType === "float")
+    ? qFloat(0)
+    : qLong(0);
+  return items.reduce((acc, item) => (isNullish(item) ? acc : add(acc, item)), seed);
 };
 
 export const sampleNumericType = (list: QList): string => {
@@ -657,6 +909,11 @@ export const sampleNumericType = (list: QList): string => {
 };
 
 export const minValue = (value: QValue): QValue => {
+  if (value.kind === "table") return tableColumnAggregate(value, minValue);
+  if (value.kind === "dictionary") {
+    const aggregated = dictionaryPositionAggregate(value, minValue);
+    if (aggregated) return aggregated;
+  }
   if (value.kind === "string") {
     return qString([...value.value].sort((a, b) => a.localeCompare(b))[0] ?? "");
   }
@@ -664,6 +921,15 @@ export const minValue = (value: QValue): QValue => {
     return value;
   }
   const list = asList(value);
+  const nestedItems = list.items.length > 0 && list.items.every((item) => item.kind === "list")
+    ? (list.items as QList[])
+    : null;
+  if (nestedItems) {
+    return nestedItems.slice(1).reduce(
+      (acc: QValue, item) => mapBinary(acc, item, (a, b) => minPair(a, b)),
+      nestedItems[0]!
+    );
+  }
   const items = list.items.filter((item) => !isNullish(item));
   if (items.length === 0) {
     const t = sampleNumericType(list);
@@ -677,6 +943,11 @@ export const minValue = (value: QValue): QValue => {
 };
 
 export const maxValue = (value: QValue): QValue => {
+  if (value.kind === "table") return tableColumnAggregate(value, maxValue);
+  if (value.kind === "dictionary") {
+    const aggregated = dictionaryPositionAggregate(value, maxValue);
+    if (aggregated) return aggregated;
+  }
   if (value.kind === "string") {
     return qString([...value.value].sort((a, b) => a.localeCompare(b)).at(-1) ?? "");
   }
@@ -684,6 +955,15 @@ export const maxValue = (value: QValue): QValue => {
     return value;
   }
   const list = asList(value);
+  const nestedItems = list.items.length > 0 && list.items.every((item) => item.kind === "list")
+    ? (list.items as QList[])
+    : null;
+  if (nestedItems) {
+    return nestedItems.slice(1).reduce(
+      (acc: QValue, item) => mapBinary(acc, item, (a, b) => maxPair(a, b)),
+      nestedItems[0]!
+    );
+  }
   const items = list.items.filter((item) => !isNullish(item));
   if (items.length === 0) {
     const t = sampleNumericType(list);
@@ -697,6 +977,31 @@ export const maxValue = (value: QValue): QValue => {
 };
 
 export const medianValue = (value: QValue): QValue => {
+  if (value.kind === "table") {
+    const rowCount = tableRowCount(value);
+    if (rowCount === 0) return qDictionary([], []);
+    const rows = Array.from({ length: rowCount }, (_, index) => rowFromTable(value, index)).sort((left, right) => {
+      const primary = compare(left.values[0] ?? qNull(), right.values[0] ?? qNull());
+      return primary === 0 ? compare(left, right) : primary;
+    });
+    const middle = Math.floor(rows.length / 2);
+    if (rows.length % 2 === 1) {
+      return rows[middle]!;
+    }
+    const left = rows[middle - 1]!;
+    const right = rows[middle]!;
+    return qDictionary(
+      left.keys,
+      left.values.map((item, index) =>
+        displayWithoutFloatSuffix(medianValue(qList([item, right.values[index]!], false)))
+      )
+    );
+  }
+  if (value.kind === "keyedTable") return medianValue(value.values);
+  if (value.kind === "dictionary") {
+    const aggregated = dictionaryPositionAggregate(value, medianValue);
+    if (aggregated) return aggregated;
+  }
   const list = asList(value);
   const items = [...list.items];
   if (items.length === 0) {
@@ -724,17 +1029,49 @@ export const minPair = (left: QValue, right: QValue): QValue =>
 export const maxPair = (left: QValue, right: QValue): QValue =>
   compare(left, right) >= 0 ? left : right;
 
+const qFloatResult = (value: number): QNumber => {
+  if (Number.isNaN(value)) return qFloat(Number.NaN, "null");
+  if (value === Number.POSITIVE_INFINITY) return qFloat(value, "posInf");
+  if (value === Number.NEGATIVE_INFINITY) return qFloat(value, "negInf");
+  return qFloat(value);
+};
+
 export const avgValue = (value: QValue): QValue => {
+  if (value.kind === "table") return tableColumnAggregate(value, avgValue);
+  if (value.kind === "dictionary") {
+    const aggregated = dictionaryPositionAggregate(value, avgValue);
+    if (aggregated) return aggregated;
+  }
   const list = asList(value);
-  const items = list.items.filter((item) => !isNullish(item));
+  const items = (list.homogeneous ?? false)
+    ? list.items.filter((item) => !isNullish(item))
+    : list.items;
   if (items.length === 0) {
     return qFloat(Number.NaN, "null");
   }
+  if (!(list.homogeneous ?? false) && items.every((item) => isNullish(item))) {
+    return qFloat(Number.NaN, "null");
+  }
   const total = sumValue(qList(items, list.homogeneous ?? false));
-  return qFloat(toNumber(total) / items.length);
+  if (total.kind === "list") {
+    return qList(
+      total.items.map((item) =>
+        item.kind === "number" ? (isNullish(item) ? qFloat(Number.NaN, "null") : qFloatResult(toNumber(item) / items.length)) : item
+      ),
+      false
+    );
+  }
+  return qFloatResult(toNumber(total) / items.length);
 };
 
 export const avgsValue = (value: QValue): QValue => {
+  if (value.kind === "table") return mappedTable(value, avgsValue);
+  if (value.kind === "dictionary") {
+    return qDictionary(
+      value.keys,
+      value.values.map((_, index) => avgValue(qList(value.values.slice(0, index + 1), false)))
+    );
+  }
   const list = asList(value);
   let running: QValue = qLong(0);
   let count = 0;
@@ -744,17 +1081,30 @@ export const avgsValue = (value: QValue): QValue => {
         running = add(running, item);
         count += 1;
       }
-      return count === 0 ? qFloat(Number.NaN, "null") : qFloat(toNumber(running) / count);
+      return count === 0 ? qFloat(Number.NaN, "null") : qFloatResult(toNumber(running) / count);
     }),
     false
   );
 };
 
 export const productValue = (value: QValue): QValue => {
+  if (value.kind === "table") return tableColumnAggregate(value, productValue);
+  if (value.kind === "dictionary") {
+    const aggregated = dictionaryPositionAggregate(value, productValue);
+    if (aggregated) return aggregated;
+  }
   if (value.kind !== "list") {
     return value;
   }
-  return value.items.reduce((acc, item) => multiply(acc, item), qLong(1));
+  const items = value.items.filter((item) => !isNullish(item));
+  if (items.every((item) => item.kind === "list")) {
+    const lists = items as QList[];
+    return lists.slice(1).reduce(
+      (acc: QValue, item) => mapBinary(acc, item, (a, b) => multiply(a, b)),
+      lists[0]!
+    );
+  }
+  return items.reduce((acc, item) => multiply(acc, item), qLong(1));
 };
 
 export const prdsValue = (value: QValue): QValue => {
@@ -799,12 +1149,41 @@ export const nextValue = (value: QValue): QValue => {
   );
 };
 
+export const xprevValue = (offsetValue: QValue, value: QValue): QValue => {
+  const offset = Math.trunc(toNumber(offsetValue));
+  if (value.kind === "string") {
+    return qString([...value.value].map((_, index) => value.value[index - offset] ?? " ").join(""));
+  }
+  const list = asList(value);
+  if (list.items.length === 0) {
+    return qList([], list.homogeneous ?? false);
+  }
+  return qList(
+    list.items.map((_, index) => list.items[index - offset] ?? nullLike(list.items[offset >= 0 ? 0 : list.items.length - 1])),
+    list.homogeneous ?? false
+  );
+};
+
 export const sumsValue = (value: QValue): QValue => {
+  if (value.kind === "table") return mappedTable(value, sumsValue);
+  if (value.kind === "dictionary") {
+    return qDictionary(
+      value.keys,
+      value.values.map((_, index) => sumValue(qList(value.values.slice(0, index + 1), false)))
+    );
+  }
   const list = asList(value);
   let running: QValue = qLong(0);
   return qList(
     list.items.map((item) => {
-      running = add(running, item);
+      if (!isNullish(item)) {
+        running =
+          item.kind === "list" && running.kind === "number" && toNumber(running) === 0
+            ? item
+            : item.kind === "list" || running.kind === "list"
+              ? mapBinary(running, item, (a, b) => add(a, b))
+              : add(running, item);
+      }
       return running;
     }),
     list.homogeneous ?? false
@@ -812,34 +1191,80 @@ export const sumsValue = (value: QValue): QValue => {
 };
 
 export const minsValue = (value: QValue): QValue => {
+  if (value.kind === "table") return mappedTable(value, minsValue);
+  if (value.kind === "dictionary") {
+    return qDictionary(
+      value.keys,
+      value.values.map((_, index) => minValue(qList(value.values.slice(0, index + 1), false)))
+    );
+  }
   const list = asList(value);
   let running: QValue | null = null;
   return qList(
     list.items.map((item) => {
       if (!isNullish(item)) {
-        running = running === null ? item : minPair(running, item);
+        running =
+          running === null
+            ? item
+            : item.kind === "list" || running.kind === "list"
+              ? mapBinary(running, item, (a, b) => minPair(a, b))
+              : minPair(running, item);
       }
-      return running ?? nullLike(item);
+      return running ?? minValue(qList([item], list.homogeneous ?? false, list.attribute));
     }),
     list.homogeneous ?? false
   );
 };
 
 export const maxsValue = (value: QValue): QValue => {
+  if (value.kind === "table") return mappedTable(value, maxsValue);
+  if (value.kind === "dictionary") {
+    return qDictionary(
+      value.keys,
+      value.values.map((_, index) => maxValue(qList(value.values.slice(0, index + 1), false)))
+    );
+  }
   const list = asList(value);
   let running: QValue | null = null;
   return qList(
     list.items.map((item) => {
       if (!isNullish(item)) {
-        running = running === null ? item : maxPair(running, item);
+        running =
+          running === null
+            ? item
+            : item.kind === "list" || running.kind === "list"
+              ? mapBinary(running, item, (a, b) => maxPair(a, b))
+              : maxPair(running, item);
       }
-      return running ?? nullLike(item);
+      return running ?? maxValue(qList([item], list.homogeneous ?? false, list.attribute));
     }),
     list.homogeneous ?? false
   );
 };
 
+const ratioFirstValue = (value: QValue): QValue =>
+  value.kind === "list"
+    ? qList(value.items.map((item) => ratioFirstValue(item)), value.homogeneous ?? false)
+    : qFloat(toNumber(value));
+
 export const ratiosValue = (value: QValue): QValue => {
+  if (value.kind === "table") return mappedTable(value, ratiosValue);
+  if (value.kind === "keyedTable") return qKeyedTable(value.keys, mappedTable(value.values, ratiosValue));
+  if (value.kind === "dictionary") {
+    return qDictionary(
+      value.keys,
+      value.values.map((item, index) => {
+        if (isNullish(item)) {
+          return qFloat(Number.NaN, "null");
+        }
+        if (index === 0) {
+          return ratioFirstValue(item);
+        }
+        const previous = value.values[index - 1] ?? qNull();
+        return isNullish(previous) ? qFloat(Number.NaN, "null") : mapBinary(item, previous, divide);
+      })
+    );
+  }
   const list = asList(value);
   return qList(
     list.items.map((item, index) => {
@@ -857,7 +1282,23 @@ export const ratiosValue = (value: QValue): QValue => {
 };
 
 export const varianceValue = (value: QValue, sample: boolean): QValue => {
+  if (value.kind === "table") {
+    return tableColumnAggregate(value, (column) => varianceValue(column, sample));
+  }
   const list = asList(value);
+  if (list.items.length > 0 && list.items.every((item) => item.kind === "list")) {
+    const rows = list.items as QList[];
+    const count = rows[0]?.items.length ?? 0;
+    if (!rows.every((row) => row.items.length === count)) {
+      throw new QRuntimeError("length", "variance expects conforming nested lists");
+    }
+    return qList(
+      Array.from({ length: count }, (_, index) =>
+        varianceValue(qList(rows.map((row) => row.items[index]!), false), sample)
+      ),
+      false
+    );
+  }
   const items = list.items.filter((item) => !isNullish(item));
   if (items.length === 0 || (sample && items.length < 2)) {
     return qFloat(Number.NaN, "null");
@@ -872,24 +1313,148 @@ export const varianceValue = (value: QValue, sample: boolean): QValue => {
 };
 
 export const deviationValue = (value: QValue, sample: boolean): QValue => {
+  if (value.kind === "table") {
+    return tableColumnAggregate(value, (column) => deviationValue(column, sample));
+  }
   const variance = varianceValue(value, sample);
+  if (variance.kind === "list") {
+    return qList(
+      variance.items.map((item) =>
+        item.kind === "number" && item.special !== "null"
+          ? qFloat(Math.sqrt(toNumber(item)))
+          : item
+      ),
+      false
+    );
+  }
   return variance.kind === "number" && variance.special === "null"
     ? variance
     : qFloat(Math.sqrt(toNumber(variance)));
 };
 
+const numericItems = (value: QValue): QValue[] => asList(value).items.filter((item) => !isNullish(item));
+
+export const covarianceValue = (left: QValue, right: QValue, sample: boolean): QValue => {
+  const leftItems = numericItems(left);
+  const rightItems = numericItems(right);
+  if (leftItems.length !== rightItems.length) {
+    throw new QRuntimeError("length", "covariance arguments must conform");
+  }
+  if (leftItems.length === 0 || (sample && leftItems.length < 2)) {
+    return qFloat(Number.NaN, "null");
+  }
+
+  const xs = leftItems.map(toNumber);
+  const ys = rightItems.map(toNumber);
+  const meanX = xs.reduce((sum, value) => sum + value, 0) / xs.length;
+  const meanY = ys.reduce((sum, value) => sum + value, 0) / ys.length;
+  const divisor = sample ? xs.length - 1 : xs.length;
+  return qFloat(
+    xs.reduce((sum, value, index) => sum + (value - meanX) * (ys[index]! - meanY), 0) / divisor
+  );
+};
+
+export const correlationValue = (left: QValue, right: QValue): QValue => {
+  const cov = covarianceValue(left, right, false);
+  const leftDev = deviationValue(left, false);
+  const rightDev = deviationValue(right, false);
+  const denominator = toNumber(leftDev) * toNumber(rightDev);
+  if (denominator === 0 || Number.isNaN(denominator)) {
+    return qFloat(Number.NaN, "null");
+  }
+  const result = toNumber(cov) / denominator;
+  if (Math.abs(result - 1) < 1e-12) {
+    return { ...qFloat(1), exactText: "1f" };
+  }
+  return Math.abs(result + 1) < 1e-12
+    ? { ...qFloat(-1), exactText: "-1f" }
+    : qFloat(result);
+};
+
+export const emaValue = (alphaValue: QValue, values: QValue): QValue => {
+  const list = asList(values);
+  const alphas =
+    alphaValue.kind === "list"
+      ? alphaValue.items.map(toNumber)
+      : Array.from({ length: list.items.length }, () => toNumber(alphaValue));
+  if (alphas.length !== list.items.length) {
+    throw new QRuntimeError("length", "ema smoothing values must conform");
+  }
+  if (list.items.length === 0) {
+    return qList([], false);
+  }
+
+  let previous = toNumber(list.items[0]!);
+  const results = list.items.map((item, index) => {
+    const current = toNumber(item);
+    previous = index === 0 ? current : alphas[index]! * current + (1 - alphas[index]!) * previous;
+    return qFloat(previous);
+  });
+  return qList(results, false);
+};
+
 export const movingCountValue = (value: QValue): QValue => {
   const list = asList(value);
-  return qLong(list.items.filter((item) => !isNullish(item)).length);
+  if (list.items.length > 0 && list.items.every((item) => item.kind === "list")) {
+    const rows = list.items as QList[];
+    const count = rows[0]?.items.length ?? 0;
+    if (rows.every((row) => row.items.length === count)) {
+      return qList(
+        Array.from({ length: count }, (_, index) =>
+          movingCountValue(qList(rows.map((row) => row.items[index]!), false))
+        ),
+        true,
+        "explicitInt"
+      );
+    }
+  }
+  return qInt(list.items.filter((item) => !isNullish(item)).length);
 };
 
 export const movingValue = (
   windowSize: QValue,
   value: QValue,
   reducer: (value: QValue) => QValue,
-  homogeneous: boolean
+  homogeneous: boolean,
+  nonPositive: "zero" | "intZero" | "floatNull" | "source" = "source"
 ): QValue => {
-  const size = Math.max(1, Math.trunc(toNumber(windowSize)));
+  const rawSize = Math.trunc(toNumber(windowSize));
+  if (rawSize <= 0) {
+    if (value.kind === "dictionary") {
+      return mappedDictionary(value, (item) => movingValue(windowSize, item, reducer, homogeneous, nonPositive));
+    }
+    if (value.kind === "table") {
+      return mappedTable(value, (column) => movingValue(windowSize, column, reducer, homogeneous, nonPositive));
+    }
+    if (nonPositive === "source") return value;
+    const list = asList(value);
+    const replacement =
+      nonPositive === "floatNull"
+        ? () => qFloat(Number.NaN, "null")
+        : nonPositive === "intZero"
+          ? () => qInt(0)
+          : () => qLong(0);
+    const values = list.items.map(replacement);
+    return qList(
+      values,
+      nonPositive === "intZero" || (nonPositive === "zero" && (list.homogeneous ?? false)),
+      nonPositive === "intZero" ? "explicitInt" : undefined
+    );
+  }
+  if (value.kind === "dictionary") {
+    const size = rawSize;
+    return qDictionary(
+      value.keys,
+      value.values.map((_, index) => {
+        const start = Math.max(0, index - size + 1);
+        return reducer(qList(value.values.slice(start, index + 1), false));
+      })
+    );
+  }
+  if (value.kind === "table") {
+    return mappedTable(value, (column) => movingValue(windowSize, column, reducer, homogeneous, nonPositive));
+  }
+  const size = rawSize;
   const list = asList(value);
   const values = list.items.map((_, index) => {
     const start = Math.max(0, index - size + 1);
@@ -907,6 +1472,21 @@ export const movingValue = (
 };
 
 export const deltasValue = (value: QValue, seed?: QValue): QValue => {
+  const fast = tryPrimitiveEachPair("-", value, seed);
+  if (fast) return fast;
+  if (value.kind === "table") return mappedTable(value, (column) => deltasValue(column, seed));
+  if (value.kind === "keyedTable") return qKeyedTable(value.keys, mappedTable(value.values, (column) => deltasValue(column, seed)));
+  if (value.kind === "dictionary") {
+    return qDictionary(
+      value.keys,
+      value.values.map((item, index) => {
+        if (index === 0) {
+          return seed === undefined ? item : mapBinary(item, seed, subtract);
+        }
+        return mapBinary(item, value.values[index - 1] ?? qNull(), subtract);
+      })
+    );
+  }
   const list = asList(value);
   if (list.items.length === 0) {
     return qList([], list.homogeneous ?? false);
@@ -924,6 +1504,18 @@ export const deltasValue = (value: QValue, seed?: QValue): QValue => {
 };
 
 export const reverseValue = (value: QValue): QValue => {
+  if (value.kind === "dictionary") {
+    return qDictionary([...value.keys].reverse(), [...value.values].reverse());
+  }
+  if (value.kind === "table") {
+    const rowCount = tableRowCount(value);
+    return selectTableRows(value, Array.from({ length: rowCount }, (_, index) => rowCount - 1 - index));
+  }
+  if (value.kind === "keyedTable") {
+    const rowCount = tableRowCount(value.keys);
+    const positions = Array.from({ length: rowCount }, (_, index) => rowCount - 1 - index);
+    return qKeyedTable(selectTableRows(value.keys, positions), selectTableRows(value.values, positions));
+  }
   if (value.kind === "string") {
     return qString([...value.value].reverse().join(""));
   }
@@ -1009,37 +1601,93 @@ export const cutValue = (left: QValue, right: QValue): QValue => {
 
 export const rotateValue = (left: QValue, right: QValue): QValue => {
   const count = toNumber(left);
+  const rotatedPositions = (length: number) => {
+    if (length === 0) return [];
+    const shift = ((count % length) + length) % length;
+    return [...Array.from({ length: length - shift }, (_, index) => index + shift), ...Array.from({ length: shift }, (_, index) => index)];
+  };
   if (right.kind === "string") {
     const chars = [...right.value];
     if (chars.length === 0) {
       return right;
     }
-    const shift = ((count % chars.length) + chars.length) % chars.length;
-    return qString([...chars.slice(shift), ...chars.slice(0, shift)].join(""));
+    const positions = rotatedPositions(chars.length);
+    return qString(positions.map((position) => chars[position]!).join(""));
+  }
+  if (right.kind === "table") {
+    return selectTableRows(right, rotatedPositions(tableRowCount(right)));
+  }
+  if (right.kind === "keyedTable") {
+    const positions = rotatedPositions(tableRowCount(right.keys));
+    return qKeyedTable(selectTableRows(right.keys, positions), selectTableRows(right.values, positions));
   }
   const list = asList(right);
-  if (list.items.length === 0) {
-    return list;
-  }
-  const shift = ((count % list.items.length) + list.items.length) % list.items.length;
+  const positions = rotatedPositions(list.items.length);
   return qList(
-    [...list.items.slice(shift), ...list.items.slice(0, shift)],
+    positions.map((position) => list.items[position]!),
     list.homogeneous ?? false
   );
 };
 
 export const sublistValue = (left: QValue, right: QValue): QValue => {
-  if (left.kind !== "list" || left.items.length < 2) {
-    throw new QRuntimeError("type", "sublist expects a two-item left argument");
-  }
-  const start = toNumber(left.items[0] ?? qLong(0));
-  const count = toNumber(left.items[1] ?? qLong(0));
+  const start = left.kind === "list" ? toNumber(left.items[0] ?? qLong(0)) : 0;
+  const count = left.kind === "list" ? toNumber(left.items[1] ?? qLong(0)) : toNumber(left);
+  const sublistPositions = (length: number) => {
+    if (count >= 0) {
+      const begin = Math.max(0, Math.trunc(start));
+      const end = Math.min(length, begin + Math.trunc(count));
+      return Array.from({ length: Math.max(0, end - begin) }, (_, index) => begin + index);
+    }
+    const begin = Math.max(0, length + Math.trunc(count));
+    return Array.from({ length: length - begin }, (_, index) => begin + index);
+  };
   if (right.kind === "string") {
-    return qString(right.value.slice(start, start + count));
+    const chars = [...right.value];
+    return qString(sublistPositions(chars.length).map((position) => chars[position]!).join(""));
+  }
+  if (right.kind === "dictionary") {
+    const positions = sublistPositions(right.keys.length);
+    return qDictionary(
+      positions.map((position) => right.keys[position]!),
+      positions.map((position) => right.values[position]!)
+    );
+  }
+  if (right.kind === "table") {
+    return selectTableRows(right, sublistPositions(tableRowCount(right)));
+  }
+  if (right.kind === "keyedTable") {
+    const positions = sublistPositions(tableRowCount(right.keys));
+    return qKeyedTable(selectTableRows(right.keys, positions), selectTableRows(right.values, positions));
   }
   const list = asList(right);
-  return qList(list.items.slice(start, start + count), list.homogeneous ?? false);
+  const positions = sublistPositions(list.items.length);
+  return qList(positions.map((position) => list.items[position]!), list.homogeneous ?? false);
 };
+
+const emptyAttributeForList = (list: QList): string | undefined => {
+  if (list.attribute && list.attribute !== "s" && list.attribute !== "namespaceKeys") {
+    return list.attribute === "explicitInt" ? "int" : list.attribute;
+  }
+  if (list.items.length === 0) return undefined;
+  if (list.items.every((item) => item.kind === "number")) {
+    const type = (list.items[0] as QNumber).numericType;
+    return list.items.every((item) => item.kind === "number" && item.numericType === type) ? type : undefined;
+  }
+  if (list.items.every((item) => item.kind === "symbol")) return "symbol";
+  if (list.items.every((item) => item.kind === "boolean")) return "boolean";
+  return undefined;
+};
+
+const attributeForAtom = (value: QValue): string | undefined => {
+  if (value.kind === "boolean") return "boolean";
+  if (value.kind === "number") return value.numericType;
+  if (value.kind === "symbol") return "symbol";
+  if (value.kind === "temporal") return value.temporalType;
+  return undefined;
+};
+
+const listWithPreservedEmptyType = (items: QValue[], source: QList): QList =>
+  qList(items, source.homogeneous ?? false, items.length === 0 ? emptyAttributeForList(source) : source.attribute);
 
 export const chunkValue = (size: number, right: QValue): QValue => {
   if (right.kind === "string") {
@@ -1232,6 +1880,9 @@ export const qsqlExpressionName = (node: AstNode | null): string | null => {
     case "call":
       return qsqlExpressionName(node.args[0] ?? null);
     case "binary":
+      if (node.op === "wsum" || node.op === "wavg") {
+        return qsqlExpressionName(node.right) ?? qsqlExpressionName(node.left);
+      }
       return qsqlExpressionName(node.left) ?? qsqlExpressionName(node.right);
     case "vector":
       return qsqlExpressionName(node.items[0] ?? null);
@@ -1253,7 +1904,9 @@ export const QSQL_AGGREGATES = new Set([
   "dev",
   "sdev",
   "var",
-  "svar"
+  "svar",
+  "wsum",
+  "wavg"
 ]);
 
 export const isQsqlAggregateExpression = (node: AstNode | null): boolean => {
@@ -1267,10 +1920,11 @@ export const isQsqlAggregateExpression = (node: AstNode | null): boolean => {
     return isQsqlAggregateExpression(node.value);
   }
   return (
-    node.kind === "call" &&
-    node.callee.kind === "identifier" &&
-    node.args.length === 1 &&
-    QSQL_AGGREGATES.has(node.callee.name)
+    (node.kind === "call" &&
+      node.callee.kind === "identifier" &&
+      node.args.length === 1 &&
+      QSQL_AGGREGATES.has(node.callee.name)) ||
+    (node.kind === "binary" && QSQL_AGGREGATES.has(node.op))
   );
 };
 
@@ -1283,7 +1937,7 @@ export const renameTableColumns = (table: QTable, names: string[]) => {
   const entries = Object.entries(table.columns);
   return qTable(
     Object.fromEntries(
-      entries.map(([_, column], index) => [names[index]!, column])
+      entries.map(([name, column], index) => [names[index] ?? name, column])
     )
   );
 };
@@ -1323,28 +1977,51 @@ export const qIdValue = (value: QValue): QValue => {
 };
 
 export const xcolValue = (namesValue: QValue, tableValue: QValue): QValue => {
-  if (namesValue.kind !== "list" || !namesValue.items.every((item) => item.kind === "symbol")) {
+  if (namesValue.kind === "dictionary") {
+    if (!namesValue.keys.every((item) => item.kind === "symbol") || !namesValue.values.every((item) => item.kind === "symbol")) {
+      throw new QRuntimeError("type", "xcol dictionary expects symbol keys and values");
+    }
+    const renameMap = new Map(
+      namesValue.keys.map((key, index) => [(key as QSymbol).value, (namesValue.values[index] as QSymbol).value])
+    );
+    const renameWithMap = (table: QTable) =>
+      qTable(
+        Object.fromEntries(
+          Object.entries(table.columns).map(([name, column]) => [renameMap.get(name) ?? name, column])
+        )
+      );
+    if (tableValue.kind === "table") return renameWithMap(tableValue);
+    if (tableValue.kind === "keyedTable") {
+      return qKeyedTable(renameWithMap(tableValue.keys), renameWithMap(tableValue.values));
+    }
+    throw new QRuntimeError("type", "xcol expects a table");
+  }
+
+  const nameItems = namesValue.kind === "symbol" ? [namesValue] : namesValue.kind === "list" ? namesValue.items : null;
+  if (nameItems === null || !nameItems.every((item) => item.kind === "symbol")) {
     throw new QRuntimeError("type", "xcol expects a symbol list on the left");
   }
 
-  const names = namesValue.items.map((item) => (item as QSymbol).value);
+  const baseNames = nameItems.map((item) => (item as QSymbol).value);
 
   if (tableValue.kind === "table") {
-    if (names.length !== Object.keys(tableValue.columns).length) {
-      throw new QRuntimeError("length", "xcol name count must match table columns");
+    const columnCount = Object.keys(tableValue.columns).length;
+    if (baseNames.length > columnCount) {
+      throw new QRuntimeError("length", "xcol name count must not exceed table columns");
     }
-    return renameTableColumns(tableValue, names);
+    return renameTableColumns(tableValue, baseNames);
   }
 
   if (tableValue.kind === "keyedTable") {
     const keyNames = Object.keys(tableValue.keys.columns);
     const valueNames = Object.keys(tableValue.values.columns);
-    if (names.length !== keyNames.length + valueNames.length) {
-      throw new QRuntimeError("length", "xcol name count must match keyed table columns");
+    const columnCount = keyNames.length + valueNames.length;
+    if (baseNames.length > columnCount) {
+      throw new QRuntimeError("length", "xcol name count must not exceed keyed table columns");
     }
     return qKeyedTable(
-      renameTableColumns(tableValue.keys, names.slice(0, keyNames.length)),
-      renameTableColumns(tableValue.values, names.slice(keyNames.length))
+      renameTableColumns(tableValue.keys, baseNames.slice(0, keyNames.length)),
+      renameTableColumns(tableValue.values, baseNames.slice(keyNames.length))
     );
   }
 
@@ -1363,9 +2040,9 @@ export const asMatrix = (value: QValue): number[][] => {
   });
 };
 
-export const fromMatrix = (rows: number[][]): QValue =>
+export const fromMatrix = (rows: number[][], rowAttribute?: string): QValue =>
   qList(
-    rows.map((row) => qList(row.map((value) => qFloat(value)), true)),
+    rows.map((row) => qList(row.map((value) => qFloat(value)), true, rowAttribute)),
     false
   );
 
@@ -1396,6 +2073,32 @@ export const mmuValue = (left: QValue, right: QValue): QValue => {
     result[i] = out;
   }
   return fromMatrix(result);
+};
+
+const transposeMatrix = (matrix: number[][]): number[][] => {
+  const cols = matrix[0]?.length ?? 0;
+  if (!matrix.every((row) => row.length === cols)) {
+    throw new QRuntimeError("length", "matrix rows must have equal length");
+  }
+  return Array.from({ length: cols }, (_, col) => matrix.map((row) => row[col]!));
+};
+
+const multiplyMatrices = (left: number[][], right: number[][]): number[][] => {
+  const rows = left.length;
+  if (rows === 0) return [];
+  const inner = left[0]!.length;
+  if (!left.every((row) => row.length === inner) || right.length !== inner) {
+    throw new QRuntimeError("length", "matrix inner dimensions must match");
+  }
+  const cols = right[0]?.length ?? 0;
+  if (!right.every((row) => row.length === cols)) {
+    throw new QRuntimeError("length", "matrix rows must have equal length");
+  }
+  return left.map((row) =>
+    Array.from({ length: cols }, (_, col) =>
+      row.reduce((sum, value, index) => sum + value * right[index]![col]!, 0)
+    )
+  );
 };
 
 export const invValue = (value: QValue): QValue => {
@@ -1439,16 +2142,62 @@ export const invValue = (value: QValue): QValue => {
   return fromMatrix(result);
 };
 
-export const wsumValue = (weights: QValue, values: QValue): QValue =>
-  sumValue(mapBinary(weights, values, (a, b) => multiply(a, b)));
+export const lsqValue = (left: QValue, right: QValue): QValue => {
+  const x = asMatrix(left);
+  const y = asMatrix(right);
+  const cols = x[0]?.length ?? 0;
+  if (cols === 0 || !x.every((row) => row.length === cols) || !y.every((row) => row.length === cols)) {
+    throw new QRuntimeError("length", "lsq expects matrices with matching column counts");
+  }
+  if (y.length > cols) {
+    throw new QRuntimeError("length", "lsq expects right rows not to exceed column count");
+  }
+  const yt = transposeMatrix(y);
+  const yyT = multiplyMatrices(y, yt);
+  const result = multiplyMatrices(multiplyMatrices(x, yt), asMatrix(invValue(fromMatrix(yyT))));
+  return result.length === 1 && result[0]?.length === 1 ? qFloat(result[0][0]!) : fromMatrix(result, "matrixRow");
+};
+
+export const wsumValue = (weights: QValue, values: QValue): QValue => {
+  if (values.kind === "dictionary") {
+    const dictionaryWeights = weights.kind === "dictionary" ? qList(weights.values, false) : weights;
+    return wsumValue(dictionaryWeights, qList(values.values, false));
+  }
+  return sumValue(mapBinary(weights, values, (a, b) => multiply(a, b)));
+};
 
 export const wavgValue = (weights: QValue, values: QValue): QValue => {
+  if (values.kind === "dictionary") {
+    const dictionaryWeights = weights.kind === "dictionary" ? qList(weights.values, false) : weights;
+    return wavgValue(dictionaryWeights, qList(values.values, false));
+  }
   const numerator = sumValue(mapBinary(weights, values, (a, b) => multiply(a, b)));
-  const denominator = sumValue(weights);
-  return divide(numerator, denominator);
+  const eligibleWeights = mapBinary(weights, values, (weight, value) =>
+    isNullish(weight) || isNullish(value) ? nullForType(numericTypeOf(weight)) : weight
+  );
+  const denominator = sumValue(eligibleWeights);
+  return mapBinary(numerator, denominator, (total, weightTotal) =>
+    weightTotal.kind === "number" && toNumber(weightTotal) === 0
+      ? qFloat(Number.NaN, "null")
+      : divide(total, weightTotal)
+  );
 };
 
 export const binarySearchValue = (list: QValue, target: QValue, mode: "bin" | "binr"): QValue => {
+  if (list.kind === "dictionary") {
+    const values = qList(list.values, false);
+    const indexes = binarySearchValue(values, target, mode);
+    const keyAt = (indexValue: QValue): QValue => {
+      if (indexValue.kind !== "number") return qSymbol("");
+      const index = Math.trunc(toNumber(indexValue));
+      if (index < 0 || index >= list.keys.length) return qSymbol("");
+      return list.keys[index] ?? qSymbol("");
+    };
+    if (indexes.kind === "list") {
+      return qList(indexes.items.map(keyAt), true, list.keys.every((key) => key.kind === "symbol") ? "symbol" : undefined);
+    }
+    return keyAt(indexes);
+  }
   if (list.kind !== "list") {
     throw new QRuntimeError("type", `${mode} expects a list on the left`);
   }
@@ -1489,20 +2238,86 @@ export const binarySearchValue = (list: QValue, target: QValue, mode: "bin" | "b
 
 export const rankValue = (value: QValue): QValue => gradeValue(gradeValue(value, true), true);
 
+export const xrankValue = (bucketValue: QValue, value: QValue): QValue => {
+  const bucketCount = Math.trunc(toNumber(bucketValue));
+  const items = asSequenceItems(value);
+  if (items.length === 0) {
+    return qList([], true);
+  }
+  if (bucketCount <= 0) {
+    return qList(items.map(() => qLong(0)), true);
+  }
+  const ranked = gradeValue(gradeValue(value, true), true);
+  if (ranked.kind !== "list") {
+    return qLong(0);
+  }
+  return qList(
+    ranked.items.map((item) => qLong(Math.floor((bucketCount * toNumber(item)) / items.length))),
+    true
+  );
+};
+
 export const randValue = (arg: QValue): QValue => {
   if (arg.kind === "list") {
     if (arg.items.length === 0) return qNull();
     return arg.items[Math.floor(Math.random() * arg.items.length)]!;
   }
+  if (arg.kind === "symbol") {
+    const length = Number.parseInt(arg.value, 10);
+    if (!Number.isFinite(length) || length < 0) {
+      throw new QRuntimeError("type", "rand symbol expects a numeric symbol length");
+    }
+    const alphabet = "abcdefghijklmnop";
+    return qSymbol(
+      Array.from({ length: Math.min(Math.trunc(length), 8) }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join("")
+    );
+  }
+  if (arg.kind === "temporal") {
+    if (arg.temporalType === "date") {
+      const days = Math.max(0, parseQDateDays(arg.value));
+      return qDate(formatQDateFromDays(Math.floor(Math.random() * (days + 1))));
+    }
+    if (arg.temporalType === "month") {
+      return qTemporal("month", formatMonthFromMonths(randNatural(parseMonthMonths(arg.value))));
+    }
+    if (arg.temporalType === "minute") {
+      return qTemporal("minute", formatClockFromUnits(randNatural(parseMinuteUnits(arg.value)), 1 / 60, "minute"));
+    }
+    if (arg.temporalType === "second") {
+      return qTemporal("second", formatClockFromUnits(randNatural(parseSecondUnits(arg.value)), 1, "second"));
+    }
+    if (arg.temporalType === "time") {
+      return qTemporal("time", formatClockFromUnits(randNatural(parseTimeMillis(arg.value)), 1000, "millisecond"));
+    }
+    if (arg.temporalType === "timespan") {
+      return qTemporal("timespan", formatTimespanFromNanos(randNatural(parseTimespanNanos(arg.value))));
+    }
+    if (arg.temporalType === "timestamp") {
+      return qTemporal("timestamp", formatTimestampFromNanos(randNatural(parseTimestampNanos(arg.value))));
+    }
+    if (arg.temporalType === "datetime") {
+      return qTemporal("datetime", formatDatetimeFromMillis(randNatural(parseDatetimeMillis(arg.value))));
+    }
+  }
+  if (arg.kind === "string") {
+    const alphabet = "abcdefghijklmnopqrstuvwxyz";
+    return qString(alphabet[Math.floor(Math.random() * alphabet.length)] ?? "a");
+  }
   if (arg.kind === "number") {
     const n = arg.value;
+    if (arg.numericType === "short") {
+      return qShort(Math.floor(Math.random() * Math.max(Math.trunc(n), 1)));
+    }
+    if (arg.numericType === "int") {
+      return qInt(Math.floor(Math.random() * Math.max(Math.trunc(n), 1)));
+    }
     if (Number.isInteger(n) && n > 0) {
       return qLong(Math.floor(Math.random() * n));
     }
-    return qFloat(Math.random() * n);
+    return arg.numericType === "real" ? qReal(Math.random() * n) : qFloat(Math.random() * n);
   }
   if (arg.kind === "boolean") {
-    return qLong(arg.value ? 0 : 0);
+    return qBool(Math.random() < 0.5);
   }
   throw new QRuntimeError("type", "rand expects a number or list");
 };
@@ -1548,6 +2363,97 @@ export const byteListFromBytes = (bytes: Uint8Array): QList =>
 
 export const byteListFromText = (text: string): QList =>
   qList([...text].map((char) => qLong(char.codePointAt(0)!)), true, "byte");
+
+const md5Shift = [
+  7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+  5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+  4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+  6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+];
+
+const md5Table = Array.from({ length: 64 }, (_, index) =>
+  Math.floor(Math.abs(Math.sin(index + 1)) * 0x100000000) >>> 0
+);
+
+const rotateLeft32 = (value: number, bits: number) =>
+  ((value << bits) | (value >>> (32 - bits))) >>> 0;
+
+export const md5Value = (value: QValue): QValue => {
+  if (value.kind !== "string") {
+    throw new QRuntimeError("type", "md5 expects a string");
+  }
+
+  const input = new TextEncoder().encode(value.value);
+  const paddedLength = (((input.length + 8) >>> 6) + 1) << 6;
+  const padded = new Uint8Array(paddedLength);
+  padded.set(input);
+  padded[input.length] = 0x80;
+  const bitLength = input.length * 8;
+  for (let offset = 0; offset < 8; offset += 1) {
+    padded[paddedLength - 8 + offset] = Math.floor(bitLength / 2 ** (8 * offset)) & 0xff;
+  }
+
+  let a0 = 0x67452301;
+  let b0 = 0xefcdab89;
+  let c0 = 0x98badcfe;
+  let d0 = 0x10325476;
+  const words = new Uint32Array(16);
+
+  for (let chunk = 0; chunk < padded.length; chunk += 64) {
+    for (let index = 0; index < 16; index += 1) {
+      const base = chunk + index * 4;
+      words[index] =
+        (padded[base]! |
+          (padded[base + 1]! << 8) |
+          (padded[base + 2]! << 16) |
+          (padded[base + 3]! << 24)) >>> 0;
+    }
+
+    let a = a0;
+    let b = b0;
+    let c = c0;
+    let d = d0;
+
+    for (let index = 0; index < 64; index += 1) {
+      let f = 0;
+      let g = 0;
+      if (index < 16) {
+        f = (b & c) | (~b & d);
+        g = index;
+      } else if (index < 32) {
+        f = (d & b) | (~d & c);
+        g = (5 * index + 1) % 16;
+      } else if (index < 48) {
+        f = b ^ c ^ d;
+        g = (3 * index + 5) % 16;
+      } else {
+        f = c ^ (b | ~d);
+        g = (7 * index) % 16;
+      }
+
+      const next = d;
+      d = c;
+      c = b;
+      b = (b + rotateLeft32((a + f + md5Table[index]! + words[g]!) >>> 0, md5Shift[index]!)) >>> 0;
+      a = next;
+    }
+
+    a0 = (a0 + a) >>> 0;
+    b0 = (b0 + b) >>> 0;
+    c0 = (c0 + c) >>> 0;
+    d0 = (d0 + d) >>> 0;
+  }
+
+  const digest = new Uint8Array(16);
+  [a0, b0, c0, d0].forEach((word, wordIndex) => {
+    const base = wordIndex * 4;
+    digest[base] = word & 0xff;
+    digest[base + 1] = (word >>> 8) & 0xff;
+    digest[base + 2] = (word >>> 16) & 0xff;
+    digest[base + 3] = (word >>> 24) & 0xff;
+  });
+  return byteListFromBytes(digest);
+};
 
 export const inferFormatFromExt = (path: string): StoredFileFormat => {
   const dot = path.lastIndexOf(".");
@@ -1737,6 +2643,73 @@ export const hydrateCanonical = (value: unknown): QValue => {
   }
   if (typeof value === "object") {
     const record = value as Record<string, unknown>;
+    if (typeof record.kind === "string" && typeof record.qType === "string" && "data" in record) {
+      if (record.kind === "atom") {
+        switch (record.qType) {
+          case "null":
+            return qNull();
+          case "boolean":
+            return qBool(Boolean(record.data));
+          case "symbol":
+            return qSymbol(String(record.data ?? ""));
+          case "string":
+            return qString(String(record.data ?? ""));
+          case "date":
+            return qDate(String(record.data ?? "0Nd"));
+          case "short":
+          case "int":
+          case "long":
+          case "real":
+          case "float":
+            if (typeof record.data === "string") return parseNumericLiteral(record.data);
+            switch (record.qType) {
+              case "short":
+                return qShort(Number(record.data ?? 0));
+              case "int":
+                return qInt(Number(record.data ?? 0));
+              case "real":
+                return qReal(Number(record.data ?? 0));
+              case "float":
+                return qFloat(Number(record.data ?? 0));
+              default:
+                return qLong(Number(record.data ?? 0));
+            }
+          default:
+            return qString(String(record.data ?? ""));
+        }
+      }
+      if (record.kind === "list" && record.data && typeof record.data === "object") {
+        const data = record.data as Record<string, unknown>;
+        const rawItems = Array.isArray(data.items) ? data.items : [];
+        return qList(
+          rawItems.map(hydrateCanonical),
+          record.qType === "vector",
+          typeof data.attribute === "string" ? data.attribute : undefined
+        );
+      }
+      if (record.kind === "dictionary" && record.data && typeof record.data === "object") {
+        const data = record.data as Record<string, unknown>;
+        const keys = Array.isArray(data.keys) ? data.keys : [];
+        const values = Array.isArray(data.values) ? data.values : [];
+        return qDictionary(keys.map(hydrateCanonical), values.map(hydrateCanonical));
+      }
+      if (record.kind === "table" && record.qType === "table" && record.data && typeof record.data === "object") {
+        const columns: Record<string, QList> = {};
+        for (const [name, rawColumn] of Object.entries(record.data as Record<string, unknown>)) {
+          const column = hydrateCanonical(rawColumn);
+          columns[name] = column.kind === "list" ? column : qList([column], true);
+        }
+        return qTable(columns);
+      }
+      if (record.kind === "table" && record.qType === "keyedTable" && record.data && typeof record.data === "object") {
+        const data = record.data as Record<string, unknown>;
+        const keys = hydrateCanonical(data.keys);
+        const values = hydrateCanonical(data.values);
+        if (keys.kind === "table" && values.kind === "table") {
+          return qKeyedTable(keys, values);
+        }
+      }
+    }
     if (record.kind === "symbol" && typeof record.value === "string") return qSymbol(record.value);
     if (record.kind === "number" && typeof record.value === "number") {
       return Number.isInteger(record.value) ? qLong(record.value) : numeric(record.value, true);
@@ -1788,10 +2761,14 @@ export const insertValue = (session: Session, target: QValue, payload: QValue): 
     throw new QRuntimeError("type", "insert expects a symbol target");
   }
   const current = session.get(target.value);
-  if (current.kind !== "table") {
+  if (current.kind !== "table" && current.kind !== "keyedTable") {
     throw new QRuntimeError("type", "insert target must be a table");
   }
-  const columnNames = Object.keys(current.columns);
+  const keyed = current.kind === "keyedTable" ? current : null;
+  const baseTable: QTable = current.kind === "keyedTable"
+    ? qTable({ ...current.keys.columns, ...current.values.columns })
+    : current;
+  const columnNames = Object.keys(baseTable.columns);
   const rowsToAppend: QValue[][] = [];
   if (payload.kind === "list") {
     if (payload.items.length === 0) {
@@ -1819,20 +2796,55 @@ export const insertValue = (session: Session, target: QValue, payload: QValue): 
       return idx >= 0 ? payload.values[idx]! : qNull();
     });
     rowsToAppend.push(row);
+  } else if (payload.kind === "table" || payload.kind === "keyedTable") {
+    const tablePayload: QTable = payload.kind === "keyedTable" ? qTable({ ...payload.keys.columns, ...payload.values.columns }) : payload;
+    const rowCount = tableRowCount(tablePayload);
+    for (const name of columnNames) {
+      if (!tablePayload.columns[name]) {
+        throw new QRuntimeError("schema", "insert: table columns must match");
+      }
+    }
+    for (let rowIndex = 0; rowIndex < rowCount; rowIndex += 1) {
+      rowsToAppend.push(columnNames.map((name) => tablePayload.columns[name]!.items[rowIndex] ?? qNull()));
+    }
   } else {
     throw new QRuntimeError("type", "insert expects a list or dictionary payload");
+  }
+  if (keyed) {
+    const keyNames = Object.keys(keyed.keys.columns);
+    const existingRows = tableRowCount(keyed.keys);
+    const keyAt = (row: QValue[]) => keyNames.map((name) => row[columnNames.indexOf(name)] ?? qNull());
+    const existingKeyAt = (rowIndex: number) => keyNames.map((name) => keyed.keys.columns[name]!.items[rowIndex] ?? qNull());
+    const seenKeys: QValue[][] = [];
+    for (const row of rowsToAppend) {
+      const rowKey = keyAt(row);
+      if (
+        Array.from({ length: existingRows }, (_, index) => existingKeyAt(index)).some((existing) =>
+          existing.every((item, index) => equals(item, rowKey[index] ?? qNull()))
+        ) ||
+        seenKeys.some((existing) => existing.every((item, index) => equals(item, rowKey[index] ?? qNull())))
+      ) {
+        throw new QRuntimeError("insert", "insert duplicate key");
+      }
+      seenKeys.push(rowKey);
+    }
   }
   const nextColumns: Record<string, QList> = {};
   for (let colIndex = 0; colIndex < columnNames.length; colIndex++) {
     const name = columnNames[colIndex]!;
-    const existing = current.columns[name]!;
+    const existing = baseTable.columns[name]!;
     const additions = rowsToAppend.map((row) => row[colIndex]!);
     const merged = [...existing.items, ...additions];
     nextColumns[name] = qList(merged, merged.every((item) => item.kind === merged[0]?.kind));
   }
-  const updated = qTable(nextColumns);
+  const updated = keyed
+    ? qKeyedTable(
+        qTable(Object.fromEntries(Object.keys(keyed.keys.columns).map((name) => [name, nextColumns[name]!]))),
+        qTable(Object.fromEntries(Object.keys(keyed.values.columns).map((name) => [name, nextColumns[name]!])))
+      )
+    : qTable(nextColumns);
   session.assignGlobal(target.value, updated);
-  const startIndex = Object.values(current.columns)[0]?.items.length ?? 0;
+  const startIndex = Object.values(baseTable.columns)[0]?.items.length ?? 0;
   return qList(
     rowsToAppend.map((_, i) => qLong(startIndex + i)),
     true
@@ -1841,7 +2853,20 @@ export const insertValue = (session: Session, target: QValue, payload: QValue): 
 
 export const upsertValue = (session: Session, target: QValue, payload: QValue): QValue => {
   if (target.kind === "symbol") {
-    return insertValue(session, target, payload);
+    const current = session.get(target.value);
+    if (payload.kind === "table" || payload.kind === "keyedTable") {
+      if (
+        (current.kind === "table" && payload.kind !== "table") ||
+        (current.kind === "keyedTable" && payload.kind !== "keyedTable") ||
+        (current.kind !== "table" && current.kind !== "keyedTable")
+      ) {
+        throw new QRuntimeError("type", "upsert target must be a table");
+      }
+      session.assignGlobal(target.value, upsertValue(session, current, payload));
+      return target;
+    }
+    insertValue(session, target, payload);
+    return target;
   }
   if (target.kind === "table" && payload.kind === "table") {
     const leftColumns = Object.keys(target.columns);
@@ -1858,11 +2883,17 @@ export const upsertValue = (session: Session, target: QValue, payload: QValue): 
     }
     return qTable(merged);
   }
+  if (target.kind === "keyedTable" && payload.kind === "keyedTable") {
+    return unionJoin(target, payload);
+  }
   throw new QRuntimeError("type", "upsert expects a symbol or matching tables");
 };
 
 export const inValue = (left: QValue, right: QValue): QValue => {
   const contains = (value: QValue) => {
+    if (right.kind === "dictionary") {
+      return qBool(right.values.some((candidate) => equals(candidate, value)));
+    }
     if (right.kind === "list") {
       return qBool(right.items.some((candidate) => equals(candidate, value)));
     }
@@ -1870,13 +2901,59 @@ export const inValue = (left: QValue, right: QValue): QValue => {
   };
 
   if (left.kind === "list") {
-    return qList(left.items.map(contains), true);
+    return qList(left.items.map((item) => inValue(item, right)), true);
+  }
+  if (left.kind === "string") {
+    return qList([...left.value].map((char) => contains(qString(char))), true);
   }
 
   return contains(left);
 };
 
+const gradePositions = (values: QValue[], ascending: boolean): number[] => {
+  const items = values.map((item, index) => ({ item, index }));
+  items.sort((left, right) => {
+    const compared = compare(left.item, right.item);
+    return compared === 0 ? left.index - right.index : ascending ? compared : -compared;
+  });
+  return items.map(({ index }) => index);
+};
+
+const tableGradePositions = (table: QTable, names: string[], ascending: boolean): number[] => {
+  const rowCount = tableRowCount(table);
+  const positions = Array.from({ length: rowCount }, (_, i) => i);
+  positions.sort((a, b) => {
+    for (const name of names) {
+      const col = table.columns[name];
+      if (!col) continue;
+      const diff = compare(col.items[a]!, col.items[b]!);
+      if (diff !== 0) return ascending ? diff : -diff;
+    }
+    return a - b;
+  });
+  return positions;
+};
+
+const sortTableByColumns = (table: QTable, names: string[], ascending: boolean): QTable => {
+  return sortSelectedTableRows(table, tableGradePositions(table, names, ascending), names, ascending);
+};
+
+const sortSelectedTableRows = (table: QTable, positions: number[], names: string[], ascending: boolean): QTable => {
+  const sorted = selectTableRows(table, positions);
+  if (ascending && names.length > 0) {
+    const [first, ...rest] = names;
+    const column = sorted.columns[first!];
+    if (column) {
+      sorted.columns[first!] = qList(column.items, column.homogeneous ?? false, rest.length === 0 ? "s" : "p");
+    }
+  }
+  return sorted;
+};
+
 export const gradeValue = (value: QValue, ascending: boolean): QValue => {
+  if (value.kind === "dictionary") {
+    return qList(gradePositions(value.values, ascending).map((index) => value.keys[index]!), false);
+  }
   const items = asSequenceItems(value).map((item, index) => ({ item, index }));
   items.sort((left, right) => {
     const compared = compare(left.item, right.item);
@@ -1926,6 +3003,45 @@ export const rebuildSequence = (prototype: QValue, items: QValue[]): QValue => {
 export const distinctItems = (items: QValue[]) =>
   items.filter((item, index) => items.findIndex((candidate) => equals(candidate, item)) === index);
 
+export const fbyValue = (session: Session, left: QValue, group: QValue): QValue => {
+  if (left.kind !== "list" || left.items.length < 2) {
+    throw new QRuntimeError("type", "fby expects (function;values) on the left");
+  }
+
+  const [callee, values] = left.items;
+  if (!callee || !values) {
+    throw new QRuntimeError("type", "fby expects (function;values) on the left");
+  }
+
+  const groupItems = asSequenceItems(group);
+  const valueItems = asSequenceItems(values);
+  if (groupItems.length !== valueItems.length) {
+    throw new QRuntimeError("length", "fby group length must match value length");
+  }
+
+  const grouped = new Map<string, { positions: number[]; values: QValue[] }>();
+  groupItems.forEach((key, index) => {
+    const id = JSON.stringify(canonicalize(key));
+    const bucket = grouped.get(id);
+    if (bucket) {
+      bucket.positions.push(index);
+      bucket.values.push(valueItems[index]!);
+      return;
+    }
+    grouped.set(id, { positions: [index], values: [valueItems[index]!] });
+  });
+
+  const result: QValue[] = Array.from({ length: valueItems.length }, () => qNull());
+  for (const bucket of grouped.values()) {
+    const aggregate = session.invoke(callee, [rebuildSequence(values, bucket.values)]);
+    bucket.positions.forEach((position) => {
+      result[position] = aggregate;
+    });
+  }
+
+  return qList(result, result.every((item) => item.kind === result[0]?.kind));
+};
+
 export const crossValue = (left: QValue, right: QValue): QValue =>
   qList(
     asSequenceItems(left).flatMap((leftItem) =>
@@ -1943,6 +3059,9 @@ export const applyEachValue = (session: Session, left: QValue, right: QValue): Q
       left.items.map((item, index) => session.invoke(item, [right.items[index]!])),
       false
     );
+  }
+  if (right.kind === "dictionary") {
+    return qDictionary(right.keys, right.values.map((item) => session.invoke(left, [item])));
   }
 
   const items = asSequenceItems(right);
@@ -2124,9 +3243,13 @@ export const primitiveDerivedAdverbValue = (
   const callable = session.get(base);
   const applyAdverb = adverb === "/" ? reducePrimitiveAdverbValue : scanPrimitiveAdverbValue;
   if (args.length === 1) {
+    const fast = adverb === "/" ? tryPrimitiveOver(base, args[0]!) : tryPrimitiveScan(base, args[0]!);
+    if (fast) return fast;
     return applyAdverb(session, callable, args[0]!);
   }
   if (args.length === 2 && args[1]?.kind === "list") {
+    const fast = adverb === "/" ? tryPrimitiveOver(base, args[1], args[0]!) : tryPrimitiveScan(base, args[1], args[0]!);
+    if (fast) return fast;
     return applyAdverb(session, callable, args[1], args[0]!);
   }
   return applyAdverb(
@@ -2154,27 +3277,49 @@ export const priorValue = (session: Session, callable: QValue, value: QValue): Q
   );
 };
 
+const regexEscape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const qPatternToRegexSource = (pattern: string, options: { allowStar: boolean }) => {
+  let source = "";
+  for (let index = 0; index < pattern.length; index += 1) {
+    const char = pattern[index]!;
+    if (char === "*") {
+      if (!options.allowStar) throw new QRuntimeError("length", "ss/ssr patterns cannot contain *");
+      source += ".*";
+      continue;
+    }
+    if (char === "?") {
+      source += ".";
+      continue;
+    }
+    if (char === "[") {
+      const end = pattern.indexOf("]", index + 1);
+      if (end > index + 1) {
+        const body = pattern.slice(index + 1, end);
+        const negate = body.startsWith("^");
+        const raw = negate ? body.slice(1) : body;
+        source += `[${negate ? "^" : ""}${raw.replace(/\\/g, "\\\\")}]`;
+        index = end;
+        continue;
+      }
+    }
+    source += regexEscape(char);
+  }
+  return source;
+};
+
 export const patternToRegex = (pattern: string) =>
-  new RegExp(
-    `^${[...pattern]
-      .map((char) => {
-        if (char === "*") {
-          return ".*";
-        }
-        if (char === "?") {
-          return ".";
-        }
-        return char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      })
-      .join("")}$`
-  );
+  new RegExp(`^${qPatternToRegexSource(pattern, { allowStar: true })}$`);
 
 export const likeValue = (left: QValue, right: QValue): QValue =>
-  mapBinary(left, right, (value, pattern) => {
-    if (value.kind !== "string" || pattern.kind !== "string") {
+  left.kind === "dictionary" && right.kind === "string"
+    ? qDictionary(left.keys, left.values.map((value) => likeValue(value, right)))
+    : mapBinary(left, right, (value, pattern) => {
+    const text = stringLikeValue(value);
+    if (text === null || pattern.kind !== "string") {
       throw new QRuntimeError("type", "like expects string arguments");
     }
-    return qBool(patternToRegex(pattern.value).test(value.value));
+    return qBool(patternToRegex(pattern.value).test(text));
   });
 
 export const ssValue = (left: QValue, right: QValue): QValue => {
@@ -2182,19 +3327,21 @@ export const ssValue = (left: QValue, right: QValue): QValue => {
     throw new QRuntimeError("type", "ss expects string arguments");
   }
   if (right.value.length === 0) {
-    return qList([], true);
+    throw new QRuntimeError("length", "ss pattern cannot be empty");
   }
+  const matcher = new RegExp(`^(?:${qPatternToRegexSource(right.value, { allowStar: false })})`);
   const positions: QValue[] = [];
   let index = 0;
-  while (index <= left.value.length - right.value.length) {
-    if (left.value.slice(index, index + right.value.length) === right.value) {
+  while (index < left.value.length) {
+    const match = matcher.exec(left.value.slice(index));
+    if (match?.[0]) {
       positions.push(qLong(index));
-      index += right.value.length;
+      index += match[0].length;
       continue;
     }
     index += 1;
   }
-  return qList(positions, true);
+  return qList(positions, true, positions.length === 0 ? "long" : undefined);
 };
 
 export const stringLikeValue = (value: QValue): string | null => {
@@ -2211,6 +3358,59 @@ export const stringLikeValue = (value: QValue): string | null => {
 };
 
 export const svValue = (left: QValue, right: QValue): QValue => {
+  if (
+    left.kind === "list" &&
+    left.attribute === "byte" &&
+    (left.items.length === 0 ||
+      (left.items.length === 1 &&
+        left.items[0]?.kind === "number" &&
+        toNumber(left.items[0]) === 0))
+  ) {
+    if (right.kind !== "list" || right.attribute !== "byte" || ![2, 4, 8].includes(right.items.length)) {
+      throw new QRuntimeError("length", "0x0 sv expects 2, 4, or 8 bytes");
+    }
+    const bytes = right.items.map(toNumber);
+    const buffer = Uint8Array.from(bytes).buffer;
+    const view = new DataView(buffer);
+    if (bytes.length === 2) return qShort(view.getInt16(0, false));
+    if (bytes.length === 4) return qInt(view.getInt32(0, false));
+    const value = view.getBigInt64(0, false);
+    return qLongExact(value);
+  }
+  if (left.kind === "boolean" && !left.value) {
+    if (right.kind !== "list" || !right.items.every((item) => item.kind === "boolean") || ![8, 16, 32, 64].includes(right.items.length)) {
+      throw new QRuntimeError("length", "0b sv expects 8, 16, 32, or 64 bits");
+    }
+    const bytes = Array.from({ length: right.items.length / 8 }, (_, byteIndex) =>
+      right.items
+        .slice(byteIndex * 8, byteIndex * 8 + 8)
+        .reduce((acc, bit, index) => acc | (bit.kind === "boolean" && bit.value ? 1 << (7 - index) : 0), 0)
+    );
+    const byteVector = qList(bytes.map((byte) => qLong(byte)), true, "byte");
+    if (right.items.length === 8) return byteVector;
+    return svValue(qList([], true, "byte"), byteVector);
+  }
+  if (left.kind === "number" || (left.kind === "list" && left.items.every((item) => item.kind === "number"))) {
+    const bases = left.kind === "number" ? [toNumber(left)] : left.items.map(toNumber);
+    const digits = asList(right).items.map(toNumber);
+    if (bases.length === 1) {
+      return qLong(digits.reduce((acc, digit) => acc * bases[0]! + digit, 0));
+    }
+    if (bases.length !== digits.length) {
+      throw new QRuntimeError("length", "sv bases and digits must conform");
+    }
+    return qLong(digits.slice(1).reduce((acc, digit, index) => acc * bases[index + 1]! + digit, digits[0] ?? 0));
+  }
+  if (left.kind === "symbol" && left.value === "" && right.kind === "list") {
+    if (right.items.every((item) => item.kind === "symbol")) {
+      const parts = right.items.map((item) => (item.kind === "symbol" ? item.value : ""));
+      return qSymbol(parts[0]?.startsWith(":") ? parts.join("/") : parts.join("."));
+    }
+    if (right.items.every((item) => item.kind === "string")) {
+      const parts = right.items.map((item) => (item.kind === "string" ? item.value : ""));
+      return qString(`${parts.join("\n")}\n`);
+    }
+  }
   if (left.kind !== "string" || right.kind !== "list") {
     throw new QRuntimeError("type", "sv expects a string separator and a list of strings");
   }
@@ -2221,7 +3421,103 @@ export const svValue = (left: QValue, right: QValue): QValue => {
   return qString((parts as string[]).join(left.value));
 };
 
+const numericBytes = (value: QNumber) => {
+  const buffer = new ArrayBuffer(value.numericType === "short" || value.numericType === "real" ? 4 : 8);
+  const view = new DataView(buffer);
+  switch (value.numericType) {
+    case "short":
+      view.setInt16(0, toNumber(value), false);
+      return [...new Uint8Array(buffer.slice(0, 2))];
+    case "int":
+      view.setInt32(0, toNumber(value), false);
+      return [...new Uint8Array(buffer.slice(0, 4))];
+    case "real":
+      view.setFloat32(0, toNumber(value), false);
+      return [...new Uint8Array(buffer.slice(0, 4))];
+    case "float":
+      view.setFloat64(0, toNumber(value), false);
+      return [...new Uint8Array(buffer)];
+    case "long": {
+      const exact = value.exactText !== undefined ? BigInt(value.exactText) : BigInt(Math.trunc(toNumber(value)));
+      view.setBigInt64(0, exact, false);
+      return [...new Uint8Array(buffer)];
+    }
+  }
+};
+
+const byteRepresentationValue = (value: QValue): QValue => {
+  if (value.kind !== "number") {
+    throw new QRuntimeError("type", "0x0 vs expects a numeric right argument");
+  }
+  return qList(numericBytes(value).map((byte) => qLong(byte)), true, "byte");
+};
+
+const bitRepresentationValue = (value: QValue): QValue => {
+  const bytes = byteRepresentationValue(value) as QList;
+  const bits = bytes.items.flatMap((byte) => {
+    const raw = toNumber(byte);
+    return Array.from({ length: 8 }, (_, bit) => qBool(Boolean(raw & (1 << (7 - bit)))));
+  });
+  return qList(bits, true, "boolean");
+};
+
 export const vsValue = (left: QValue, right: QValue): QValue => {
+  if (left.kind === "symbol" && left.value === "") {
+    if (right.kind === "string") {
+      const lines = right.value.replace(/\r\n/g, "\n").replace(/\n$/, "").split("\n");
+      return qList(lines.map((line) => qString(line)), false);
+    }
+    if (right.kind === "symbol") {
+      return qList(right.value.split(".").map((part) => qSymbol(part)), true, "symbol");
+    }
+  }
+  if (left.kind === "boolean" && !left.value) {
+    return bitRepresentationValue(right);
+  }
+  if (
+    left.kind === "list" &&
+    left.attribute === "byte" &&
+    (left.items.length === 0 ||
+      (left.items.length === 1 &&
+        left.items[0]?.kind === "number" &&
+        toNumber(left.items[0]) === 0))
+  ) {
+    return byteRepresentationValue(right);
+  }
+  if (left.kind === "number" || (left.kind === "list" && left.items.every((item) => item.kind === "number"))) {
+    const bases = left.kind === "number" ? [toNumber(left)] : left.items.map(toNumber);
+    const encodeOne = (value: QValue): QValue[] => {
+      let remaining = Math.trunc(toNumber(value));
+      const digits = bases.length === 1 ? [] as QValue[] : Array.from({ length: bases.length }, () => qLong(0));
+      if (bases.length === 1) {
+        const base = bases[0]!;
+        if (remaining === 0) return [qLong(0)];
+        const output: QValue[] = [];
+        while (remaining > 0) {
+          output.unshift(qLong(remaining % base));
+          remaining = Math.floor(remaining / base);
+        }
+        return output;
+      }
+      for (let index = bases.length - 1; index >= 0; index -= 1) {
+        const base = bases[index]!;
+        digits[index] = qLong(remaining % base);
+        remaining = Math.floor(remaining / base);
+      }
+      return digits;
+    };
+    if (right.kind === "list") {
+      const encoded = right.items.map(encodeOne);
+      const width = Math.max(0, ...encoded.map((item) => item.length));
+      return qList(
+        Array.from({ length: width }, (_, row) =>
+          qList(encoded.map((digits) => digits[row - (width - digits.length)] ?? qLong(0)), true)
+        ),
+        false
+      );
+    }
+    return qList(encodeOne(right), true);
+  }
   if (left.kind !== "string" || right.kind !== "string") {
     throw new QRuntimeError("type", "vs expects string arguments");
   }
@@ -2242,18 +3538,26 @@ export const resolveWithinBound = (bound: QValue, index: number, length: number)
 };
 
 export const withinValue = (left: QValue, right: QValue): QValue => {
-  if (right.kind !== "list" || right.items.length !== 2) {
+  const bounds =
+    right.kind === "string"
+      ? [...right.value].map((char) => qString(char))
+      : right.kind === "list"
+        ? right.items
+        : null;
+  if (!bounds || bounds.length !== 2) {
     throw new QRuntimeError("type", "within expects a two-item right argument");
   }
 
-  const [lower, upper] = right.items;
+  const [lower, upper] = bounds;
   const withinScalar = (value: QValue, lowerBound: QValue, upperBound: QValue) =>
     qBool(compare(value, lowerBound) >= 0 && compare(value, upperBound) <= 0);
 
   if (left.kind === "list") {
     return qList(
       left.items.map((item, index) =>
-        withinScalar(
+        item.kind === "list" || item.kind === "string"
+          ? withinValue(item, right)
+          : withinScalar(
           item,
           resolveWithinBound(lower, index, left.items.length),
           resolveWithinBound(upper, index, left.items.length)
@@ -2262,11 +3566,27 @@ export const withinValue = (left: QValue, right: QValue): QValue => {
       true
     );
   }
+  if (left.kind === "string") {
+    return qList([...left.value].map((char) => withinScalar(qString(char), lower, upper)), true);
+  }
 
   return withinScalar(left, resolveWithinBound(lower, 0, 1), resolveWithinBound(upper, 0, 1));
 };
 
+const tableRows = (table: QTable): QDictionary[] =>
+  Array.from({ length: tableRowCount(table) }, (_, index) => rowFromTable(table, index));
+
 export const exceptValue = (left: QValue, right: QValue): QValue => {
+  if (left.kind === "table" && right.kind === "table") {
+    const rightRows = tableRows(right);
+    return selectTableRows(
+      left,
+      tableRows(left)
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => !rightRows.some((candidate) => equals(candidate, row)))
+        .map(({ index }) => index)
+    );
+  }
   const rightItems = asSequenceItems(right);
   return rebuildSequence(
     left,
@@ -2277,17 +3597,33 @@ export const exceptValue = (left: QValue, right: QValue): QValue => {
 };
 
 export const interValue = (left: QValue, right: QValue): QValue => {
+  if (left.kind === "dictionary" && right.kind === "dictionary") {
+    const values = left.values.filter((value) => right.values.some((candidate) => equals(candidate, value)));
+    return qList(values, values.every((value) => value.kind === values[0]?.kind));
+  }
+  if (left.kind === "table" && right.kind === "table") {
+    const rightRows = tableRows(right);
+    return selectTableRows(
+      left,
+      tableRows(left)
+        .map((row, index) => ({ row, index }))
+        .filter(({ row }) => rightRows.some((candidate) => equals(candidate, row)))
+        .map(({ index }) => index)
+    );
+  }
   const rightItems = asSequenceItems(right);
   return rebuildSequence(
     left,
-    distinctItems(asSequenceItems(left)).filter((item) =>
-      rightItems.some((candidate) => equals(candidate, item))
-    )
+    asSequenceItems(left).filter((item) => rightItems.some((candidate) => equals(candidate, item)))
   );
 };
 
-export const unionValue = (left: QValue, right: QValue): QValue =>
-  rebuildSequence(left, distinctItems([...asSequenceItems(left), ...asSequenceItems(right)]));
+export const unionValue = (left: QValue, right: QValue): QValue => {
+  if (left.kind === "table" && right.kind === "table") {
+    return distinctValue(concatTables(left, right));
+  }
+  return rebuildSequence(left, distinctItems([...asSequenceItems(left), ...asSequenceItems(right)]));
+};
 
 export const lowerValue = (value: QValue): QValue => {
   if (value.kind === "string") {
@@ -2340,6 +3676,8 @@ export const trimStringValue = (value: QValue, mode: "left" | "right" | "both"):
 };
 
 export const nullValue = (value: QValue): QValue => {
+  if (value.kind === "table") return mappedTable(value, nullValue);
+  if (value.kind === "dictionary") return mappedDictionary(value, nullValue);
   if (value.kind === "list") {
     return qList(value.items.map((item) => qBool(isNullish(item))), true);
   }
@@ -2365,13 +3703,18 @@ export const flipListValue = (value: QList): QValue => {
     throw new QRuntimeError("length", "Flip expects a rectangular list");
   }
 
+  const sourceRowsAreStrings = value.items.every((item) => item.kind === "string");
   return qList(
-    Array.from({ length: width }, (_, columnIndex) =>
-      qList(
-        rows.map((row) => row[columnIndex]!),
-        rows.every((row) => row[columnIndex]!.kind === rows[0]?.[columnIndex]?.kind)
-      )
-    ),
+    Array.from({ length: width }, (_, columnIndex) => {
+      const column = rows.map((row) => row[columnIndex]!);
+      if (sourceRowsAreStrings && column.every((item) => item.kind === "string")) {
+        return qString(column.map((item) => (item.kind === "string" ? item.value : "")).join(""));
+      }
+      return qList(
+        column,
+        column.every((item) => item.kind === column[0]?.kind)
+      );
+    }),
     false
   );
 };
@@ -2379,6 +3722,12 @@ export const flipListValue = (value: QList): QValue => {
 export const flipValue = (value: QValue): QValue => {
   if (value.kind === "list") {
     return flipListValue(value);
+  }
+  if (value.kind === "table") {
+    return qDictionary(
+      Object.keys(value.columns).map((name) => qSymbol(name)),
+      Object.values(value.columns)
+    );
   }
   if (value.kind !== "dictionary") {
     return value;
@@ -2448,6 +3797,14 @@ export const distinctValue = (value: QValue): QValue => {
   }
 
   if (value.kind !== "list") {
+    if (value.kind === "string") {
+      const seen = new Set<string>();
+      return qString([...value.value].filter((char) => {
+        if (seen.has(char)) return false;
+        seen.add(char);
+        return true;
+      }).join(""));
+    }
     return value;
   }
   const seen = new Set<string>();
@@ -2470,11 +3827,46 @@ export const namespaceKeys = (value: QValue) => {
 };
 
 export const whereValue = (value: QValue): QValue => {
+  if (value.kind === "dictionary") {
+    const keys = value.keys;
+    const values = value.values;
+    if (values.every((item) => item.kind === "boolean")) {
+      return qList(
+        values.flatMap((item, index) => isTruthy(item) ? [keys[index] ?? qNull()] : []),
+        true,
+        keys.every((key) => key.kind === "symbol") ? "symbol" : undefined
+      );
+    }
+    const items = values.flatMap((item, index) => {
+      if (item.kind !== "number" || (item.numericType !== "int" && item.numericType !== "long")) {
+        throw new QRuntimeError("type", "where expects int or long counts");
+      }
+      if (isNumericNull(item) || item.value < 0) {
+        throw new QRuntimeError("limit", "where expects non-negative counts");
+      }
+      return Array.from({ length: Math.trunc(item.value) }, () => keys[index] ?? qNull());
+    });
+    return qList(items, items.every((item) => item.kind === items[0]?.kind));
+  }
+
   const list = asList(value);
-  const items = list.items.flatMap((item, index) =>
-    isTruthy(item) ? [qLong(index)] : []
-  );
-  return qList(items, true);
+  if (list.items.every((item) => item.kind === "boolean")) {
+    const items = list.items.flatMap((item, index) => isTruthy(item) ? [qLong(index)] : []);
+    return qList(items, true);
+  }
+  if (list.items.every((item) => item.kind === "number")) {
+    const items = list.items.flatMap((item, index) => {
+      if (item.kind !== "number" || (item.numericType !== "int" && item.numericType !== "long")) {
+        throw new QRuntimeError("type", "where expects int or long counts");
+      }
+      if (isNumericNull(item) || item.value < 0) {
+        throw new QRuntimeError("limit", "where expects non-negative counts");
+      }
+      return Array.from({ length: Math.trunc(item.value) }, () => qLong(index));
+    });
+    return qList(items, true);
+  }
+  throw new QRuntimeError("type", "where expects booleans or int/long counts");
 };
 
 export const concatValues = (left: QValue, right: QValue): QValue => {
@@ -2537,20 +3929,26 @@ export const concatTables = (left: QTable, right: QTable): QTable => {
 };
 
 export const razeValue = (value: QValue): QValue => {
+  if (value.kind === "dictionary") {
+    return razeValue(qList(value.values, false));
+  }
+  if (value.kind === "table") {
+    const rowCount = tableRowCount(value);
+    return rowCount === 0 ? qDictionary([], []) : rowFromTable(value, rowCount - 1);
+  }
   if (value.kind !== "list") {
     return value;
   }
-  const items = flattenRazeLeaves(value);
-  if (items.length === 0) {
+  if (value.items.length === 0) {
     return qList([]);
   }
-  if (items.every((item) => item.kind === "string")) {
-    return qString(items.map((item) => item.value).join(""));
-  }
-  return items.reduce((acc, item) => concatValues(acc, item));
+  return value.items.reduce((acc, item) => concatValues(acc, item));
 };
 
 export const takeValue = (left: QValue, right: QValue): QValue => {
+  if (left.kind === "symbol") {
+    return setAttributeValue(left, right);
+  }
   if (left.kind === "list") {
     const shape = left.items.map((item) => {
       if (item.kind !== "number") {
@@ -2567,7 +3965,7 @@ export const takeValue = (left: QValue, right: QValue): QValue => {
   const count = toNumber(left);
   if (right.kind === "list") {
     if (right.items.length === 0) {
-      return qList([]);
+      return qList([], right.homogeneous ?? false, emptyAttributeForList(right));
     }
     const n = Math.abs(count);
     const len = right.items.length;
@@ -2575,7 +3973,7 @@ export const takeValue = (left: QValue, right: QValue): QValue => {
       count >= 0
         ? Array.from({ length: n }, (_, index) => right.items[index % len]!)
         : Array.from({ length: n }, (_, index) => right.items[((len - n + index) % len + len) % len]!);
-    return qList(items, right.homogeneous ?? false);
+    return listWithPreservedEmptyType(items, right);
   }
   if (right.kind === "string") {
     const n = Math.abs(count);
@@ -2612,7 +4010,8 @@ export const takeValue = (left: QValue, right: QValue): QValue => {
     }
     return qDictionary(newKeys, newValues);
   }
-  return qList(Array.from({ length: Math.abs(count) }, () => right));
+  const items = Array.from({ length: Math.abs(count) }, () => right);
+  return qList(items, items.every((item) => item.kind === right.kind), items.length === 0 ? attributeForAtom(right) : undefined);
 };
 
 export const reshapeValue = (shape: number[], value: QValue): QValue => {
@@ -2674,7 +4073,7 @@ export const dropValue = (left: QValue, right: QValue): QValue => {
       for (let i = 0; i < indices.length; i += 1) {
         const start = indices[i]!;
         const end = i + 1 < indices.length ? indices[i + 1]! : total;
-        segments.push(qList(right.items.slice(start, end), right.homogeneous ?? false));
+        segments.push(listWithPreservedEmptyType(right.items.slice(start, end), right));
       }
       return qList(segments, false);
     }
@@ -2700,9 +4099,9 @@ export const dropValue = (left: QValue, right: QValue): QValue => {
   const count = toNumber(left);
   if (right.kind === "list") {
     if (count < 0) {
-      return qList(right.items.slice(0, Math.max(0, right.items.length + count)), right.homogeneous ?? false);
+      return listWithPreservedEmptyType(right.items.slice(0, Math.max(0, right.items.length + count)), right);
     }
-    return qList(right.items.slice(Math.max(0, count)), right.homogeneous ?? false);
+    return listWithPreservedEmptyType(right.items.slice(Math.max(0, count)), right);
   }
   if (right.kind === "string") {
     if (count < 0) {
@@ -2723,6 +4122,28 @@ export const dropValue = (left: QValue, right: QValue): QValue => {
 };
 
 export const fillValue = (left: QValue, right: QValue): QValue => {
+  if (left.kind === "dictionary" && right.kind === "dictionary") {
+    const keys = [...left.keys];
+    for (const key of right.keys) {
+      if (!keys.some((candidate) => equals(candidate, key))) {
+        keys.push(key);
+      }
+    }
+    const lookup = (dictionary: QDictionary, key: QValue) => {
+      const index = dictionary.keys.findIndex((candidate) => equals(candidate, key));
+      return index < 0 ? null : dictionary.values[index] ?? qNull();
+    };
+    return qDictionary(
+      keys,
+      keys.map((key) => {
+        const rightValue = lookup(right, key);
+        const leftValue = lookup(left, key);
+        return rightValue === null || isNullish(rightValue)
+          ? (leftValue ?? qNull())
+          : rightValue;
+      })
+    );
+  }
   if (left.kind === "list" && right.kind === "list") {
     if (left.items.length !== right.items.length) {
       throw new QRuntimeError("length", "Fill arguments must have the same length");
@@ -2750,12 +4171,19 @@ export const fillValue = (left: QValue, right: QValue): QValue => {
 export const sampleSequence = (count: number, source: QValue): QValue => {
   const distinct = count < 0;
   const size = Math.abs(Math.trunc(count));
+  const permute = Number.isNaN(count);
 
   if (source.kind === "number") {
     const limit = Math.max(0, Math.trunc(toNumber(source)));
     const pool = Array.from({ length: limit }, (_, index) => qLong(index));
+    if (permute) {
+      return qList(shuffleItems(pool), true, "explicitInt");
+    }
+    if (distinct && size > pool.length) {
+      throw new QRuntimeError("length", "length");
+    }
     const picks = distinct
-      ? shuffleItems(pool).slice(0, Math.min(size, pool.length))
+      ? shuffleItems(pool).slice(0, size)
       : Array.from({ length: size }, () => qLong(Math.floor(Math.random() * Math.max(limit, 1))));
     return qList(picks, true, "explicitInt");
   }
@@ -2764,9 +4192,15 @@ export const sampleSequence = (count: number, source: QValue): QValue => {
   if (items.length === 0) {
     return rebuildSequence(source, []);
   }
+  if (permute) {
+    return rebuildSequence(source, shuffleItems(items));
+  }
+  if (distinct && size > items.length) {
+    throw new QRuntimeError("length", "length");
+  }
 
   const picks = distinct
-    ? shuffleItems(items).slice(0, Math.min(size, items.length))
+    ? shuffleItems(items).slice(0, size)
     : Array.from({ length: size }, () => items[Math.floor(Math.random() * items.length)]!);
   return rebuildSequence(source, picks);
 };
@@ -2810,7 +4244,22 @@ export const findMappedValues = (left: QList, right: QValue): QValue | null => {
 
 export const findValue = (left: QValue, right: QValue): QValue => {
   if (left.kind === "number") {
-    return sampleSequence(left.value, right);
+    return sampleSequence(isNumericNull(left) ? Number.NaN : left.value, right);
+  }
+  if (left.kind === "string") {
+    const lookup = (item: QValue) => {
+      if (item.kind !== "string") return qLong(left.value.length);
+      const char = item.value[0] ?? "";
+      const index = left.value.indexOf(char);
+      return qLong(index >= 0 ? index : left.value.length);
+    };
+    if (right.kind === "string") {
+      const chars = [...right.value];
+      if (chars.length === 1) return lookup(qString(chars[0]!));
+      return qList(chars.map((char) => lookup(qString(char))), true);
+    }
+    if (right.kind === "list") return qList(right.items.map(lookup), true);
+    return lookup(right);
   }
   if (left.kind !== "list") {
     throw new QRuntimeError("type", "Find expects a list on the left");
@@ -2848,6 +4297,7 @@ export const castNameFromLeftOperand = (left: QValue) => {
 };
 
 export const CAST_ALIAS_GROUPS: ReadonlyArray<{ aliases: readonly string[]; cast: CastHandler }> = [
+  { aliases: ["*", "0h"], cast: (value) => value },
   { aliases: ["", "symbol", "11h"], cast: (value) => castSymbolValue(value) },
   { aliases: ["boolean", "bool", "1h"], cast: (value) => castBooleanValue(value) },
   { aliases: ["byte", "x", "4h"], cast: (value) => castByteValue(value) },
@@ -2857,25 +4307,358 @@ export const CAST_ALIAS_GROUPS: ReadonlyArray<{ aliases: readonly string[]; cast
   { aliases: ["real", "e", "8h"], cast: (value) => castRealValue(value) },
   { aliases: ["float", "f", "9h"], cast: (value) => castFloatValue(value) },
   { aliases: ["10h", "char", "string"], cast: (value) => castCharValue(value) },
-  { aliases: ["date", "14h"], cast: (value) => castDateValue(value) }
+  { aliases: ["timestamp", "p", "12h"], cast: (value) => castTemporalValue(value, "timestamp") },
+  { aliases: ["month", "m", "13h"], cast: (value) => castTemporalValue(value, "month") },
+  { aliases: ["date", "d", "14h"], cast: (value) => castDateValue(value) },
+  { aliases: ["datetime", "z", "15h"], cast: (value) => castTemporalValue(value, "datetime") },
+  { aliases: ["timespan", "n", "16h"], cast: (value) => castTemporalValue(value, "timespan") },
+  { aliases: ["minute", "u", "17h"], cast: (value) => castTemporalValue(value, "minute") },
+  { aliases: ["second", "v", "18h"], cast: (value) => castTemporalValue(value, "second") },
+  { aliases: ["time", "t", "19h"], cast: (value) => castTemporalValue(value, "time") }
 ];
 
 export const CAST_HANDLER_BY_NAME = new Map<string, CastHandler>(
   CAST_ALIAS_GROUPS.flatMap(({ aliases, cast }) => aliases.map((alias) => [alias, cast] as const))
 );
 
+const parseBigIntegerToken = (text: string) => (/^[+-]?\d+$/.test(text.trim()) ? BigInt(text.trim()) : null);
+const parseIntegerToken = (text: string) => (/^[+-]?\d+$/.test(text.trim()) ? Number.parseInt(text, 10) : null);
+const parseFloatToken = (text: string) => (/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(text.trim()) ? Number.parseFloat(text) : null);
+const parseByteToken = (text: string) => (/^[0-9a-fA-F]{2}$/.test(text.trim()) ? Number.parseInt(text.trim(), 16) : 0);
+const parseIpToken = (text: string) => {
+  const parts = text.trim().split(".");
+  if (parts.length !== 4) return null;
+  const bytes = parts.map((part) => (/^\d+$/.test(part) ? Number.parseInt(part, 10) : Number.NaN));
+  if (bytes.some((byte) => !Number.isInteger(byte) || byte < 0 || byte > 255)) return null;
+  return ((bytes[0]! << 24) | (bytes[1]! << 16) | (bytes[2]! << 8) | bytes[3]!) | 0;
+};
+
+const tokShortInteger = (text: string) => {
+  const parsed = parseBigIntegerToken(text);
+  if (parsed === null) return qShort(0, "shortNull");
+  if (parsed === BigInt(Q_SHORT_MAX)) return qShort(Q_SHORT_MAX, "shortPosInf");
+  if (parsed <= BigInt(-Q_SHORT_MAX - 1) || parsed > BigInt(Q_SHORT_MAX)) return qShort(0, "shortNull");
+  return qShort(Number(parsed));
+};
+
+const tokIntInteger = (text: string) => {
+  const ip = parseIpToken(text);
+  if (ip !== null) return qInt(ip);
+  const parsed = parseBigIntegerToken(text);
+  if (parsed === null) return qInt(0, "intNull");
+  if (parsed === BigInt(Q_INT_MAX)) return qInt(Q_INT_MAX, "intPosInf");
+  if (parsed <= BigInt(-Q_INT_MAX - 1) || parsed > BigInt(Q_INT_MAX)) return qInt(0, "intNull");
+  return qInt(Number(parsed));
+};
+
+const tokLongInteger = (text: string) => {
+  const parsed = parseBigIntegerToken(text);
+  if (parsed === null) return qLong(0, "longNull");
+  if (parsed === Q_LONG_MAX_BIGINT) return qLong(Q_LONG_MAX, "longPosInf");
+  if (parsed === -Q_LONG_MAX_BIGINT) return qLong(-Q_LONG_MAX, "longNegInf");
+  if (parsed < -Q_LONG_MAX_BIGINT || parsed > Q_LONG_MAX_BIGINT) return qLong(0, "longNull");
+  return qLongExact(parsed);
+};
+
+const TOK_NAME_BY_NEGATIVE_SHORT: Record<string, string> = {
+  "-1h": "B",
+  "-4h": "X",
+  "-5h": "H",
+  "-6h": "I",
+  "-7h": "J",
+  "-8h": "E",
+  "-9h": "F",
+  "-10h": "C",
+  "-11h": "S",
+  "-12h": "P",
+  "-13h": "M",
+  "-14h": "D",
+  "-15h": "Z",
+  "-16h": "N",
+  "-17h": "U",
+  "-18h": "V",
+  "-19h": "T"
+};
+
+const tokTemporalPatterns: Record<TemporalType, RegExp> = {
+  timestamp: /^\d{4}\.\d{2}\.\d{2}D\d{1,2}:\d{2}:\d{2}\.\d{9}$/,
+  month: /^\d{4}\.\d{2}m?$/,
+  date: /^\d{4}\.\d{2}\.\d{2}$|^0Nd$/,
+  datetime: /^\d{4}\.\d{2}\.\d{2}T\d{1,2}:\d{2}:\d{2}\.\d{3}$/,
+  timespan: /^-?\d+D\d{1,2}:\d{2}:\d{2}\.\d{9}$/,
+  minute: /^\d{1,2}:\d{2}$/,
+  second: /^\d{1,2}:\d{2}:\d{2}$/,
+  time: /^\d{1,2}:\d{2}:\d{2}\.\d{3}$/
+};
+
+const normalizeDateToken = (text: string) => {
+  const trimmed = text.trim();
+  const dashed = /^(\d{4})-(\d{2})-(\d{2})$/.exec(trimmed);
+  if (dashed) return `${dashed[1]}.${dashed[2]}.${dashed[3]}`;
+  const compact = /^(\d{4})(\d{2})(\d{2})$/.exec(trimmed);
+  if (compact) return `${compact[1]}.${compact[2]}.${compact[3]}`;
+  return trimmed;
+};
+
+const normalizeFraction = (text: string, width: number) => text.padEnd(width, "0").slice(0, width);
+
+const normalizeRawTimeToken = (text: string, fractionWidth: 3 | 9, prefix = "") => {
+  const raw = text.trim();
+  const match = /^(\d{2})(\d{2})(\d{2})(\d*)$/.exec(raw);
+  if (!match) return null;
+  const fraction = normalizeFraction(match[4] ?? "", fractionWidth);
+  return `${prefix}${match[1]}:${match[2]}:${match[3]}.${fraction}`;
+};
+
+const normalizeTemporalToken = (text: string, temporalType: TemporalType) => {
+  const trimmed = text.trim();
+  if (temporalType === "date") {
+    const date = normalizeDateToken(trimmed);
+    return tokTemporalPatterns.date.test(date) ? date : temporalNullForType(temporalType);
+  }
+  if (temporalType === "timestamp" || temporalType === "datetime") {
+    const match = /^(\d{4}[-.]?\d{2}[-.]?\d{2})([DT-])(\d{1,2}:\d{2}:\d{2})(?:\.(\d{1,9}))?$/.exec(trimmed);
+    if (match) {
+      const date = normalizeDateToken(match[1]!);
+      const separator = temporalType === "timestamp" ? "D" : "T";
+      const fraction = normalizeFraction(match[4] ?? "", temporalType === "timestamp" ? 9 : 3);
+      return `${date}${separator}${match[3]}.${fraction}`;
+    }
+  }
+  if (temporalType === "time") {
+    const rawTime = normalizeRawTimeToken(trimmed, 3);
+    if (rawTime) return rawTime;
+  }
+  if (temporalType === "timespan") {
+    const rawTimespan = normalizeRawTimeToken(trimmed, 9, "0D");
+    if (rawTimespan) return rawTimespan;
+  }
+  if (temporalType === "minute" && /^\d{1,2}:\d{2}:\d{2}/.test(trimmed)) {
+    return trimmed.slice(0, trimmed.indexOf(":", trimmed.indexOf(":") + 1));
+  }
+  if (!tokTemporalPatterns[temporalType].test(trimmed)) return temporalNullForType(temporalType);
+  if (temporalType === "month" && !trimmed.endsWith("m")) return `${trimmed}m`;
+  return trimmed;
+};
+
+const tokAtom = (name: string, value: QValue): QValue => {
+  if (value.kind !== "string") {
+    throw new QRuntimeError("type", `${name}$ expects strings`);
+  }
+  switch (name) {
+    case "B":
+      return qBool(/^[txyTXY1]$/.test(value.value.trim()));
+    case "C":
+      return qString(value.value.length === 1 ? value.value : " ");
+    case "X":
+      return qList([qLong(parseByteToken(value.value))], true, "byte");
+    case "H": {
+      return tokShortInteger(value.value);
+    }
+    case "I": {
+      return tokIntInteger(value.value);
+    }
+    case "J": {
+      return tokLongInteger(value.value);
+    }
+    case "E": {
+      const parsed = parseFloatToken(value.value);
+      return parsed === null ? qReal(0, "realNull") : qReal(parsed);
+    }
+    case "F": {
+      const parsed = parseFloatToken(value.value);
+      return parsed === null ? qFloat(Number.NaN, "null") : qFloat(parsed);
+    }
+    case "S":
+      return qSymbol(value.value.trim());
+    case "D":
+      return qTemporal("date", normalizeTemporalToken(value.value, "date"));
+    case "M":
+      return qTemporal("month", normalizeTemporalToken(value.value, "month"));
+    case "U":
+      return qTemporal("minute", normalizeTemporalToken(value.value, "minute"));
+    case "V":
+      return qTemporal("second", normalizeTemporalToken(value.value, "second"));
+    case "T":
+      return qTemporal("time", normalizeTemporalToken(value.value, "time"));
+    case "N":
+      return qTemporal("timespan", normalizeTemporalToken(value.value, "timespan"));
+    case "P":
+      return qTemporal("timestamp", normalizeTemporalToken(value.value, "timestamp"));
+    case "Z":
+      return qTemporal("datetime", normalizeTemporalToken(value.value, "datetime"));
+    default:
+      throw new QRuntimeError("nyi", `Tok ${name}$ is not implemented yet`);
+  }
+};
+
+const tokValue = (name: string, value: QValue): QValue => {
+  if (name.length > 1) {
+    if (value.kind !== "list") {
+      throw new QRuntimeError("length", `${name}$ expects a list of matching tokens`);
+    }
+    return qList(
+      [...name].map((char, index) => tokValue(char, value.items[index] ?? qNull())),
+      false,
+      "tokTuple"
+    );
+  }
+  if (value.kind === "list") {
+    if (name === "X") {
+      return qList(
+        value.items.map((item) => {
+          if (item.kind !== "string") throw new QRuntimeError("type", "X$ expects strings");
+          return qLong(parseByteToken(item.value));
+        }),
+        true,
+        "byte"
+      );
+    }
+    const items = value.items.map((item) => tokAtom(name, item));
+    return qList(items, items.every((item) => item.kind === items[0]?.kind), items[0]?.kind === "temporal" ? items[0].temporalType : undefined);
+  }
+  return tokAtom(name, value);
+};
+
+const temporalDateText = (value: QValue) => {
+  if (value.kind !== "temporal") return null;
+  if (value.temporalType === "date" || value.temporalType === "month") return value.value;
+  if (value.temporalType === "timestamp") return value.value.split("D")[0] ?? null;
+  if (value.temporalType === "datetime") return value.value.split("T")[0] ?? null;
+  return null;
+};
+
+const temporalTimeText = (value: QValue) => {
+  if (value.kind !== "temporal") return null;
+  if (value.temporalType === "minute" || value.temporalType === "second" || value.temporalType === "time") return value.value;
+  if (value.temporalType === "timespan") return value.value.split("D")[1] ?? null;
+  if (value.temporalType === "timestamp") return value.value.split("D")[1] ?? null;
+  if (value.temporalType === "datetime") return value.value.split("T")[1] ?? null;
+  return null;
+};
+
+const temporalExtractorAtom = (name: string, value: QValue): QValue => {
+  const dateText = temporalDateText(value);
+  if ((name === "year" || name === "mm" || name === "dd") && dateText) {
+    const clean = dateText.replace(/m$/, "");
+    const [year, month, day] = clean.split(".").map((part) => Number.parseInt(part, 10));
+    if (name === "year") return qInt(year || 0);
+    if (name === "mm") return qInt(month || 0);
+    return qInt(day || 0);
+  }
+
+  const timeText = temporalTimeText(value);
+  if ((name === "hh" || name === "uu" || name === "ss") && timeText) {
+    const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?/.exec(timeText);
+    if (!match) return qInt(0, "intNull");
+    if (name === "hh") return qInt(Number.parseInt(match[1]!, 10));
+    if (name === "uu") return qInt(Number.parseInt(match[2]!, 10));
+    return qInt(Number.parseInt(match[3] ?? "0", 10));
+  }
+
+  throw new QRuntimeError("type", `${name}$ expects temporal values`);
+};
+
+const temporalExtractorValue = (name: string, value: QValue): QValue => {
+  if (value.kind === "list") {
+    return qList(value.items.map((item) => temporalExtractorAtom(name, item)), true, "int");
+  }
+  return temporalExtractorAtom(name, value);
+};
+
+const TEMPORAL_EXTRACT_CASTS = new Set(["year", "mm", "dd", "hh", "uu", "ss"]);
+
+const padString = (width: number, value: string) => {
+  const size = Math.abs(Math.trunc(width));
+  if (value.length >= size) return width < 0 ? value.slice(value.length - size) : value.slice(0, size);
+  const padding = " ".repeat(size - value.length);
+  return width < 0 ? `${padding}${value}` : `${value}${padding}`;
+};
+
+const qPaddedString = (value: string): QString => ({ ...qString(value), displayAsString: true } as QString);
+
+export const padValue = (widthValue: QNumber, value: QValue): QValue => {
+  const width = toNumber(widthValue);
+  if (value.kind === "string") {
+    return qPaddedString(padString(width, value.value));
+  }
+  if (value.kind === "list") {
+    return qList(value.items.map((item) => padValue(widthValue, item)), false);
+  }
+  if (value.kind === "dictionary") {
+    return qDictionary(value.keys, value.values.map((item) => padValue(widthValue, item)));
+  }
+  if (value.kind === "table") {
+    return qTable(
+      Object.fromEntries(
+        Object.entries(value.columns).map(([name, column]) => [
+          name,
+          qList(column.items.map((item) => padValue(widthValue, item)), false)
+        ])
+      )
+    );
+  }
+  if (value.kind === "keyedTable") {
+    return qKeyedTable(padValue(widthValue, value.keys) as QTable, padValue(widthValue, value.values) as QTable);
+  }
+  return padValue(widthValue, stringValue(value));
+};
+
 export const castValue = (left: QValue, right: QValue): QValue => {
+  if (left.kind === "list") {
+    if (right.kind === "list" && right.items.length === left.items.length) {
+      return qList(
+        left.items.map((castSpec, index) => castValue(castSpec, right.items[index]!)),
+        false
+      );
+    }
+    return qList(left.items.map((castSpec) => castValue(castSpec, right)), false);
+  }
+  if (left.kind === "number" && left.numericType === "long" && Number.isInteger(left.value)) {
+    return padValue(left, right);
+  }
+
   const castName = castNameFromLeftOperand(left);
   if (castName === null) {
     throw new QRuntimeError("type", "Cast expects a symbol or string on the left");
   }
 
   const cast = CAST_HANDLER_BY_NAME.get(castName);
-  if (!cast) {
-    throw new QRuntimeError("nyi", `Cast ${castName}$ is not implemented yet`);
+  if (cast) {
+    return cast(right);
   }
+  if (TEMPORAL_EXTRACT_CASTS.has(castName)) {
+    return temporalExtractorValue(castName, right);
+  }
+  const tokName = TOK_NAME_BY_NEGATIVE_SHORT[castName] ?? castName;
+  if (/^[A-Z]+$/.test(tokName)) {
+    return tokValue(tokName, right);
+  }
+  throw new QRuntimeError("nyi", `Cast ${castName}$ is not implemented yet`);
+};
 
-  return cast(right);
+export const foreignKeyValue = (name: string, parent: QValue, value: QValue): QValue => {
+  if (parent.kind !== "keyedTable") {
+    throw new QRuntimeError("type", "Foreign-key casts expect a keyed table");
+  }
+  const keyNames = tableColumnNames(parent.keys);
+  if (keyNames.length !== 1) {
+    throw new QRuntimeError("type", "Foreign-key casts expect a single-key table");
+  }
+  const domain = parent.keys.columns[keyNames[0]!]!.items;
+  const ensureInDomain = (item: QValue) => {
+    if (item.kind !== "symbol") {
+      throw new QRuntimeError("type", "Foreign-key casts expect symbols");
+    }
+    if (!domain.some((candidate) => equals(candidate, item))) {
+      throw new QRuntimeError("cast", item.value);
+    }
+    return item;
+  };
+  if (value.kind === "list") {
+    return { ...value, items: value.items.map(ensureInDomain), homogeneous: true, foreignKey: name };
+  }
+  return { ...qList([ensureInDomain(value)], true), foreignKey: name };
 };
 
 export const tableColumnNames = (table: QTable) => Object.keys(table.columns);
@@ -2932,6 +4715,11 @@ export const xkeyValue = (cols: QValue, tableValue: QValue): QValue => {
   const table = asTable(tableValue);
   const keyNames = asSymbolList(cols);
   const allNames = tableColumnNames(table);
+  for (const name of keyNames) {
+    if (!table.columns[name]) {
+      throw new QRuntimeError("name", name);
+    }
+  }
   const valNames = allNames.filter((n) => !keyNames.includes(n));
   const keys = qTable(Object.fromEntries(keyNames.map((k) => [k, table.columns[k]!])));
   const values = qTable(Object.fromEntries(valNames.map((k) => [k, table.columns[k]!])));
@@ -2977,11 +4765,12 @@ export const ssrValue = (text: QValue, pattern: QValue, replacement: QValue): QV
   const pat = stringLikeValue(pattern);
   const rep = stringLikeValue(replacement);
   if (pat === null || rep === null) throw new QRuntimeError("type", "ssr pattern/replacement must be strings");
-  if (pat === "") return text;
-  return qString(text.value.split(pat).join(rep));
+  if (pat === "") throw new QRuntimeError("length", "ssr pattern cannot be empty");
+  const matcher = new RegExp(qPatternToRegexSource(pat, { allowStar: false }), "g");
+  return qString(text.value.replace(matcher, rep));
 };
 
-export const leftJoin = (left: QValue, right: QValue): QValue => {
+export const leftJoin = (left: QValue, right: QValue, options: { fill?: boolean } = {}): QValue => {
   const lt = asTable(left);
   if (right.kind !== "keyedTable") {
     throw new QRuntimeError("type", "lj expects a keyed table on the right");
@@ -3019,14 +4808,17 @@ export const leftJoin = (left: QValue, right: QValue): QValue => {
       for (const vn of valNames) {
         const sourceCol = right.values.columns[vn]!.items;
         const targetList = resultCols[vn]!.items;
-        targetList[i] = sourceCol[matchIdx]!;
+        const candidate = sourceCol[matchIdx]!;
+        if (!options.fill || !isNullish(candidate)) {
+          targetList[i] = candidate;
+        }
       }
     }
   }
   return qTable(resultCols);
 };
 
-export const innerJoin = (left: QValue, right: QValue): QValue => {
+export const innerJoin = (left: QValue, right: QValue, options: { fill?: boolean } = {}): QValue => {
   const lt = asTable(left);
   if (right.kind !== "keyedTable") {
     throw new QRuntimeError("type", "ij expects a keyed table on the right");
@@ -3061,12 +4853,76 @@ export const innerJoin = (left: QValue, right: QValue): QValue => {
     resultCols[name] = qList(resultPositions.map((p) => lt.columns[name]!.items[p]!), true);
   }
   for (const name of valNames) {
-    resultCols[name] = qList(rightMatchPositions.map((p) => right.values.columns[name]!.items[p]!), true);
+    resultCols[name] = qList(
+      rightMatchPositions.map((p, index) => {
+        const candidate = right.values.columns[name]!.items[p]!;
+        const leftItem = lt.columns[name]?.items[resultPositions[index]!];
+        return options.fill && leftItem && isNullish(candidate) ? leftItem : candidate;
+      }),
+      true
+    );
   }
   return qTable(resultCols);
 };
 
-export const unionJoin = (left: QValue, right: QValue): QValue => {
+export const unionJoin = (left: QValue, right: QValue, options: { fill?: boolean } = {}): QValue => {
+  if (left.kind === "keyedTable" && right.kind === "keyedTable") {
+    const keyNames = tableColumnNames(left.keys);
+    const rightKeyNames = tableColumnNames(right.keys);
+    if (keyNames.length !== rightKeyNames.length || keyNames.some((name, index) => name !== rightKeyNames[index])) {
+      throw new QRuntimeError("type", "uj expects matching key columns for keyed tables");
+    }
+
+    const leftValNames = tableColumnNames(left.values);
+    const rightValNames = tableColumnNames(right.values);
+    const valNames = Array.from(new Set([...leftValNames, ...rightValNames]));
+    const keyCols: Record<string, QValue[]> = Object.fromEntries(
+      keyNames.map((name) => [name, [...left.keys.columns[name]!.items]])
+    );
+    const valCols: Record<string, QValue[]> = Object.fromEntries(
+      valNames.map((name) => {
+        const source = left.values.columns[name];
+        return [name, source ? [...source.items] : Array(tableRowCount(left.keys)).fill(nullLike(right.values.columns[name]?.items[0]))];
+      })
+    );
+
+    const leftRows = tableRowCount(left.keys);
+    const rightRows = tableRowCount(right.keys);
+    const findMatch = (rightRow: number) => {
+      for (let leftRow = 0; leftRow < leftRows; leftRow += 1) {
+        if (keyNames.every((name) => equals(left.keys.columns[name]!.items[leftRow]!, right.keys.columns[name]!.items[rightRow]!))) {
+          return leftRow;
+        }
+      }
+      return -1;
+    };
+
+    for (let rightRow = 0; rightRow < rightRows; rightRow += 1) {
+      const match = findMatch(rightRow);
+      if (match >= 0) {
+        for (const name of rightValNames) {
+          const candidate = right.values.columns[name]!.items[rightRow]!;
+          if (!options.fill || !isNullish(candidate)) {
+            valCols[name]![match] = candidate;
+          }
+        }
+        continue;
+      }
+
+      for (const name of keyNames) {
+        keyCols[name]!.push(right.keys.columns[name]!.items[rightRow]!);
+      }
+      for (const name of valNames) {
+        valCols[name]!.push(right.values.columns[name]?.items[rightRow] ?? nullLike(left.values.columns[name]?.items[0]));
+      }
+    }
+
+    return qKeyedTable(
+      qTable(Object.fromEntries(keyNames.map((name) => [name, qList(keyCols[name]!, true)]))),
+      qTable(Object.fromEntries(valNames.map((name) => [name, qList(valCols[name]!, false)])))
+    );
+  }
+
   const lt = asTable(left);
   const rt = asTable(right);
   const allNames = Array.from(new Set([...tableColumnNames(lt), ...tableColumnNames(rt)]));
@@ -3494,13 +5350,13 @@ export const castSymbolValue = (value: QValue): QValue => {
     return qSymbol(value.value);
   }
   if (value.kind === "string") {
-    return qSymbol(value.value);
+    return qSymbol(value.value.trim());
   }
   if (value.kind === "symbol") {
     return value;
   }
   if (value.kind === "list") {
-    return qList(value.items.map(castSymbolAtom), true);
+    return qList(value.items.map(castSymbolAtom), true, value.items.length === 0 ? "symbol" : undefined);
   }
   throw new QRuntimeError("type", "symbol$ expects strings or symbols");
 };
@@ -3510,7 +5366,7 @@ export const castSymbolAtom = (value: QValue): QValue => {
     return qSymbol(value.value);
   }
   if (value.kind === "string") {
-    return qSymbol(value.value);
+    return qSymbol(value.value.trim());
   }
   if (value.kind === "symbol") {
     return value;
@@ -3526,7 +5382,7 @@ export const castBooleanValue = (value: QValue): QValue => {
     );
   }
   if (value.kind === "list") {
-    return qList(value.items.map(castBooleanAtom), true);
+    return qList(value.items.map(castBooleanAtom), true, value.items.length === 0 ? "boolean" : undefined);
   }
   return castBooleanAtom(value);
 };
@@ -3576,7 +5432,8 @@ export const castShortValue = (value: QValue): QValue => {
   if (value.kind === "list") {
     return qList(
       value.items.map((item) => (item.kind === "list" ? castShortValue(item) : castShortAtom(item))),
-      true
+      true,
+      value.items.length === 0 ? "short" : undefined
     );
   }
   return castShortAtom(value);
@@ -3590,7 +5447,7 @@ export const castShortAtom = (value: QValue): QValue => {
     if (value.special === "null" || value.special === "intNull") {
       return qShort(0);
     }
-    return qShort(Math.trunc(value.value));
+    return qShort(roundHalfAwayFromZero(value.value));
   }
   if (value.kind === "boolean") {
     return qShort(value.value ? 1 : 0);
@@ -3642,6 +5499,22 @@ export const stringValue = (value: QValue): QValue => {
   if (value.kind === "string") {
     return qList([...value.value].map((char) => qString(char)), false);
   }
+  if (value.kind === "dictionary") {
+    return qDictionary(value.keys, value.values.map((item) => stringValue(item)));
+  }
+  if (value.kind === "table") {
+    return qTable(
+      Object.fromEntries(
+        Object.entries(value.columns).map(([name, column]) => [
+          name,
+          qList(column.items.map((item) => stringValue(item)), false)
+        ])
+      )
+    );
+  }
+  if (value.kind === "keyedTable") {
+    return qKeyedTable(stringValue(value.keys) as QTable, stringValue(value.values) as QTable);
+  }
   if (value.kind === "list") {
     return qList(
       value.items.map((item) => (item.kind === "string" ? stringValue(item) : stringAtomValue(item))),
@@ -3668,7 +5541,7 @@ export const castIntValue = (value: QValue): QValue => {
 export const castLongAtom = (value: QValue): QValue => {
   if (value.kind === "number") {
     if (isNumericNull(value)) return qLong(0, "longNull");
-    return qLong(Math.trunc(value.value));
+    return qLong(roundHalfAwayFromZero(value.value));
   }
   if (value.kind === "temporal" && value.temporalType === "date") {
     if (value.value === "0Nd") return qLong(0, "longNull");
@@ -3720,7 +5593,7 @@ export const castRealValue = (value: QValue): QValue => {
 export const castIntAtom = (value: QValue): QValue => {
   if (value.kind === "number") {
     if (isNumericNull(value)) return qInt(0, "intNull");
-    return qInt(Math.trunc(value.value));
+    return qInt(roundHalfAwayFromZero(value.value));
   }
   if (value.kind === "temporal" && value.temporalType === "date") {
     if (value.value === "0Nd") return qInt(0, "intNull");
@@ -3739,7 +5612,8 @@ export const castFloatValue = (value: QValue): QValue => {
   if (value.kind === "list") {
     return qList(
       value.items.map((item) => (item.kind === "list" ? castFloatValue(item) : castFloatAtom(item))),
-      true
+      true,
+      value.items.length === 0 ? "float" : undefined
     );
   }
   return castFloatAtom(value);
@@ -3767,9 +5641,155 @@ export const castFloatAtom = (value: QValue): QValue => {
   throw new QRuntimeError("type", "float$ expects numeric values");
 };
 
+const pad2 = (value: number) => String(value).padStart(2, "0");
+const pad3 = (value: number) => String(value).padStart(3, "0");
+const pad9 = (value: number) => String(value).padStart(9, "0");
+
+const positiveMod = (value: number, modulus: number) => ((value % modulus) + modulus) % modulus;
+
+const randNatural = (upperInclusive: number) =>
+  Math.floor(Math.random() * (Math.max(0, Math.trunc(upperInclusive)) + 1));
+
+const formatMonthFromMonths = (months: number) => {
+  const year = 2000 + Math.floor(months / 12);
+  const month = positiveMod(months, 12) + 1;
+  return `${year}.${pad2(month)}m`;
+};
+
+const parseMonthMonths = (value: string) => {
+  const [yearText, monthText] = value.replace(/m$/, "").split(".");
+  return (Number.parseInt(yearText ?? "2000", 10) - 2000) * 12 + Number.parseInt(monthText ?? "1", 10) - 1;
+};
+
+const parseClockParts = (value: string) => {
+  const match = /^(\d{1,2}):(\d{2})(?::(\d{2}))?(?:\.(\d{1,9}))?$/.exec(value);
+  if (!match) return { hours: 0, minutes: 0, seconds: 0, fraction: "" };
+  return {
+    hours: Number.parseInt(match[1]!, 10),
+    minutes: Number.parseInt(match[2]!, 10),
+    seconds: Number.parseInt(match[3] ?? "0", 10),
+    fraction: match[4] ?? ""
+  };
+};
+
+const parseMinuteUnits = (value: string) => {
+  const parts = parseClockParts(value);
+  return parts.hours * 60 + parts.minutes;
+};
+
+const parseSecondUnits = (value: string) => {
+  const parts = parseClockParts(value);
+  return parts.hours * 3600 + parts.minutes * 60 + parts.seconds;
+};
+
+const parseTimeMillis = (value: string) => {
+  const parts = parseClockParts(value);
+  const millis = Number.parseInt(parts.fraction.padEnd(3, "0").slice(0, 3) || "0", 10);
+  return parseSecondUnits(value) * 1000 + millis;
+};
+
+const parseClockNanos = (value: string) => {
+  const parts = parseClockParts(value);
+  const nanos = Number.parseInt(parts.fraction.padEnd(9, "0").slice(0, 9) || "0", 10);
+  return parseSecondUnits(value) * 1_000_000_000 + nanos;
+};
+
+const parseTimespanNanos = (value: string) => {
+  const match = /^(-?\d+)D(.+)$/.exec(value);
+  if (!match) return parseClockNanos(value);
+  return Number.parseInt(match[1]!, 10) * 24 * 60 * 60 * 1_000_000_000 + parseClockNanos(match[2]!);
+};
+
+const parseTimestampNanos = (value: string) => {
+  const [date, time = "00:00:00.000000000"] = value.split("D");
+  return parseQDateDays(date ?? "2000.01.01") * 24 * 60 * 60 * 1_000_000_000 + parseClockNanos(time);
+};
+
+const parseDatetimeMillis = (value: string) => {
+  const [date, time = "00:00:00.000"] = value.split("T");
+  return parseQDateDays(date ?? "2000.01.01") * 24 * 60 * 60 * 1000 + parseTimeMillis(time);
+};
+
+const formatClockFromUnits = (units: number, unitsPerSecond: number, precision: "minute" | "second" | "millisecond" | "nanosecond") => {
+  const dayUnits = 24 * 60 * 60 * unitsPerSecond;
+  const wrapped = positiveMod(Math.trunc(units), dayUnits);
+  const hours = Math.floor(wrapped / (60 * 60 * unitsPerSecond));
+  const minutes = Math.floor((wrapped % (60 * 60 * unitsPerSecond)) / (60 * unitsPerSecond));
+  const seconds = Math.floor((wrapped % (60 * unitsPerSecond)) / unitsPerSecond);
+  const subsecond = wrapped % unitsPerSecond;
+  if (precision === "minute") return `${pad2(hours)}:${pad2(minutes)}`;
+  if (precision === "second") return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}`;
+  if (precision === "millisecond") return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}.${pad3(subsecond)}`;
+  return `${pad2(hours)}:${pad2(minutes)}:${pad2(seconds)}.${pad9(subsecond)}`;
+};
+
+const formatTimespanFromNanos = (nanos: number) => {
+  const dayNanos = 24 * 60 * 60 * 1_000_000_000;
+  const whole = Math.trunc(nanos);
+  const days = Math.trunc(whole / dayNanos);
+  const rem = Math.abs(whole - days * dayNanos);
+  return `${days}D${formatClockFromUnits(rem, 1_000_000_000, "nanosecond")}`;
+};
+
+const formatTimestampFromNanos = (nanos: number) => {
+  const dayNanos = 24 * 60 * 60 * 1_000_000_000;
+  const whole = Math.trunc(nanos);
+  const days = Math.floor(whole / dayNanos);
+  const rem = whole - days * dayNanos;
+  return `${formatQDateFromDays(days)}D${formatClockFromUnits(rem, 1_000_000_000, "nanosecond")}`;
+};
+
+const formatDatetimeFromDays = (days: number) => `${formatQDateFromDays(Math.trunc(days))}T00:00:00.000`;
+
+const formatDatetimeFromMillis = (millis: number) => {
+  const dayMillis = 24 * 60 * 60 * 1000;
+  const whole = Math.trunc(millis);
+  const days = Math.floor(whole / dayMillis);
+  const rem = whole - days * dayMillis;
+  return `${formatQDateFromDays(days)}T${formatClockFromUnits(rem, 1000, "millisecond")}`;
+};
+
+export const castTemporalValue = (value: QValue, temporalType: TemporalType): QValue => {
+  if (value.kind === "list") {
+    return qList(value.items.map((item) => castTemporalAtom(item, temporalType)), true, temporalType);
+  }
+  return castTemporalAtom(value, temporalType);
+};
+
+export const castTemporalAtom = (value: QValue, temporalType: TemporalType): QValue => {
+  if (temporalType === "date") return castDateAtom(value);
+  if (value.kind === "temporal" && value.temporalType === temporalType) return value;
+  if (value.kind === "null" || (value.kind === "number" && isNumericNull(value))) {
+    return qTemporal(temporalType, temporalNullForType(temporalType));
+  }
+  const raw =
+    value.kind === "number" ? Math.trunc(value.value) :
+    value.kind === "boolean" ? (value.value ? 1 : 0) :
+    null;
+  if (raw === null) {
+    throw new QRuntimeError("type", `${temporalType}$ expects numeric values`);
+  }
+  switch (temporalType) {
+    case "timestamp":
+      return qTemporal("timestamp", formatTimestampFromNanos(raw));
+    case "month":
+      return qTemporal("month", formatMonthFromMonths(raw));
+    case "datetime":
+      return qTemporal("datetime", formatDatetimeFromDays(raw));
+    case "timespan":
+      return qTemporal("timespan", formatTimespanFromNanos(raw));
+    case "minute":
+      return qTemporal("minute", formatClockFromUnits(raw, 1 / 60, "minute"));
+    case "second":
+      return qTemporal("second", formatClockFromUnits(raw, 1, "second"));
+    case "time":
+      return qTemporal("time", formatClockFromUnits(raw, 1000, "millisecond"));
+  }
+};
+
 export const castDateValue = (value: QValue): QValue => {
   if (value.kind === "list") {
-    return qList(value.items.map(castDateAtom), true);
+    return qList(value.items.map(castDateAtom), true, value.items.length === 0 ? "date" : undefined);
   }
   return castDateAtom(value);
 };
@@ -3814,7 +5834,11 @@ export const formatQDateFromDays = (days: number) => {
 
 export const buildTable = (columns: { name: string; value: QValue }[]): QTable => {
   const listCounts = columns.flatMap((column) =>
-    column.value.kind === "list" ? [column.value.items.length] : []
+    column.value.kind === "list"
+      ? [column.value.items.length]
+      : column.value.kind === "string"
+        ? [column.value.value.length]
+        : []
   );
   const counts = [...new Set(listCounts)];
   if (counts.length > 1) {
@@ -3825,6 +5849,12 @@ export const buildTable = (columns: { name: string; value: QValue }[]): QTable =
   const entries = columns.map(({ name, value }) => {
     if (value.kind === "list") {
       return [name, value] as const;
+    }
+    if (value.kind === "string") {
+      return [
+        name,
+        qList([...value.value].map((char) => qString(char)), true)
+      ] as const;
     }
 
     return [
@@ -3838,10 +5868,62 @@ export const buildTable = (columns: { name: string; value: QValue }[]): QTable =
 
 export const tableRowCount = (table: QTable) => Object.values(table.columns)[0]?.items.length ?? 0;
 
+export const ungroupValue = (value: QValue): QValue => {
+  const table =
+    value.kind === "keyedTable"
+      ? qTable({ ...value.keys.columns, ...value.values.columns })
+      : value.kind === "table"
+        ? value
+        : null;
+  if (!table) {
+    throw new QRuntimeError("type", "ungroup expects a table or keyed table");
+  }
+
+  const names = Object.keys(table.columns);
+  const output: Record<string, QValue[]> = Object.fromEntries(names.map((name) => [name, []]));
+  const rows = tableRowCount(table);
+
+  for (let row = 0; row < rows; row += 1) {
+    const cells = names.map((name) => table.columns[name]!.items[row] ?? nullLike(table.columns[name]!.items[0]));
+    const listLengths = cells
+      .filter((cell) => cell.kind === "list" || cell.kind === "string")
+      .map((cell) => cell.kind === "list" ? cell.items.length : cell.value.length);
+    const repeat = listLengths[0] ?? 1;
+    if (!listLengths.every((length) => length === repeat)) {
+      throw new QRuntimeError("length", "ungroup row list cells must have the same length");
+    }
+
+    for (let offset = 0; offset < repeat; offset += 1) {
+      for (let columnIndex = 0; columnIndex < names.length; columnIndex += 1) {
+        const name = names[columnIndex]!;
+        const cell = cells[columnIndex]!;
+        output[name]!.push(
+          cell.kind === "list"
+            ? cell.items[offset] ?? nullLike(cell.items[0])
+            : cell.kind === "string"
+              ? qString(cell.value[offset] ?? "")
+              : cell
+        );
+      }
+    }
+  }
+
+  return qTable(
+    Object.fromEntries(
+      names.map((name) => [
+        name,
+        qList(output[name]!, output[name]!.every((item) => item.kind === output[name]![0]?.kind))
+      ])
+    )
+  );
+};
+
 export const selectColumnRows = (column: QList, positions: number[]) =>
   qList(
     positions.map((position) => column.items[position] ?? nullLike(column.items[0])),
-    column.homogeneous ?? false
+    column.homogeneous ?? false,
+    column.attribute,
+    column.foreignKey
   );
 
 export const selectTableRows = (table: QTable, positions: number[]) =>
@@ -3910,6 +5992,9 @@ export const applyDictionaryIndex = (dictionary: QDictionary, args: QValue[]) =>
 
 export const applyValue = (value: QValue, args: QValue[]): QValue => {
   switch (value.kind) {
+    case "null":
+      if (args.length === 1) return args[0]!;
+      throw new QRuntimeError("rank", ":: identity expects one argument");
     case "list":
       return applyListIndex(value, args);
     case "string":
@@ -3930,7 +6015,12 @@ export const indexList = (list: QList, index: QValue): QValue => {
     return list.items[index.value] ?? nullLike(list.items[0]);
   }
   if (index.kind === "list") {
-    return qList(index.items.map((item) => indexList(list, item)), list.homogeneous ?? false);
+    return qList(
+      index.items.map((item) => indexList(list, item)),
+      list.homogeneous ?? false,
+      list.attribute,
+      list.foreignKey
+    );
   }
   throw new QRuntimeError("type", "List index must be numeric");
 };
@@ -3970,8 +6060,8 @@ export const indexNestedRows = (list: QList, args: QValue[]): QValue => {
     throw new QRuntimeError("type", "Nested index expects row vectors");
   };
 
-  // Only iterate when the row selector itself is a list/vector (rank-2 slice)
-  if (rowSelector.kind === "list" && rows.kind === "list") {
+  // Iterate for rank-2 slices and whole-row column projection.
+  if ((rowSelector.kind === "list" || rowSelector.kind === "null") && rows.kind === "list") {
     return qList(rows.items.map(project), false);
   }
 
@@ -4169,6 +6259,7 @@ export const formatBare = (value: QValue): string => {
     case "boolean":
       return value.value ? "1b" : "0b";
     case "number":
+      if (value.exactText !== undefined) return value.exactText;
       if (value.special === "longNull") return "0N";
       if (value.special === "longPosInf") return "0W";
       if (value.special === "longNegInf") return "-0W";
@@ -4204,11 +6295,17 @@ export const formatBare = (value: QValue): string => {
           .map((byte) => byte.toString(16).padStart(2, "0"))
           .join("")}`;
       }
-      if (value.items.length === 0) {
+  if (value.items.length === 0) {
+        if (value.attribute === "byte") return "0x";
+        if (value.attribute === "boolean") return "`boolean$()";
+        if (value.attribute === "symbol") return "`symbol$()";
+        if (["short", "int", "long", "real", "float"].includes(value.attribute ?? "")) {
+          return `\`${value.attribute}$()`;
+        }
         return "()";
       }
       if (value.items.length === 1 && value.attribute !== "namespaceKeys") {
-        return `,${formatBare(value.items[0])}`;
+        return value.items[0]?.kind === "list" ? formatBare(value.items[0]) : `,${formatBare(value.items[0])}`;
       }
       if (value.items.every((item) => item.kind === "number")) {
         const nums = value.items as QNumber[];
@@ -4224,13 +6321,17 @@ export const formatBare = (value: QValue): string => {
           const only = [...types][0]!;
           const suffix = suffixMap[only] ?? "";
           const body = nums.map((n) => formatListNumber(n)).join(" ");
-          if (!suffix) {
+          if (value.attribute === "matrixRow" && only === "float") {
             return body;
+          }
+          if (!suffix) {
+            return value.attribute === "s" ? `\`s#${body}` : body;
           }
           if (only === "float") {
             // Only add trailing `f` if every value is an integer (no decimal in output)
             const anyDecimal = body.includes(".") || body.toLowerCase().includes("e");
-            return anyDecimal ? body : `${body}f`;
+            const hasSpecial = nums.some((n) => n.special !== undefined);
+            return anyDecimal || hasSpecial ? body : `${body}f`;
           }
           if (only === "real") {
             const anyDecimal = body.includes(".") || body.toLowerCase().includes("e");
@@ -4244,13 +6345,71 @@ export const formatBare = (value: QValue): string => {
       if (value.items.every((item) => item.kind === "boolean")) {
         return `${value.items.map((item) => (item.kind === "boolean" && item.value ? "1" : "0")).join("")}b`;
       }
+      if (
+        value.items.every(
+          (item) =>
+            item.kind === "list" &&
+            item.items.every((nested) => nested.kind === "boolean")
+        )
+      ) {
+        const rows = value.items as QList[];
+        const lengths = new Set(rows.map((row) => row.items.length));
+        if (lengths.size === 1) {
+          return rows.map(formatBare).join("\n");
+        }
+        const cells = rows.map((row) => [formatBare(row)]);
+        const width = Math.max(0, ...cells.flat().map((cell) => cell.length));
+        return cells.map((row) => row.map((cell) => cell.padEnd(width)).join(" ")).join("\n");
+      }
+      if (
+        value.items.every(
+          (item) =>
+            item.kind === "list" &&
+            item.items.every(
+              (nested) =>
+                nested.kind === "boolean" ||
+                (nested.kind === "list" && nested.items.every((leaf) => leaf.kind === "boolean"))
+            )
+        )
+      ) {
+        const rows = value.items as QList[];
+        const cells = rows.map((row) => {
+          const mixedRow = row.items.some((cell) => cell.kind === "list");
+          return row.items.map((cell) =>
+            cell.kind === "boolean"
+              ? mixedRow
+                ? formatBare(cell)
+                : cell.value ? "1" : "0"
+              : formatBare(cell)
+          );
+        });
+        const columnCount = Math.max(0, ...cells.map((row) => row.length));
+        const widths = Array.from({ length: columnCount }, (_, column) =>
+          Math.max(...cells.map((row) => row[column]?.length ?? 0))
+        );
+        return cells
+          .map((row) => row.map((cell, column) => cell.padEnd(widths[column]!)).join(" ").trimEnd())
+          .join("\n");
+      }
+      if (value.items.every((item) => item.kind === "temporal")) {
+        const temporalItems = value.items.filter((item): item is Extract<QValue, { kind: "temporal" }> => item.kind === "temporal");
+        const temporalTypes = new Set(temporalItems.map((item) => item.temporalType));
+        if (temporalTypes.size === 1 && temporalTypes.has("month")) {
+          return `${temporalItems.map((item) => item.value.replace(/m$/, "")).join(" ")}m`;
+        }
+        return temporalItems.map((item) => item.value).join(temporalTypes.size === 1 ? " " : "\n");
+      }
       if (value.items.every((item) => item.kind === "symbol")) {
+        if (value.foreignKey) {
+          return `\`${value.foreignKey}$${value.items.map((item) => formatBare(item)).join("")}`;
+        }
         if (value.attribute === "namespaceKeys") {
           return `\`\`${value.items
             .map((item) => (item.kind === "symbol" ? item.value : ""))
             .join("`")}`;
         }
-        return value.items.map((item) => formatBare(item)).join("");
+        const body = value.items.map((item) => formatBare(item)).join("");
+        return value.attribute === "s" && value.items.length > 1 ? `\`s#${body}` : body;
       }
       if (value.items.every((item) => item.kind === "string")) {
         return value.items
@@ -4258,7 +6417,10 @@ export const formatBare = (value: QValue): string => {
           .join("\n");
       }
       if (value.items.every((item) => item.kind === "list" || item.kind === "string")) {
-        return value.items.map((item) => formatBare(item)).join("\n");
+        const hasNonSymbolList = value.items.some(
+          (item) => item.kind === "list" && !item.items.every((nested) => nested.kind === "symbol")
+        );
+        return value.items.map((item) => formatNestedListItem(item, { symbolsAsColumns: hasNonSymbolList })).join("\n");
       }
       if (
         value.items.some(
@@ -4267,10 +6429,14 @@ export const formatBare = (value: QValue): string => {
             item.kind === "string" ||
             item.kind === "dictionary" ||
             item.kind === "table" ||
-            item.kind === "keyedTable"
+            item.kind === "keyedTable" ||
+            item.kind === "null"
         )
       ) {
-        return value.items.map(formatBare).join("\n");
+        return value.items.map((item) => formatNestedListItem(item)).join("\n");
+      }
+      if (!value.items.every((item) => item.kind === value.items[0]?.kind)) {
+        return value.items.map((item) => formatNestedListItem(item)).join("\n");
       }
       return value.items.map(formatBare).join(" ");
     case "dictionary":
@@ -4287,6 +6453,8 @@ export const formatBare = (value: QValue): string => {
         .join(";")}]`;
     case "builtin":
       return value.name;
+    case "parseTree":
+      return value.display;
     case "namespace":
       return value.name;
     case "error":
@@ -4386,13 +6554,14 @@ export const layoutTable = (table: QTable) => {
 export const formatKeyedTable = (table: QKeyedTable) => {
   const keys = layoutTable(table.keys);
   const values = layoutTable(table.values);
-  const header = `${keys.header}| ${values.header}`;
+  const keyWidth = Math.max(keys.header.length, ...keys.rows.map((row) => row.length));
+  const header = `${keys.header.padEnd(keyWidth)}| ${values.header}`;
   const divider = `${keys.divider}| ${values.divider}`;
   const rowCount = Math.max(keys.rows.length, values.rows.length);
   const rows = Array.from({ length: rowCount }, (_, index) => {
     const left = keys.rows[index] ?? "";
     const right = values.rows[index] ?? "";
-    return `${left.padEnd(keys.header.length)}| ${right}`.trimEnd();
+    return `${left.padEnd(keyWidth)}| ${right}`.trimEnd();
   });
   return [header, divider, ...rows].join("\n");
 };
@@ -4400,6 +6569,12 @@ export const formatKeyedTable = (table: QKeyedTable) => {
 export const formatTableCell = (value: QValue) => {
   if (isNullish(value)) {
     return "";
+  }
+  if (value.kind === "boolean") {
+    return value.value ? "1" : "0";
+  }
+  if (value.kind === "number") {
+    return formatListNumber(value);
   }
   if (value.kind === "symbol") {
     return value.value;
@@ -4412,10 +6587,32 @@ export const formatTableCell = (value: QValue) => {
 
 export const formatDictionary = (dictionary: QDictionary) => {
   const keys = dictionary.keys.map((key) =>
-    key.kind === "symbol" ? key.value : formatBare(key)
+    key.kind === "symbol"
+      ? key.value
+      : key.kind === "string" && key.value.length === 1
+        ? key.value
+        : formatBare(key)
   );
   const width = Math.max(0, ...keys.map((key) => key.length));
-  const typedSymbols = dictionary.values.every((value) => value.kind === "symbol");
+  const numericListValues = dictionary.values.every(
+    (value) => value.kind === "list" && value.items.every((item) => item.kind === "number")
+  )
+    ? (dictionary.values as QList[])
+    : null;
+  const symbolColumnValues = dictionary.values.length > 0 && dictionary.values.every((value) => value.kind === "symbol");
+  const numericListWidths =
+    numericListValues &&
+    numericListValues.length > 0 &&
+    numericListValues.every((value) => value.items.length === numericListValues[0]!.items.length) &&
+    (numericListValues[0]?.items.length ?? 0) > 1
+      ? Array.from({ length: numericListValues[0]!.items.length }, (_, column) =>
+          Math.max(
+            ...numericListValues.map((value) =>
+              formatListNumber(value.items[column] ?? qLong(0)).length
+            )
+          )
+        )
+      : null;
   return keys
     .map(
       (key, index) => {
@@ -4423,8 +6620,20 @@ export const formatDictionary = (dictionary: QDictionary) => {
         const rendered =
           value.kind === "null"
             ? ""
-            : typedSymbols
-              ? formatTableCell(value)
+            : value.kind === "boolean"
+              ? value.value ? "1" : "0"
+            : value.kind === "string"
+              ? (value as QString & { displayAsString?: boolean }).displayAsString
+                ? formatBare(value)
+                : [...value.value].join(" ")
+            : value.kind === "symbol" && symbolColumnValues
+              ? value.value
+            : value.kind !== "list"
+              ? formatBare(value)
+              : numericListWidths && value.items.every((item) => item.kind === "number")
+                ? value.items
+                    .map((item, column) => formatListNumber(item).padEnd(numericListWidths[column]!))
+                    .join(" ")
               : formatBare(value);
         return `${key.padEnd(width)}| ${rendered}`;
       }

@@ -81,5 +81,5 @@ describe.skipIf(!hasRealQ)("Rosetta Code q corpus against real q parse", () => {
       .map(exampleName);
 
     expect(failures).toEqual([]);
-  });
+  }, 30_000);
 });

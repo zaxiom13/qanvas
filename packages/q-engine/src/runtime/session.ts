@@ -1,10 +1,10 @@
 import { canonicalize, isTruthy, qBool, qDate, qDictionary, qFloat, qInt, qKeyedTable, qList, qLong, qNull, qProjection, qReal, qShort, qString, qSymbol, qTable, type QBuiltin, type QList, type QNamespace, type QProjection, type QSymbol, type QTable, type QValue } from "@qpad/core";
 import { createMemoryFileSystem, type HostFileSystem } from "../host-file-system.js";
-import { isSilentExpression, parse } from "./parser.js";
+import { isSilentExpression, parse, renderAst } from "./parser.js";
 import { SHARED_BUILTINS } from "./builtins.js";
 import { CX_USAGE, Q_LONG_MAX, Q_RESERVED_WORDS, Q_X10_ALPHABET, Q_X12_ALPHABET, type AstNode, type BuiltinEntry, type EvalResult, type HostAdapter, type LambdaValue, QRuntimeError, type TableQueryScope } from "./types.js";
 import * as V from "./values.js";
-const { formatValue, parseNumericLiteral, parseTemporalLiteral, qTemporal, lambdaArity, collectImplicitParams, asList, toNumber, numeric, NUMERIC_RANK, numericTypeOf, promoteNumericType, numericOf, nullForType, isNumericNull, unaryNumeric, roundHalfAwayFromZero, qComplex, complexDictionaryField, complexParts, qComplexFromValue, complexArg, positiveModulo, complexModulo, dictionaryKeysMatch, applyDictionaryBinary, arithBinary, addTemporal, subtractTemporal, add, subtract, multiply, divide, divValue, modValue, compare, compareValue, equals, numericUnary, mapBinary, countValue, absValue, allValue, anyValue, ceilingValue, colsValue, firstValue, lastValue, ascValue, descValue, attrValue, sumValue, sampleNumericType, minValue, maxValue, medianValue, minPair, maxPair, avgValue, avgsValue, productValue, prdsValue, prevValue, nextValue, sumsValue, minsValue, maxsValue, ratiosValue, varianceValue, deviationValue, movingCountValue, movingValue, deltasValue, reverseValue, differValue, fillsValue, reciprocalValue, signumValue, floorValue, cutValue, rotateValue, sublistValue, chunkValue, cutByIndices, addMonthsValue, parseQOpt, defineDefaults, formatQNumber, atobValue, btoaValue, encodeFixedBase, decodeFixedBase, sanitizeQIdentifier, uniquifyQIdentifiers, qsqlExpressionName, QSQL_AGGREGATES, isQsqlAggregateExpression, qsqlColumnNames, renameTableColumns, qIdValue, xcolValue, asMatrix, fromMatrix, mmuValue, invValue, wsumValue, wavgValue, binarySearchValue, rankValue, randValue, hsymValue, fileHandlePath, loadScriptFromFs, textLines, byteListFromBytes, byteListFromText, inferFormatFromExt, isDelimitedFormat, delimiterForDelimitedFormat, delimiterForFormat, variableNameFromFilePath, escapeCsvField, cellToCsvText, tableToCsv, tableForDelimitedSave, parseCsvLine, inferCellValue, csvToTable, writeQValueToFs, readQValueFromFs, hydrateCanonical, xcolsValue, insertValue, upsertValue, inValue, gradeValue, asSequenceItems, shuffleItems, rebuildSequence, distinctItems, crossValue, applyEachValue, groupValue, callableArity, convergeValue, reduceValueWithSeed, scanValueWithSeed, flattenRazeLeaves, PRIMITIVE_ADVERB_TYPECHECK_NAMES, ensurePrimitiveAdverbInput, reduceValue, scanValue, reducePrimitiveAdverbValue, scanPrimitiveAdverbValue, primitiveDerivedAdverbValue, priorValue, patternToRegex, likeValue, ssValue, stringLikeValue, svValue, vsValue, resolveWithinBound, withinValue, exceptValue, interValue, unionValue, lowerValue, upperValue, trimStringValue, nullValue, flipListValue, flipValue, negateValue, notValue, distinctValue, namespaceKeys, whereValue, concatValues, concatTables, razeValue, takeValue, reshapeValue, reshapeStrings, reshapeItems, dropValue, fillValue, sampleSequence, findMappedValues, findValue, castNameFromLeftOperand, CAST_ALIAS_GROUPS, CAST_HANDLER_BY_NAME, castValue, tableColumnNames, tableRowAsDict, asKeyedTable, asTable, asSymbolList, xascValue, xkeyValue, xgroupValue, ssrValue, leftJoin, innerJoin, unionJoin, plusJoin, bangValue, asofJoinValue, equiJoinValue, windowJoinValue, asofValue, xbarValue, castSymbolValue, castSymbolAtom, castBooleanValue, castBooleanAtom, castByteValue, castByteAtom, castShortValue, castShortAtom, castCharValue, stringAtomValue, stringValue, castIntValue, castLongAtom, castLongValue, castRealAtom, castRealValue, castIntAtom, castFloatValue, castFloatAtom, castDateValue, castDateAtom, isDateLiteral, Q_DATE_EPOCH_MS, parseQDateDays, formatQDateFromDays, buildTable, tableRowCount, selectColumnRows, selectTableRows, materializeTableColumn, requireUnaryIndex, collectNumericPositions, tableColumnByName, applyListIndex, applyStringIndex, applyDictionaryIndex, applyValue, indexList, indexString, indexNestedRows, indexDictionary, isSymbolList, selectTableByUnaryIndex, projectTableSelection, indexTable, rowFromTable, indexKeyedTable, nullLike, temporalNullForType, isNullish, selectTableColumns, formatBare, trimFloat, formatFloat, formatListNumber, formatTable, layoutTable, formatKeyedTable, formatTableCell, formatDictionary } = V;
+const { formatValue, parseNumericLiteral, parseTemporalLiteral, qTemporal, lambdaArity, collectImplicitParams, asList, toNumber, numeric, NUMERIC_RANK, numericTypeOf, promoteNumericType, numericOf, nullForType, isNumericNull, unaryNumeric, roundHalfAwayFromZero, qComplex, complexDictionaryField, complexParts, qComplexFromValue, complexArg, positiveModulo, complexModulo, dictionaryKeysMatch, applyDictionaryBinary, arithBinary, addTemporal, subtractTemporal, add, subtract, multiply, divide, divValue, modValue, compare, compareValue, equals, numericUnary, mapBinary, countValue, absValue, allValue, anyValue, ceilingValue, colsValue, firstValue, lastValue, ascValue, descValue, attrValue, sumValue, sampleNumericType, minValue, maxValue, medianValue, minPair, maxPair, avgValue, avgsValue, productValue, prdsValue, prevValue, nextValue, sumsValue, minsValue, maxsValue, ratiosValue, varianceValue, deviationValue, movingCountValue, movingValue, deltasValue, reverseValue, differValue, fillsValue, reciprocalValue, signumValue, floorValue, cutValue, rotateValue, sublistValue, chunkValue, cutByIndices, addMonthsValue, parseQOpt, defineDefaults, formatQNumber, atobValue, btoaValue, encodeFixedBase, decodeFixedBase, sanitizeQIdentifier, uniquifyQIdentifiers, qsqlExpressionName, QSQL_AGGREGATES, isQsqlAggregateExpression, qsqlColumnNames, renameTableColumns, qIdValue, xcolValue, asMatrix, fromMatrix, mmuValue, invValue, wsumValue, wavgValue, binarySearchValue, rankValue, randValue, hsymValue, fileHandlePath, loadScriptFromFs, textLines, byteListFromBytes, byteListFromText, inferFormatFromExt, isDelimitedFormat, delimiterForDelimitedFormat, delimiterForFormat, variableNameFromFilePath, escapeCsvField, cellToCsvText, tableToCsv, tableForDelimitedSave, parseCsvLine, inferCellValue, csvToTable, writeQValueToFs, readQValueFromFs, hydrateCanonical, xcolsValue, insertValue, upsertValue, inValue, gradeValue, asSequenceItems, shuffleItems, rebuildSequence, distinctItems, fbyValue, crossValue, applyEachValue, groupValue, callableArity, convergeValue, reduceValueWithSeed, scanValueWithSeed, flattenRazeLeaves, PRIMITIVE_ADVERB_TYPECHECK_NAMES, ensurePrimitiveAdverbInput, reduceValue, scanValue, reducePrimitiveAdverbValue, scanPrimitiveAdverbValue, primitiveDerivedAdverbValue, priorValue, patternToRegex, likeValue, ssValue, stringLikeValue, svValue, vsValue, resolveWithinBound, withinValue, exceptValue, interValue, unionValue, lowerValue, upperValue, trimStringValue, nullValue, flipListValue, flipValue, negateValue, notValue, distinctValue, namespaceKeys, whereValue, concatValues, concatTables, razeValue, takeValue, reshapeValue, reshapeStrings, reshapeItems, dropValue, fillValue, sampleSequence, findMappedValues, findValue, castNameFromLeftOperand, CAST_ALIAS_GROUPS, CAST_HANDLER_BY_NAME, castValue, tableColumnNames, tableRowAsDict, asKeyedTable, asTable, asSymbolList, xascValue, xkeyValue, xgroupValue, ssrValue, leftJoin, innerJoin, unionJoin, plusJoin, bangValue, asofJoinValue, equiJoinValue, windowJoinValue, asofValue, xbarValue, castSymbolValue, castSymbolAtom, castBooleanValue, castBooleanAtom, castByteValue, castByteAtom, castShortValue, castShortAtom, castCharValue, stringAtomValue, stringValue, castIntValue, castLongAtom, castLongValue, castRealAtom, castRealValue, castIntAtom, castFloatValue, castFloatAtom, castDateValue, castDateAtom, isDateLiteral, Q_DATE_EPOCH_MS, parseQDateDays, formatQDateFromDays, displayWithoutFloatSuffix, buildTable, tableRowCount, selectColumnRows, selectTableRows, materializeTableColumn, requireUnaryIndex, collectNumericPositions, tableColumnByName, applyListIndex, applyStringIndex, applyDictionaryIndex, applyValue, indexList, indexString, indexNestedRows, indexDictionary, isSymbolList, selectTableByUnaryIndex, projectTableSelection, indexTable, rowFromTable, indexKeyedTable, nullLike, temporalNullForType, isNullish, selectTableColumns, formatBare, trimFloat, formatFloat, formatListNumber, formatTable, layoutTable, formatKeyedTable, formatTableCell, formatDictionary } = V;
 
 const createHostAdapter = (host: HostAdapter): Required<HostAdapter> => ({
   now: host.now ?? (() => new Date()),
@@ -31,12 +31,45 @@ const namespaceValue = (name: string, entries: [string, QValue][]): QNamespace =
   entries: new Map<string, QValue>(entries)
 });
 
+const KEY_TYPE_BY_ATTRIBUTE: Record<string, string> = {
+  boolean: "boolean",
+  byte: "byte",
+  short: "short",
+  int: "int",
+  long: "long",
+  real: "real",
+  float: "float",
+  symbol: "symbol",
+  date: "date",
+  month: "month",
+  minute: "minute",
+  second: "second",
+  time: "time",
+  timespan: "timespan",
+  datetime: "datetime",
+  timestamp: "timestamp"
+};
+
+const keyTypeName = (value: QList) => {
+  if (value.attribute && KEY_TYPE_BY_ATTRIBUTE[value.attribute]) return KEY_TYPE_BY_ATTRIBUTE[value.attribute]!;
+  if (value.items.length === 0) return "";
+  const first = value.items[0]!;
+  if (first.kind === "boolean") return "boolean";
+  if (first.kind === "string") return "char";
+  if (first.kind === "symbol") return "symbol";
+  if (first.kind === "temporal") return first.temporalType;
+  if (first.kind === "number") return first.numericType;
+  return "";
+};
+
 export class Session {
   private readonly env = new Map<string, QValue>();
   private readonly builtins: ReadonlyMap<string, BuiltinEntry>;
   private readonly host: Required<HostAdapter>;
   private readonly root: Session;
   private readonly parent: Session | null;
+  private readonly viewSources = new Map<string, string>();
+  private readonly evaluatingViews = new Set<string>();
   private outputBuffer = "";
 
   constructor(host: HostAdapter = {}, root?: Session, parent?: Session | null) {
@@ -68,13 +101,6 @@ export class Session {
 
   get(name: string): QValue {
     this.root.refreshDynamicNamespaces();
-    if (name.includes(".")) {
-      return this.getDotted(name);
-    }
-    const value = this.lookup(name);
-    if (value !== undefined) {
-      return value;
-    }
     const builtin = this.builtins.get(name);
     if (builtin) {
       return {
@@ -83,7 +109,25 @@ export class Session {
         arity: builtin.arity
       };
     }
-
+    if (name.includes(".")) {
+      return this.getDotted(name);
+    }
+    const viewSource = this.root.viewSources.get(name);
+    if (viewSource && !this.root.evaluatingViews.has(name)) {
+      this.root.evaluatingViews.add(name);
+      try {
+        return this.root.evaluate(viewSource).value;
+      } finally {
+        this.root.evaluatingViews.delete(name);
+      }
+    }
+    const value = this.lookup(name);
+    if (value !== undefined) {
+      return value;
+    }
+    if (name === "csv") {
+      return qString(",");
+    }
     const derived = name.match(/^(.*)([\/\\])$/);
     if (derived && derived[1]) {
       return qProjection(this.get(derived[2]!), [this.get(derived[1]!)], 2);
@@ -94,6 +138,9 @@ export class Session {
 
   assign(name: string, value: QValue): QValue {
     if (!name.includes(".")) {
+      if (this === this.root) {
+        this.root.viewSources.delete(name);
+      }
       this.env.set(name, value);
       return value;
     }
@@ -140,12 +187,26 @@ export class Session {
     return value;
   }
 
-  assignGlobal(name: string, value: QValue): QValue {
+  assignGlobal(name: string, value: QValue, source?: string): QValue {
     this.root.assign(name, value);
+    if (source && this === this.root) {
+      this.root.viewSources.set(name, source);
+    }
     if (this !== this.root) {
       this.assign(name, value);
     }
     return value;
+  }
+
+  viewValue(name: QValue): QValue {
+    if (name.kind !== "symbol") {
+      throw new QRuntimeError("type", "view expects a symbol");
+    }
+    const source = this.root.viewSources.get(name.value);
+    if (source === undefined) {
+      throw new QRuntimeError("value", `view ${name.value} is not defined`);
+    }
+    return qString(source);
   }
 
   emit(value: QValue) {
@@ -184,7 +245,15 @@ export class Session {
       }
     }
     names.sort();
-    return qList(names.map((name) => qSymbol(name)), true);
+    return qList(names.map((name) => qSymbol(name)), true, names.length === 0 ? "symbol" : "s");
+  }
+
+  listViews(namespace: string): QValue {
+    if (namespace !== "" && namespace !== ".") {
+      return qList([], true, "symbol");
+    }
+    const names = [...this.root.viewSources.keys()].sort();
+    return qList(names.map((name) => qSymbol(name)), true, names.length === 0 ? "symbol" : "s");
   }
 
   private createChildScope() {
@@ -199,7 +268,7 @@ export class Session {
       case "assign":
         return this.assign(node.name, this.eval(node.value));
       case "assignGlobal":
-        return this.assignGlobal(node.name, this.eval(node.value));
+        return this.assignGlobal(node.name, this.eval(node.value), renderAst(node.value));
       case "return":
         return this.eval(node.value);
       case "identifier":
@@ -298,6 +367,9 @@ export class Session {
       case "each": {
         const callee = this.eval(node.callee);
         const arg = this.eval(node.arg);
+        if (arg.kind === "dictionary") {
+          return qDictionary(arg.keys, arg.values.map((item) => this.invoke(callee, [item])));
+        }
         const items =
           arg.kind === "list"
             ? arg.items
@@ -501,7 +573,22 @@ export class Session {
       child.assign(param, args[index] ?? qNull());
     });
 
-    return child.evalStatements(lambda.body);
+    const z = this.root.getDotted(".z");
+    const previousSelf = z.kind === "namespace" ? z.entries.get("s") : undefined;
+    if (z.kind === "namespace") {
+      z.entries.set("s", lambda);
+    }
+    try {
+      return child.evalStatements(lambda.body);
+    } finally {
+      if (z.kind === "namespace") {
+        if (previousSelf === undefined) {
+          z.entries.delete("s");
+        } else {
+          z.entries.set("s", previousSelf);
+        }
+      }
+    }
   }
 
   private evalStatements(body: AstNode[]) {
@@ -686,7 +773,7 @@ export class Session {
       const subgroupPositions = group.positions.map((index) => sourcePositions[index]!);
       const context = this.createTableContext(subgroup, subgroupPositions);
       selectColumns.forEach((column, index) => {
-        resultCells[index]!.push(context.eval(column.value));
+        resultCells[index]!.push(displayWithoutFloatSuffix(context.eval(column.value)));
       });
     }
 
@@ -931,6 +1018,9 @@ export class Session {
       case "?":
         return findValue(left, right);
       case "$":
+        if (left.kind === "symbol" && !left.value.startsWith(":") && this.env.has(left.value)) {
+          return V.foreignKeyValue(left.value, this.get(left.value), right);
+        }
         return castValue(left, right);
       case "@": {
         const args = right.kind === "list" && !(right.homogeneous ?? false) ? right.items : [right];
@@ -969,8 +1059,12 @@ export class Session {
         return crossValue(left, right);
       case "within":
         return withinValue(left, right);
+      case "where":
+        return applyValue(left, [whereValue(right)]);
       case "except":
         return exceptValue(left, right);
+      case "fby":
+        return fbyValue(this, left, right);
       case "inter":
         return interValue(left, right);
       case "union":
@@ -980,13 +1074,17 @@ export class Session {
       case "div":
         return mapBinary(left, right, (a, b) => divValue(a, b));
       case "mavg":
-        return movingValue(left, right, avgValue, false);
+        return movingValue(left, right, avgValue, false, "floatNull");
       case "mcount":
-        return movingValue(left, right, movingCountValue, true);
+        return movingValue(left, right, movingCountValue, true, "intZero");
       case "mdev":
-        return movingValue(left, right, (window) => deviationValue(window, false), false);
+        return movingValue(left, right, (window) => deviationValue(window, false), false, "floatNull");
+      case "mmin":
+        return movingValue(left, right, minValue, false, "source");
+      case "mmax":
+        return movingValue(left, right, maxValue, false, "source");
       case "msum":
-        return movingValue(left, right, sumValue, false);
+        return movingValue(left, right, sumValue, false, "zero");
       case "mod":
         return mapBinary(left, right, (a, b) => modValue(a, b));
       case "rotate":
@@ -1006,16 +1104,31 @@ export class Session {
       case "xdesc":
         return xascValue(left, right, false);
       case "xkey":
+        if (right.kind === "symbol" && !right.value.startsWith(":")) {
+          const keyed = xkeyValue(left, this.get(right.value));
+          if (keyed.kind !== "keyedTable") {
+            throw new QRuntimeError("type", "xkey expects a table");
+          }
+          this.env.set(right.value, keyed);
+          return right;
+        }
         return xkeyValue(left, right);
       case "xgroup":
         return xgroupValue(left, right);
+      case "lsq":
+        return V.lsqValue(left, right);
       case "lj":
-      case "ljf":
         return leftJoin(left, right);
+      case "ljf":
+        return leftJoin(left, right, { fill: true });
       case "ij":
         return innerJoin(left, right);
+      case "ijf":
+        return innerJoin(left, right, { fill: true });
       case "uj":
         return unionJoin(left, right);
+      case "ujf":
+        return unionJoin(left, right, { fill: true });
       case "pj":
         return plusJoin(left, right);
       case "asof":
@@ -1039,10 +1152,29 @@ export class Session {
       return qList(arg.keys, arg.keys.every((key) => key.kind === "symbol"));
     }
     if (arg.kind === "table") {
-      return qList(Object.keys(arg.columns).map((name) => qSymbol(name)), true);
+      throw new QRuntimeError("type", "key expects a keyed table or dictionary");
     }
     if (arg.kind === "keyedTable") {
       return arg.keys;
+    }
+    if (arg.kind === "number" && (arg.numericType === "short" || arg.numericType === "int" || arg.numericType === "long")) {
+      if (isNumericNull(arg) || arg.value < 0) {
+        throw new QRuntimeError("domain", "key expects a non-negative integer");
+      }
+      if (!Number.isFinite(arg.value)) {
+        throw new QRuntimeError("limit", "key integer is too large");
+      }
+      return qList(Array.from({ length: Math.trunc(arg.value) }, (_, index) => qLong(index)), true, "long");
+    }
+    if (arg.kind === "boolean") {
+      return qList([qLong(0)], true, "long");
+    }
+    if (arg.kind === "string") {
+      return qSymbol("char");
+    }
+    if (arg.kind === "list") {
+      if (arg.foreignKey) return qSymbol(arg.foreignKey);
+      return qSymbol(keyTypeName(arg));
     }
     if (arg.kind === "namespace") {
       return qList(namespaceKeys(arg), true, "namespaceKeys");
@@ -1057,6 +1189,13 @@ export class Session {
       if (arg.value.startsWith(":")) {
         const entries = this.fs().list(arg.value.slice(1));
         return qList(entries.map((entry) => qSymbol(entry)), true);
+      }
+      if (this.env.has(arg.value)) {
+        const value = this.get(arg.value);
+        if (value.kind === "dictionary" || value.kind === "keyedTable" || value.kind === "namespace") {
+          return this.keyValue(value);
+        }
+        return qSymbol(arg.value);
       }
       return qList(
         namespaceKeys(this.get(arg.value.startsWith(".") ? arg.value : `.${arg.value}`)),
@@ -1220,4 +1359,3 @@ export class Session {
     return current;
   }
 }
-

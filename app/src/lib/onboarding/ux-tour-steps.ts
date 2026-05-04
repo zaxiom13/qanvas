@@ -1,4 +1,4 @@
-export type WorkspaceMode = 'studio' | 'practice';
+export type WorkspaceMode = 'studio' | 'practice' | 'reference';
 
 export type UxTourAdvanceMode = 'next' | 'click-target';
 
@@ -18,6 +18,7 @@ export type UxTourStepDefinition = {
 export function buildUxTourSteps(workspaceMode: WorkspaceMode, mobile: boolean): UxTourStepDefinition[] {
   if (mobile) return buildMobileTourSteps(workspaceMode);
 
+  if (workspaceMode === 'reference') return buildDesktopStudioSteps();
   if (workspaceMode === 'practice') return buildDesktopPracticeSteps();
   return buildDesktopStudioSteps();
 }

@@ -1,8 +1,14 @@
-import { qBool, qDate, qDictionary, qFloat, qInt, qKeyedTable, qList, qLong, qNull, qReal, qShort, qString, qSymbol, qTypeNumber, type QSymbol } from "@qpad/core";
+import { qBool, qDate, qDictionary, qFloat, qInt, qKeyedTable, qList, qLong, qNull, qParseTree, qReal, qShort, qString, qSymbol, qTable, qTypeNumber, type QSymbol, type QTable, type QValue } from "@qpad/core";
 import { Q_LONG_MAX, Q_RESERVED_WORDS, Q_X10_ALPHABET, Q_X12_ALPHABET, type BuiltinEntry, type BuiltinImpl, QRuntimeError } from "./types.js";
 import type { Session } from "./session.js";
+import { primitiveNamesBy } from "./primitive-manifest.js";
+import { COMPLEX_HANDLERS, SIMPLE_DYAD_HANDLERS, SIMPLE_MONAD_HANDLERS } from "./primitive-handlers.js";
+import { parseTreeDisplay } from "./parser.js";
 import * as V from "./values.js";
-const { formatValue, parseNumericLiteral, parseTemporalLiteral, qTemporal, lambdaArity, collectImplicitParams, asList, toNumber, numeric, NUMERIC_RANK, numericTypeOf, promoteNumericType, numericOf, nullForType, isNumericNull, unaryNumeric, roundHalfAwayFromZero, qComplex, complexDictionaryField, complexParts, qComplexFromValue, complexArg, positiveModulo, complexModulo, dictionaryKeysMatch, applyDictionaryBinary, arithBinary, addTemporal, subtractTemporal, add, subtract, multiply, divide, divValue, modValue, compare, compareValue, equals, numericUnary, mapBinary, countValue, absValue, allValue, anyValue, ceilingValue, colsValue, firstValue, lastValue, ascValue, descValue, attrValue, sumValue, sampleNumericType, minValue, maxValue, medianValue, minPair, maxPair, avgValue, avgsValue, productValue, prdsValue, prevValue, nextValue, sumsValue, minsValue, maxsValue, ratiosValue, varianceValue, deviationValue, movingCountValue, movingValue, deltasValue, reverseValue, differValue, fillsValue, reciprocalValue, signumValue, floorValue, cutValue, rotateValue, sublistValue, chunkValue, cutByIndices, addMonthsValue, parseQOpt, defineDefaults, formatQNumber, atobValue, btoaValue, encodeFixedBase, decodeFixedBase, sanitizeQIdentifier, uniquifyQIdentifiers, qsqlExpressionName, QSQL_AGGREGATES, isQsqlAggregateExpression, qsqlColumnNames, renameTableColumns, qIdValue, xcolValue, asMatrix, fromMatrix, mmuValue, invValue, wsumValue, wavgValue, binarySearchValue, rankValue, randValue, hsymValue, fileHandlePath, loadScriptFromFs, textLines, byteListFromBytes, byteListFromText, inferFormatFromExt, isDelimitedFormat, delimiterForDelimitedFormat, delimiterForFormat, variableNameFromFilePath, escapeCsvField, cellToCsvText, tableToCsv, tableForDelimitedSave, parseCsvLine, inferCellValue, csvToTable, writeQValueToFs, readQValueFromFs, hydrateCanonical, xcolsValue, insertValue, upsertValue, inValue, gradeValue, asSequenceItems, shuffleItems, rebuildSequence, distinctItems, crossValue, applyEachValue, groupValue, callableArity, convergeValue, reduceValueWithSeed, scanValueWithSeed, flattenRazeLeaves, PRIMITIVE_ADVERB_TYPECHECK_NAMES, ensurePrimitiveAdverbInput, reduceValue, scanValue, reducePrimitiveAdverbValue, scanPrimitiveAdverbValue, primitiveDerivedAdverbValue, priorValue, patternToRegex, likeValue, ssValue, stringLikeValue, svValue, vsValue, resolveWithinBound, withinValue, exceptValue, interValue, unionValue, lowerValue, upperValue, trimStringValue, nullValue, flipListValue, flipValue, negateValue, notValue, distinctValue, namespaceKeys, whereValue, concatValues, concatTables, razeValue, takeValue, reshapeValue, reshapeStrings, reshapeItems, dropValue, fillValue, sampleSequence, findMappedValues, findValue, castNameFromLeftOperand, CAST_ALIAS_GROUPS, CAST_HANDLER_BY_NAME, castValue, tableColumnNames, tableRowAsDict, asKeyedTable, asTable, asSymbolList, xascValue, xkeyValue, xgroupValue, ssrValue, leftJoin, innerJoin, unionJoin, plusJoin, bangValue, asofJoinValue, equiJoinValue, windowJoinValue, asofValue, xbarValue, castSymbolValue, castSymbolAtom, castBooleanValue, castBooleanAtom, castByteValue, castByteAtom, castShortValue, castShortAtom, castCharValue, stringAtomValue, stringValue, castIntValue, castLongAtom, castLongValue, castRealAtom, castRealValue, castIntAtom, castFloatValue, castFloatAtom, castDateValue, castDateAtom, isDateLiteral, Q_DATE_EPOCH_MS, parseQDateDays, formatQDateFromDays, buildTable, tableRowCount, selectColumnRows, selectTableRows, materializeTableColumn, requireUnaryIndex, collectNumericPositions, tableColumnByName, applyListIndex, applyStringIndex, applyDictionaryIndex, applyValue, indexList, indexString, indexNestedRows, indexDictionary, isSymbolList, selectTableByUnaryIndex, projectTableSelection, indexTable, rowFromTable, indexKeyedTable, nullLike, temporalNullForType, isNullish, selectTableColumns, formatBare, trimFloat, formatFloat, formatListNumber, formatTable, layoutTable, formatKeyedTable, formatTableCell, formatDictionary } = V;
+const { ungroupValue } = V;
+const { xprevValue } = V;
+const { xrankValue } = V;
+const { formatValue, parseNumericLiteral, parseTemporalLiteral, qTemporal, lambdaArity, collectImplicitParams, asList, toNumber, numeric, NUMERIC_RANK, numericTypeOf, promoteNumericType, numericOf, nullForType, isNumericNull, unaryNumeric, roundHalfAwayFromZero, qComplex, complexDictionaryField, complexParts, qComplexFromValue, complexArg, positiveModulo, complexModulo, dictionaryKeysMatch, applyDictionaryBinary, arithBinary, addTemporal, subtractTemporal, add, subtract, multiply, divide, divValue, modValue, compare, compareValue, equals, numericUnary, mapBinary, countValue, absValue, allValue, anyValue, ceilingValue, colsValue, firstValue, lastValue, ascValue, descValue, attrValue, sumValue, sampleNumericType, minValue, maxValue, medianValue, minPair, maxPair, avgValue, avgsValue, productValue, prdsValue, prevValue, nextValue, sumsValue, minsValue, maxsValue, ratiosValue, varianceValue, deviationValue, covarianceValue, correlationValue, emaValue, movingCountValue, movingValue, deltasValue, reverseValue, differValue, fillsValue, reciprocalValue, signumValue, floorValue, cutValue, rotateValue, sublistValue, chunkValue, cutByIndices, addMonthsValue, parseQOpt, defineDefaults, formatQNumber, atobValue, btoaValue, encodeFixedBase, decodeFixedBase, sanitizeQIdentifier, uniquifyQIdentifiers, qsqlExpressionName, QSQL_AGGREGATES, isQsqlAggregateExpression, qsqlColumnNames, renameTableColumns, qIdValue, xcolValue, asMatrix, fromMatrix, mmuValue, invValue, wsumValue, wavgValue, binarySearchValue, rankValue, randValue, hsymValue, fileHandlePath, loadScriptFromFs, textLines, byteListFromBytes, byteListFromText, inferFormatFromExt, isDelimitedFormat, delimiterForDelimitedFormat, delimiterForFormat, variableNameFromFilePath, escapeCsvField, cellToCsvText, tableToCsv, tableForDelimitedSave, parseCsvLine, inferCellValue, csvToTable, writeQValueToFs, readQValueFromFs, hydrateCanonical, xcolsValue, insertValue, upsertValue, inValue, gradeValue, asSequenceItems, shuffleItems, rebuildSequence, distinctItems, crossValue, applyEachValue, groupValue, callableArity, convergeValue, reduceValueWithSeed, scanValueWithSeed, flattenRazeLeaves, PRIMITIVE_ADVERB_TYPECHECK_NAMES, ensurePrimitiveAdverbInput, reduceValue, scanValue, reducePrimitiveAdverbValue, scanPrimitiveAdverbValue, primitiveDerivedAdverbValue, priorValue, patternToRegex, likeValue, ssValue, stringLikeValue, svValue, vsValue, resolveWithinBound, withinValue, exceptValue, interValue, unionValue, lowerValue, upperValue, trimStringValue, nullValue, flipListValue, flipValue, negateValue, notValue, distinctValue, namespaceKeys, whereValue, concatValues, concatTables, razeValue, takeValue, reshapeValue, reshapeStrings, reshapeItems, dropValue, fillValue, sampleSequence, findMappedValues, findValue, castNameFromLeftOperand, CAST_ALIAS_GROUPS, CAST_HANDLER_BY_NAME, castValue, tableColumnNames, tableRowAsDict, asKeyedTable, asTable, asSymbolList, xascValue, xkeyValue, xgroupValue, ssrValue, leftJoin, innerJoin, unionJoin, plusJoin, bangValue, asofJoinValue, equiJoinValue, windowJoinValue, asofValue, xbarValue, castSymbolValue, castSymbolAtom, castBooleanValue, castBooleanAtom, castByteValue, castByteAtom, castShortValue, castShortAtom, castCharValue, stringAtomValue, stringValue, castIntValue, castLongAtom, castLongValue, castRealAtom, castRealValue, castIntAtom, castFloatValue, castFloatAtom, castDateValue, castDateAtom, isDateLiteral, Q_DATE_EPOCH_MS, parseQDateDays, formatQDateFromDays, buildTable, tableRowCount, selectColumnRows, selectTableRows, materializeTableColumn, requireUnaryIndex, collectNumericPositions, tableColumnByName, applyListIndex, applyStringIndex, applyDictionaryIndex, applyValue, indexList, indexString, indexNestedRows, indexDictionary, isSymbolList, selectTableByUnaryIndex, projectTableSelection, indexTable, rowFromTable, indexKeyedTable, nullLike, temporalNullForType, isNullish, selectTableColumns, formatBare, trimFloat, formatFloat, formatListNumber, formatTable, layoutTable, formatKeyedTable, formatTableCell, formatDictionary } = V;
 
 export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   const builtins = new Map<string, BuiltinEntry>();
@@ -27,68 +33,86 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     register(`${base}\\`, 1, (session, args) => primitiveDerivedAdverbValue(session, base, "\\", args));
   };
 
-  register("abs", 1, (_, [arg]) => absValue(arg));
-  register("all", 1, (_, [arg]) => allValue(arg));
-  register("any", 1, (_, [arg]) => anyValue(arg));
-  register("avgs", 1, (_, [arg]) => avgsValue(arg));
-  register("til", 1, (_, [arg]) => qList(Array.from({ length: toNumber(arg) }, (_, i) => qLong(i)), true));
-  register("ceiling", 1, (_, [arg]) => ceilingValue(arg));
-  register("cols", 1, (_, [arg]) => colsValue(arg));
-  register("count", 1, (_, [arg]) => qLong(countValue(arg)));
-  register("desc", 1, (_, [arg]) => descValue(arg));
-  register("differ", 1, (_, [arg]) => differValue(arg));
-  register("exp", 1, (_, [arg]) => numericUnary(arg, Math.exp));
-  register("fills", 1, (_, [arg]) => fillsValue(arg));
-  register("first", 1, (_, [arg]) => firstValue(arg));
-  register("last", 1, (_, [arg]) => lastValue(arg));
-  register("log", 1, (_, [arg]) => numericUnary(arg, Math.log));
-  register("iasc", 1, (_, [arg]) => gradeValue(arg, true));
-  register("idesc", 1, (_, [arg]) => gradeValue(arg, false));
-  register("asc", 1, (_, [arg]) => ascValue(arg));
-  register("asin", 1, (_, [arg]) => numericUnary(arg, Math.asin));
-  register("acos", 1, (_, [arg]) => numericUnary(arg, Math.acos));
-  register("atan", 1, (_, [arg]) => numericUnary(arg, Math.atan));
-  register("min", 1, (_, [arg]) => minValue(arg));
-  register("mins", 1, (_, [arg]) => minsValue(arg));
-  register("max", 1, (_, [arg]) => maxValue(arg));
-  register("maxs", 1, (_, [arg]) => maxsValue(arg));
-  register("med", 1, (_, [arg]) => medianValue(arg));
-  register("sum", 1, (_, [arg]) => sumValue(arg));
-  register("avg", 1, (_, [arg]) => avgValue(arg));
-  register("sin", 1, (_, [arg]) => numericUnary(arg, Math.sin));
-  register("cos", 1, (_, [arg]) => numericUnary(arg, Math.cos));
-  register("tan", 1, (_, [arg]) => numericUnary(arg, Math.tan));
-  register("floor", 1, (_, [arg]) => floorValue(arg));
-  register("null", 1, (_, [arg]) => nullValue(arg));
-  register("reciprocal", 1, (_, [arg]) => reciprocalValue(arg));
-  register("reverse", 1, (_, [arg]) => reverseValue(arg));
-  register("signum", 1, (_, [arg]) => signumValue(arg));
-  register("sqrt", 1, (_, [arg]) => numericUnary(arg, Math.sqrt));
-  register("neg", 1, (_, [arg]) => negateValue(arg));
-  register("not", 1, (_, [arg]) => notValue(arg));
-  register("enlist", 1, (_, [arg]) => qList([arg]));
-  register("distinct", 1, (_, [arg]) => distinctValue(arg));
-  register("attr", 1, (_, [arg]) => attrValue(arg));
-  register("flip", 1, (_, [arg]) => flipValue(arg));
-  register("group", 1, (_, [arg]) => groupValue(arg));
+  SIMPLE_MONAD_HANDLERS.forEach(([name, impl]) => register(name, 1, impl));
   register("key", 1, (session, [arg]) => session.keyValue(arg));
-  registerAlias("keys", "key");
-  register("lower", 1, (_, [arg]) => lowerValue(arg));
-  register("ltrim", 1, (_, [arg]) => trimStringValue(arg, "left"));
-  register("next", 1, (_, [arg]) => nextValue(arg));
-  register("upper", 1, (_, [arg]) => upperValue(arg));
-  register("prd", 1, (_, [arg]) => productValue(arg));
-  register("prds", 1, (_, [arg]) => prdsValue(arg));
-  register("prev", 1, (_, [arg]) => prevValue(arg));
+  register("keys", 1, (session, [arg]) => {
+    const value = arg.kind === "symbol" && !arg.value.startsWith(":") ? session.get(arg.value) : arg;
+    if (value.kind === "dictionary") return qList(value.keys, value.keys.every((key) => key.kind === "symbol"));
+    if (value.kind === "table") return qList([], true, "symbol");
+    if (value.kind === "keyedTable") {
+      return qList(Object.keys(value.keys.columns).map((name) => qSymbol(name)), true);
+    }
+    return qList([], true, "symbol");
+  });
+  register("meta", 1, (session, [arg]) => {
+    const value = arg.kind === "symbol" && !arg.value.startsWith(":") ? session.get(arg.value) : arg;
+    const table =
+      value.kind === "keyedTable"
+        ? { kind: "table" as const, columns: { ...value.keys.columns, ...value.values.columns } }
+        : value.kind === "table"
+          ? value
+          : null;
+    if (!table) {
+      throw new QRuntimeError("type", "meta expects a table or keyed table");
+    }
+    const atomType = (value: QValue): string => {
+      if (value.kind === "boolean") return "b";
+      if (value.kind === "number") {
+        switch (value.numericType) {
+          case "short": return "h";
+          case "int": return "i";
+          case "long": return "j";
+          case "real": return "e";
+          case "float": return "f";
+        }
+      }
+      if (value.kind === "temporal" && value.temporalType === "date") return "d";
+      if (value.kind === "symbol") return "s";
+      if (value.kind === "string") return "c";
+      return " ";
+    };
+    const typeLetter = (column: QValue) => {
+      if (column.kind !== "list" || column.items.length === 0) return " ";
+      const first = column.items[0]!;
+      if (first.kind === "list" && first.items.length > 0) {
+        const nested = atomType(first.items[0]!);
+        return nested === " " ? " " : nested.toUpperCase();
+      }
+      return column.items.every((item) =>
+        item.kind === first.kind && (item.kind !== "number" || first.kind !== "number" || item.numericType === first.numericType)
+      )
+        ? atomType(first)
+        : " ";
+    };
+    const names = Object.keys(table.columns);
+    return qKeyedTable(
+      buildTable([{ name: "c", value: qList(names.map((name) => qSymbol(name)), true) }]),
+      buildTable([
+        { name: "t", value: qList(names.map((name) => qString(typeLetter(table.columns[name]!))), true) },
+        { name: "f", value: qList(names.map((name) => qSymbol(table.columns[name]!.foreignKey ?? "")), true) },
+        { name: "a", value: qList(names.map((name) => qString(table.columns[name]!.attribute ?? " ")), true) }
+      ])
+    );
+  });
+  register("fkeys", 1, (session, [arg]) => {
+    const value = arg.kind === "symbol" && !arg.value.startsWith(":") ? session.get(arg.value) : arg;
+    if (value.kind !== "table" && value.kind !== "keyedTable") {
+      throw new QRuntimeError("type", "fkeys expects a table or table name");
+    }
+    const table =
+      value.kind === "keyedTable"
+        ? { kind: "table" as const, columns: { ...value.keys.columns, ...value.values.columns } }
+        : value;
+    const names = Object.keys(table.columns).filter((name) => table.columns[name]!.foreignKey);
+    return qDictionary(
+      names.map((name) => qSymbol(name)),
+      names.map((name) => qSymbol(table.columns[name]!.foreignKey!))
+    );
+  });
+  register("ungroup", 1, (_, [arg]) => ungroupValue(arg));
   register("raze", 1, (_, args) =>
     args.length === 1 ? razeValue(args[0]!) : args.slice(1).reduce((acc, item) => razeValue(qList([acc, item])), args[0]!)
   );
-  register("ratios", 1, (_, [arg]) => ratiosValue(arg));
-  register("rtrim", 1, (_, [arg]) => trimStringValue(arg, "right"));
-  register("var", 1, (_, [arg]) => varianceValue(arg, false));
-  register("svar", 1, (_, [arg]) => varianceValue(arg, true));
-  register("dev", 1, (_, [arg]) => deviationValue(arg, false));
-  register("sdev", 1, (_, [arg]) => deviationValue(arg, true));
   register("-':", 1, (_, [arg, maybeValues]) =>
     maybeValues === undefined ? deltasValue(arg) : deltasValue(maybeValues, arg)
   );
@@ -98,7 +122,37 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   register("trim", 1, (_, [arg]) => trimStringValue(arg, "both"));
   register("type", 1, (_, [arg]) => qShort(qTypeNumber(arg)));
   register("where", 1, (_, [arg]) => whereValue(arg));
-  register("value", 1, (_, [arg]) => arg);
+  register("value", 1, (session, [arg]) => {
+    if (arg.kind === "string") {
+      return session.evaluate(arg.value).value;
+    }
+    if (arg.kind === "symbol") {
+      return session.get(arg.value);
+    }
+    if (arg.kind === "list" && arg.foreignKey) {
+      return qList(arg.items, arg.homogeneous ?? false, arg.attribute);
+    }
+    if (arg.kind === "list" && arg.items.length > 0) {
+      const [head, ...args] = arg.items;
+      let callable: QValue = head!.kind === "string" ? session.evaluate(head!.value).value : head!;
+      if (head!.kind === "symbol") {
+        const resolved = session.get(head!.value);
+        if (resolved.kind === "lambda" || resolved.kind === "projection") {
+          callable = resolved;
+        }
+      }
+      if (callable.kind === "builtin" || callable.kind === "lambda" || callable.kind === "projection") {
+        return session.invoke(callable, args);
+      }
+    }
+    if (arg.kind === "dictionary") {
+      return qList(arg.values, arg.values.every((value) => value.kind === arg.values[0]?.kind));
+    }
+    if (arg.kind === "keyedTable") {
+      return arg.values;
+    }
+    return arg;
+  });
   register("::", 1, (_, [arg]) => arg);
   register("show", 1, (session, [arg]) => {
     session.emit(arg);
@@ -170,13 +224,220 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     return qLong(1);
   });
   register("hclose", 1, (_, [_arg]) => qNull());
-  register("@", 2, (session, [target, arg, handler]) => {
-    const args = arg.kind === "list" && !(arg.homogeneous ?? false) ? arg.items : [arg];
+  register(":", 2, (_, [_old, value]) => value);
+  const tableWithAmendedRows = (table: QTable, rows: Map<number, QValue>) =>
+    qTable(
+      Object.fromEntries(
+        Object.entries(table.columns).map(([name, column]) => [
+          name,
+          qList(
+            column.items.map((cell, rowIndex) => {
+              const row = rows.get(rowIndex);
+              if (!row) return cell;
+              if (row.kind !== "dictionary") {
+                throw new QRuntimeError("type", "table amend rows must be dictionaries");
+              }
+              const columnPosition = row.keys.findIndex((key) => key.kind === "symbol" && key.value === name);
+              return columnPosition >= 0 ? row.values[columnPosition] ?? nullLike(column.items[0]) : cell;
+            }),
+            column.homogeneous ?? false,
+            column.attribute,
+            column.foreignKey
+          )
+        ])
+      )
+    );
+  const amendAt = (session: Session, target: QValue, index: QValue, handler: QValue, replacement: QValue | undefined): QValue => {
+    if (index.kind === "null") {
+      if (target.kind === "list" || target.kind === "string") {
+        return amendAt(
+          session,
+          target,
+          qList(asSequenceItems(target).map((_, itemIndex) => qLong(itemIndex)), true),
+          handler,
+          replacement
+        );
+      }
+      return replacement === undefined
+        ? session.invoke(handler, [target])
+        : session.invoke(handler, [target, replacement]);
+    }
+    if (target.kind === "dictionary") {
+      const indexItems = index.kind === "list" ? index.items : [index];
+      const replacementItems =
+        replacement && replacement.kind === "list" && indexItems.length === replacement.items.length
+          ? replacement.items
+          : null;
+      const values = [...target.values];
+      indexItems.forEach((key, itemIndex) => {
+        const position = target.keys.findIndex((candidate) => equals(candidate, key));
+        if (position < 0) return;
+        const oldValue = values[position] ?? qNull();
+        values[position] =
+          replacement === undefined
+            ? session.invoke(handler, [oldValue])
+            : session.invoke(handler, [oldValue, replacementItems?.[itemIndex] ?? replacement]);
+      });
+      return qDictionary(target.keys, values);
+    }
+    if (target.kind === "table") {
+      const indexItems = index.kind === "list" ? index.items : [index];
+      const replacementItems =
+        replacement && replacement.kind === "list" && indexItems.length === replacement.items.length
+          ? replacement.items
+          : null;
+      const rows = new Map<number, QValue>();
+      indexItems.forEach((indexValue, itemIndex) => {
+        if (indexValue.kind !== "number") {
+          throw new QRuntimeError("type", "table amend row indices must be numeric");
+        }
+        const position = Math.trunc(indexValue.value);
+        const oldValue = rowFromTable(target, position);
+        rows.set(
+          position,
+          replacement === undefined
+            ? session.invoke(handler, [oldValue])
+            : session.invoke(handler, [oldValue, replacementItems?.[itemIndex] ?? replacement])
+        );
+      });
+      return tableWithAmendedRows(target, rows);
+    }
+    const indexItems = index.kind === "list" ? index.items : [index];
+    const replacementItems =
+      replacement && replacement.kind === "list" && indexItems.length === replacement.items.length
+        ? replacement.items
+        : replacement && target.kind === "string" && replacement.kind === "string" && replacement.value.length === indexItems.length
+          ? [...replacement.value].map((char) => qString(char))
+          : null;
+    const source = asSequenceItems(target);
+    const result = [...source];
+
+    indexItems.forEach((indexValue, itemIndex) => {
+      if (indexValue.kind !== "number") {
+        throw new QRuntimeError("type", "amend indices must be numeric");
+      }
+      const position = Math.trunc(indexValue.value);
+      const oldValue = result[position] ?? nullLike(source[0]);
+      const nextValue =
+        replacement === undefined
+          ? session.invoke(handler, [oldValue])
+          : session.invoke(handler, [oldValue, replacementItems?.[itemIndex] ?? replacement]);
+      result[position] = nextValue;
+    });
+
+    return rebuildSequence(target, result);
+  };
+  const isApplicable = (value: QValue) => value.kind === "builtin" || value.kind === "lambda" || value.kind === "projection";
+  const normalizeIndexSelector = (value: QValue) => value.kind === "builtin" && value.name === "::" ? qNull() : value;
+  const applyDot = (session: Session, target: QValue, path: QValue) => {
+    if (isApplicable(target)) {
+      const args =
+        path.kind === "list"
+          ? path.items
+          : path.kind === "string"
+            ? [...path.value].map((char) => qString(char))
+            : [path];
+      const arity = callableArity(target);
+      if (arity !== null && args.length > arity) {
+        throw new QRuntimeError("rank", "rank");
+      }
+      return session.invoke(target, args);
+    }
+    if (path.kind === "null") {
+      return target;
+    }
+    if (path.kind === "list") {
+      const selectors = path.items.map(normalizeIndexSelector);
+      if ((target.kind === "list" || target.kind === "table") && path.items.length === 2) {
+        return applyValue(target, selectors);
+      }
+      return selectors.reduce<QValue>((value, index) => index.kind === "null" ? value : applyValue(value, [index]), target);
+    }
+    return applyValue(target, [normalizeIndexSelector(path)]);
+  };
+  const trapError = (session: Session, handler: QValue, error: QRuntimeError) =>
+    isApplicable(handler) ? session.invoke(handler, [qString(error.qName)]) : handler;
+  register(".", 2, (session, [target, path, handler, replacement]) => {
+    if (handler === undefined) {
+      return applyDot(session, target, path);
+    }
+    if (replacement === undefined && isApplicable(target)) {
+      try {
+        return applyDot(session, target, path);
+      } catch (error) {
+        if (!(error instanceof QRuntimeError)) {
+          throw error;
+        }
+        return trapError(session, handler, error);
+      }
+    }
+    if (target.kind === "symbol" && !target.value.startsWith(":")) {
+      const amended = session.invoke(session.get("."), [session.get(target.value), path, handler, replacement]);
+      session.assignGlobal(target.value, amended);
+      return target;
+    }
+    if (path.kind !== "list") {
+      return amendAt(session, target, path, handler, replacement);
+    }
+    const pathItems = path.items;
+    if (pathItems.length === 0) {
+      return replacement === undefined
+        ? session.invoke(handler, [target])
+        : session.invoke(handler, [target, replacement]);
+    }
+    if (pathItems.length === 1) {
+      return amendAt(session, target, pathItems[0]!, handler, replacement);
+    }
+    if (pathItems.length === 2) {
+      const [rowIndex, columnIndex] = pathItems;
+      if (!rowIndex || !columnIndex) {
+        throw new QRuntimeError("rank", ". amend path is empty");
+      }
+      if (target.kind === "table") {
+        const rowPositions = rowIndex.kind === "list" ? rowIndex.items : [rowIndex];
+        const rows = new Map<number, QValue>();
+        rowPositions.forEach((rowPositionValue) => {
+          if (rowPositionValue.kind !== "number") {
+            throw new QRuntimeError("type", ". amend row indices must be numeric");
+          }
+          const rowPosition = Math.trunc(rowPositionValue.value);
+          rows.set(rowPosition, amendAt(session, rowFromTable(target, rowPosition), columnIndex, handler, replacement));
+        });
+        return tableWithAmendedRows(target, rows);
+      }
+      const rowPositions = rowIndex.kind === "list" ? rowIndex.items : [rowIndex];
+      const source = asSequenceItems(target);
+      const result = [...source];
+      rowPositions.forEach((rowPositionValue) => {
+        if (rowPositionValue.kind !== "number") {
+          throw new QRuntimeError("type", ". amend row indices must be numeric");
+        }
+        const rowPosition = Math.trunc(rowPositionValue.value);
+        const row = result[rowPosition] ?? nullLike(source[0]);
+        result[rowPosition] = amendAt(session, row, columnIndex, handler, replacement);
+      });
+      return rebuildSequence(target, result);
+    }
+    throw new QRuntimeError("rank", ". amend supports one or two path levels");
+  });
+  register("@", 2, (session, args) => {
+    const [target, arg, handler, replacement] = args;
+    if (target.kind === "symbol" && !target.value.startsWith(":") && handler !== undefined) {
+      const amended = amendAt(session, session.get(target.value), arg, handler, replacement);
+      session.assignGlobal(target.value, amended);
+      return target;
+    }
+    const amendable = target.kind === "list" || target.kind === "string" || target.kind === "dictionary" || target.kind === "table";
+    if (amendable && handler !== undefined) {
+      return amendAt(session, target, arg, handler, replacement);
+    }
+
+    const invokeArgs = arg.kind === "list" && !(arg.homogeneous ?? false) ? arg.items : [arg];
     try {
       if (target.kind === "builtin" || target.kind === "lambda" || target.kind === "projection") {
-        return session.invoke(target, args);
+        return session.invoke(target, invokeArgs);
       }
-      return applyValue(target, args);
+      return applyValue(target, invokeArgs);
     } catch (error) {
       if (handler === undefined) {
         throw error;
@@ -184,10 +445,7 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
       if (!(error instanceof QRuntimeError)) {
         throw error;
       }
-      if (handler.kind === "builtin" || handler.kind === "lambda" || handler.kind === "projection") {
-        return session.invoke(handler, [qString(error.message)]);
-      }
-      return applyValue(handler, [qString(error.message)]);
+      return trapError(session, handler, error);
     }
   });
   register("|:", 1, (_, [arg]) => reverseValue(arg));
@@ -207,156 +465,7 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   register(".Q.j10", 1, (_, [arg]) => decodeFixedBase(arg, Q_X10_ALPHABET));
   register(".Q.x12", 1, (_, [arg]) => encodeFixedBase(arg, 12, Q_X12_ALPHABET));
   register(".Q.j12", 1, (_, [arg]) => decodeFixedBase(arg, Q_X12_ALPHABET));
-  register(".cx.from", 1, (_, [arg]) => qComplexFromValue(arg));
-  register(".cx.new", 2, (_, [re, im]) => qComplex(toNumber(re), toNumber(im)));
-  register(".cx.z", 2, (_, [re, im]) => qComplex(toNumber(re), toNumber(im)));
-  register(".cx.re", 1, (_, [arg]) => qFloat(complexParts(arg).re));
-  register(".cx.im", 1, (_, [arg]) => qFloat(complexParts(arg).im));
-  register(".cx.conj", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qComplex(value.re, -value.im);
-  });
-  register(".cx.neg", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qComplex(-value.re, -value.im);
-  });
-  register(".cx.add", 2, (_, [left, right]) => {
-    const a = complexParts(left);
-    const b = complexParts(right);
-    return qComplex(a.re + b.re, a.im + b.im);
-  });
-  register(".cx.sub", 2, (_, [left, right]) => {
-    const a = complexParts(left);
-    const b = complexParts(right);
-    return qComplex(a.re - b.re, a.im - b.im);
-  });
-  register(".cx.mul", 2, (_, [left, right]) => {
-    const a = complexParts(left);
-    const b = complexParts(right);
-    return qComplex(a.re * b.re - a.im * b.im, a.re * b.im + a.im * b.re);
-  });
-  register(".cx.div", 2, (_, [left, right]) => {
-    const a = complexParts(left);
-    const b = complexParts(right);
-    const denominator = b.re * b.re + b.im * b.im;
-    if (denominator === 0) {
-      throw new QRuntimeError("domain", "domain");
-    }
-    return qComplex(
-      (a.re * b.re + a.im * b.im) / denominator,
-      (a.im * b.re - a.re * b.im) / denominator
-    );
-  });
-  register(".cx.abs", 1, (_, [arg]) => qFloat(Math.hypot(complexParts(arg).re, complexParts(arg).im)));
-  register(".cx.modulus", 1, (_, [arg]) => qFloat(Math.hypot(complexParts(arg).re, complexParts(arg).im)));
-  register(".cx.floor", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qComplex(Math.floor(value.re), Math.floor(value.im));
-  });
-  register(".cx.ceil", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qComplex(Math.ceil(value.re), Math.ceil(value.im));
-  });
-  register(".cx.round", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qComplex(roundHalfAwayFromZero(value.re), roundHalfAwayFromZero(value.im));
-  });
-  register(".cx.frac", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qComplex(value.re - Math.floor(value.re), value.im - Math.floor(value.im));
-  });
-  register(".cx.mod", 2, (_, [left, right]) => complexModulo(left, right));
-  register(".cx.arg", 1, (_, [arg]) => qFloat(complexArg(complexParts(arg))));
-  register(".cx.recip", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    const denominator = value.re * value.re + value.im * value.im;
-    if (denominator === 0) {
-      throw new QRuntimeError("domain", "domain");
-    }
-    return qComplex(value.re / denominator, -value.im / denominator);
-  });
-  register(".cx.normalize", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    const magnitude = Math.hypot(value.re, value.im);
-    if (magnitude === 0) {
-      throw new QRuntimeError("domain", "domain");
-    }
-    return qComplex(value.re / magnitude, value.im / magnitude);
-  });
-  register(".cx.fromPolar", 2, (_, [radius, theta]) => {
-    const r = toNumber(radius);
-    const angle = toNumber(theta);
-    return qComplex(r * Math.cos(angle), r * Math.sin(angle));
-  });
-  register(".cx.polar", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qDictionary(
-      [qSymbol("r"), qSymbol("theta")],
-      [qFloat(Math.hypot(value.re, value.im)), qFloat(complexArg(value))]
-    );
-  });
-  register(".cx.exp", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    const expRe = Math.exp(value.re);
-    return qComplex(expRe * Math.cos(value.im), expRe * Math.sin(value.im));
-  });
-  register(".cx.log", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    const magnitude = Math.hypot(value.re, value.im);
-    if (magnitude === 0) {
-      throw new QRuntimeError("domain", "domain");
-    }
-    return qComplex(Math.log(magnitude), complexArg(value));
-  });
-  register(".cx.pow", 2, (_, [left, right]) => {
-    const base = complexParts(left);
-    const exponent = complexParts(right);
-    const magnitude = Math.hypot(base.re, base.im);
-    if (magnitude === 0) {
-      throw new QRuntimeError("domain", "domain");
-    }
-    const logBase = { re: Math.log(magnitude), im: complexArg(base) };
-    const product = {
-      re: exponent.re * logBase.re - exponent.im * logBase.im,
-      im: exponent.re * logBase.im + exponent.im * logBase.re
-    };
-    const expRe = Math.exp(product.re);
-    return qComplex(expRe * Math.cos(product.im), expRe * Math.sin(product.im));
-  });
-  register(".cx.powEach", 2, (_, [left, right]) => {
-    const base = complexParts(left);
-    if (right.kind === "number") {
-      return qComplex(Math.pow(base.re, right.value), Math.pow(base.im, right.value));
-    }
-    const exponent = complexParts(right);
-    return qComplex(Math.pow(base.re, exponent.re), Math.pow(base.im, exponent.im));
-  });
-  register(".cx.sqrt", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    const angle = complexArg(value) / 2;
-    return qComplex(
-      Math.sqrt(Math.hypot(value.re, value.im)) * Math.cos(angle),
-      Math.sqrt(Math.hypot(value.re, value.im)) * Math.sin(angle)
-    );
-  });
-  register(".cx.sin", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qComplex(Math.sin(value.re) * Math.cosh(value.im), Math.cos(value.re) * Math.sinh(value.im));
-  });
-  register(".cx.cos", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    return qComplex(Math.cos(value.re) * Math.cosh(value.im), -Math.sin(value.re) * Math.sinh(value.im));
-  });
-  register(".cx.tan", 1, (session, [arg]) => {
-    const sine = session.invoke(session.get(".cx.sin"), [arg]);
-    const cosine = session.invoke(session.get(".cx.cos"), [arg]);
-    return session.invoke(session.get(".cx.div"), [sine, cosine]);
-  });
-  register(".cx.str", 1, (_, [arg]) => {
-    const value = complexParts(arg);
-    const sign = value.im < 0 ? "-" : "+";
-    return qString(`${formatFloat(value.re)} ${sign} ${formatFloat(Math.abs(value.im))}i`);
-  });
+  COMPLEX_HANDLERS.forEach(([name, arity, impl]) => register(name, arity, impl));
   register("cut", 2, (_, [left, right]) => cutValue(left, right));
   register("and", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => minPair(a, b)));
   register("cross", 2, (_, [left, right]) => crossValue(left, right));
@@ -370,6 +479,8 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   register("sv", 2, (_, [left, right]) => svValue(left, right));
   register("vs", 2, (_, [left, right]) => vsValue(left, right));
   register("xbar", 2, (_, [left, right]) => xbarValue(left, right));
+  register("xprev", 2, (_, [left, right]) => xprevValue(left, right));
+  register("xrank", 2, (_, [left, right]) => xrankValue(left, right));
   register("xcol", 2, (_, [left, right]) => xcolValue(left, right));
   register("xexp", 2, (_, [left, right]) =>
     mapBinary(left, right, (a, b) => qFloat(Math.pow(toNumber(a), toNumber(b))))
@@ -377,6 +488,7 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   register("like", 2, (_, [left, right]) => likeValue(left, right));
   register("within", 2, (_, [left, right]) => withinValue(left, right));
   register("except", 2, (_, [left, right]) => exceptValue(left, right));
+  register("fby", 2, (session, [left, right]) => V.fbyValue(session, left, right));
   register("inter", 2, (_, [left, right]) => interValue(left, right));
   register("union", 2, (_, [left, right]) => unionValue(left, right));
   register("xlog", 2, (_, [left, right]) =>
@@ -389,51 +501,35 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     const items = args.length === 2 && args[1]?.kind === "list" ? [args[0]!, ...args[1].items] : args;
     return items.slice(1).reduce((acc, item) => session.invoke(session.get(","), [acc, item]), items[0]!);
   });
-  registerPrimitiveDerivedAdverb("+");
+  primitiveNamesBy("primitiveAdverbs").forEach(registerPrimitiveDerivedAdverb);
 
-  register("+", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => add(a, b)));
-  register("-", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => subtract(a, b)));
-  register("*", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => multiply(a, b)));
-  register("%", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => divide(a, b)));
-  register("div", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => divValue(a, b)));
-  register("mavg", 2, (_, [left, right]) => movingValue(left, right, avgValue, false));
-  register("mcount", 2, (_, [left, right]) => movingValue(left, right, movingCountValue, true));
-  register("mdev", 2, (_, [left, right]) =>
-    movingValue(left, right, (window) => deviationValue(window, false), false)
-  );
-  register("msum", 2, (_, [left, right]) => movingValue(left, right, sumValue, false));
-  register("mod", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => modValue(a, b)));
-  register("=", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => qBool(equals(a, b))));
-  register("<", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => qBool(compare(a, b) < 0)));
-  register(">", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => qBool(compare(a, b) > 0)));
-  register("<=", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => qBool(compare(a, b) <= 0)));
-  register(">=", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => qBool(compare(a, b) >= 0)));
-  register(",", 2, (_, [left, right]) => concatValues(left, right));
-  register("!", 2, (_, [left, right]) => bangValue(left, right));
-  register("#", 2, (_, [left, right]) => takeValue(left, right));
-  register("_", 2, (_, [left, right]) => dropValue(left, right));
-  register("~", 2, (_, [left, right]) => qBool(equals(left, right)));
-  register("^", 2, (_, [left, right]) => fillValue(left, right));
-  register("?", 2, (_, [left, right]) => findValue(left, right));
-  register("$", 2, (_, [left, right]) => castValue(left, right));
-  register("|", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => maxPair(a, b)));
-  register("&", 2, (_, [left, right]) => mapBinary(left, right, (a, b) => minPair(a, b)));
-  ["-", "*", "%", "=", "<", ">", "<=", ">=", "!", "#", "_", "~", "^", "?", "$", "|", "&"].forEach(
-    registerPrimitiveDerivedAdverb
-  );
-  register("/", 2, (session, [callable, arg, seed]) => reducePrimitiveAdverbValue(session, callable, arg, seed));
-  register("\\", 2, (session, [callable, arg, seed]) => scanPrimitiveAdverbValue(session, callable, arg, seed));
+  SIMPLE_DYAD_HANDLERS.forEach(([name, impl]) => register(name, 2, impl));
+  register("/", 2, (session, [callable, first, second]) => {
+    if (second === undefined) return reducePrimitiveAdverbValue(session, callable, first);
+    return callableArity(callable) === 1
+      ? reducePrimitiveAdverbValue(session, callable, first, second)
+      : reducePrimitiveAdverbValue(session, callable, second, first);
+  });
+  register("\\", 2, (session, [callable, first, second]) => {
+    if (second === undefined) return scanPrimitiveAdverbValue(session, callable, first);
+    return callableArity(callable) === 1
+      ? scanPrimitiveAdverbValue(session, callable, first, second)
+      : scanPrimitiveAdverbValue(session, callable, second, first);
+  });
 
   register("xasc", 2, (_, [left, right]) => xascValue(left, right, true));
   register("xdesc", 2, (_, [left, right]) => xascValue(left, right, false));
   register("xkey", 2, (_, [left, right]) => xkeyValue(left, right));
   register("xgroup", 2, (_, [left, right]) => xgroupValue(left, right));
+  register("lsq", 2, (_, [left, right]) => V.lsqValue(left, right));
   register("ssr", 3, (_, [text, pattern, replacement]) => ssrValue(text, pattern, replacement));
 
   register("lj", 2, (_, [left, right]) => leftJoin(left, right));
-  register("ljf", 2, (_, [left, right]) => leftJoin(left, right));
+  register("ljf", 2, (_, [left, right]) => leftJoin(left, right, { fill: true }));
   register("ij", 2, (_, [left, right]) => innerJoin(left, right));
+  register("ijf", 2, (_, [left, right]) => innerJoin(left, right, { fill: true }));
   register("uj", 2, (_, [left, right]) => unionJoin(left, right));
+  register("ujf", 2, (_, [left, right]) => unionJoin(left, right, { fill: true }));
   register("pj", 2, (_, [left, right]) => plusJoin(left, right));
 
   register("asof", 2, (_, [left, right]) => asofValue(left, right));
@@ -468,6 +564,9 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   });
 
   register("get", 1, (session, [arg]) => {
+    if (arg.kind === "string") {
+      return session.evaluate(arg.value).value;
+    }
     if (arg.kind === "symbol") {
       if (arg.value.startsWith(":")) {
         return readQValueFromFs(session, arg.value.slice(1));
@@ -483,17 +582,9 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
         return target;
       }
       session.assignGlobal(target.value, value);
-      return value;
+      return target;
     }
     if (target.kind === "list" && target.items.every((item) => item.kind === "symbol")) {
-      const names = target.items.map((item) => (item as QSymbol).value);
-      const values =
-        value.kind === "list" && value.items.length === names.length
-          ? value.items
-          : names.map(() => value);
-      for (let i = 0; i < names.length; i++) {
-        session.assignGlobal(names[i]!, values[i]!);
-      }
       return value;
     }
     throw new QRuntimeError("type", "set expects a symbol (or symbol list) target");
@@ -518,6 +609,56 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
     session.assignGlobal(varName, value);
     return qSymbol(varName);
   });
+  register("rsave", 1, (session, [arg]) => {
+    if (arg.kind !== "symbol" || arg.value.startsWith(":")) {
+      throw new QRuntimeError("type", "rsave expects a table name symbol");
+    }
+    const value = session.get(arg.value);
+    if (value.kind !== "table") {
+      throw new QRuntimeError("type", "rsave expects an unkeyed table");
+    }
+    writeQValueToFs(session, `${arg.value}/.qanvas-table`, value);
+    return qSymbol(`:${arg.value}/`);
+  });
+  register("rload", 1, (session, [arg]) => {
+    if (arg.kind !== "symbol" || arg.value.startsWith(":")) {
+      throw new QRuntimeError("type", "rload expects a table name symbol");
+    }
+    const value = readQValueFromFs(session, `${arg.value}/.qanvas-table`);
+    if (value.kind !== "table") {
+      throw new QRuntimeError("type", "rload expected a splayed table payload");
+    }
+    session.assignGlobal(arg.value, value);
+    return qSymbol(arg.value);
+  });
+  register("dsave", 2, (session, [root, names]) => {
+    const rootPath =
+      root.kind === "symbol"
+        ? root.value.replace(/^:/, "").replace(/\/$/, "")
+        : root.kind === "list" && root.items.length > 0 && root.items[0]!.kind === "symbol"
+          ? root.items[0]!.value.replace(/^:/, "").replace(/\/$/, "")
+          : null;
+    if (rootPath === null) {
+      throw new QRuntimeError("type", "dsave expects a file-symbol root");
+    }
+    const nameValues =
+      names.kind === "symbol"
+        ? [names]
+        : names.kind === "list" && names.items.every((item) => item.kind === "symbol")
+          ? (names.items as QSymbol[])
+          : null;
+    if (nameValues === null) {
+      throw new QRuntimeError("type", "dsave expects symbol table names");
+    }
+    for (const name of nameValues) {
+      const value = session.get(name.value);
+      if (value.kind !== "table") {
+        throw new QRuntimeError("type", "dsave expects unkeyed table globals");
+      }
+      writeQValueToFs(session, `${rootPath}/${name.value}/.qanvas-table`, value);
+    }
+    return names;
+  });
 
   register("getenv", 1, (session, [arg]) => {
     const name = arg.kind === "symbol" ? arg.value : arg.kind === "string" ? arg.value : "";
@@ -534,24 +675,54 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   register("gtime", 1, (_, [arg]) => arg);
   register("ltime", 1, (_, [arg]) => arg);
 
-  register("parse", 1, (_, [arg]) => arg);
-  register("eval", 1, (session, [arg]) => {
+  register("parse", 1, (session, [arg]) => {
     if (arg.kind === "string") {
-      return session.evaluate(arg.value).value;
+      const trimmed = arg.value.trim();
+      if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+        return session.evaluate(arg.value).value;
+      }
+      return qParseTree(arg.value, parseTreeDisplay(arg.value));
     }
     return arg;
   });
+  register("eval", 1, (session, [arg]) => {
+    if (arg.kind === "parseTree") {
+      return session.evaluate(arg.source).value;
+    }
+    if (arg.kind === "list" && arg.items.length > 0) {
+      const [head, ...args] = arg.items;
+      if (head!.kind === "builtin" || head!.kind === "lambda" || head!.kind === "projection") {
+        const evalArg = (value: typeof arg.items[number]): typeof arg.items[number] =>
+          value.kind === "list" &&
+          value.items.length > 0 &&
+          (value.items[0]!.kind === "builtin" ||
+            value.items[0]!.kind === "lambda" ||
+            value.items[0]!.kind === "projection")
+            ? session.invoke(value.items[0]!, value.items.slice(1).map(evalArg))
+            : value;
+        return session.invoke(head!, args.map(evalArg));
+      }
+    }
+    return arg;
+  });
+  register("reval", 1, (session, [arg]) => session.invoke(session.get("eval"), [arg]));
+  register("view", 1, (session, [arg]) => session.viewValue(arg));
+  register("md5", 1, (_, [arg]) => V.md5Value(arg));
 
-  register("tables", 1, (session, [arg]) => {
-    const ns = arg.kind === "symbol" ? arg.value : "";
+  register("tables", 0, (session, [arg]) => {
+    const ns = arg?.kind === "symbol" ? arg.value : "";
     return session.listTables(ns);
   });
-  register("views", 1, () => qList([], true));
-
-  register("while", 2, (session) => session.unsupported("while (expression form)"));
+  register("views", 0, (session, [arg]) => {
+    const ns = arg?.kind === "symbol" ? arg.value : "";
+    return session.listViews(ns);
+  });
 
   register("in", 2, (_, [left, right]) => inValue(left, right));
   register("each", 2, (session, [callable, arg]) => {
+    if (arg.kind === "dictionary") {
+      return qDictionary(arg.keys, arg.values.map((item) => session.invoke(callable, [item])));
+    }
     const items =
       arg.kind === "list"
         ? arg.items
@@ -566,7 +737,7 @@ export const createBuiltins = (): ReadonlyMap<string, BuiltinEntry> => {
   register("ajf", 3, (_, [cols, left, right]) => asofJoinValue(cols, left, right, { useT2Time: false, fill: true }));
   register("ajf0", 3, (_, [cols, left, right]) => asofJoinValue(cols, left, right, { useT2Time: true, fill: true }));
   register("ej", 3, (_, [cols, left, right]) => equiJoinValue(cols, left, right));
-  register("exit", 1, (session) => session.unsupported("exit"));
+  register("exit", 1, () => qNull());
 
   return builtins;
 };

@@ -1,19 +1,14 @@
 import { KdbLexError, lexKdbLex, type KdbLexToken } from "../../../q-language/src/index.js";
-import { parse as pegParse } from "../q-parser.js";
 import { MONAD_KEYWORDS, WORD_DIAD_KEYWORDS, type AstNode, type SourceRange, type SourcePosition, type Token, QRuntimeError } from "./types.js";
 
-const buildTokenTape = (tokens: Token[]) => "x".repeat(tokens.length);
-
-export const parsePeggyExpressionForTests = (source: string): AstNode => {
+export const parseExpressionForTests = (source: string): AstNode => {
   let tokens: Token[] = [];
   try {
     tokens = tokenize(source);
-    return pegParse(buildTokenTape(tokens), {
-      tokens,
-      Parser,
-      source,
-      startRule: "ExpressionStart"
-    } as Parameters<typeof pegParse>[1] & { startRule: string }) as AstNode;
+    const parser = new Parser(tokens, source);
+    const expression = parser.parseExpression();
+    parser.consumeEofForTests();
+    return expression;
   } catch (error) {
     throw enrichParseError(error, source, tokens);
   }
@@ -23,7 +18,7 @@ export const parse = (source: string): AstNode => {
   let tokens: Token[] = [];
   try {
     tokens = tokenize(source);
-    return pegParse(buildTokenTape(tokens), { tokens, Parser, source }) as AstNode;
+    return new Parser(tokens, source).parseProgram(source);
   } catch (error) {
     throw enrichParseError(error, source, tokens);
   }
@@ -317,6 +312,9 @@ export class Parser {
 
     if (this.peek().kind === "identifier" && this.peek().value === "each") {
       this.consume("identifier", "each");
+      if (!this.canStartPrimary(this.peek()) || this.isStopIdentifier(this.peek())) {
+        return { kind: "call", callee: { kind: "identifier", name: "each" }, args: [callee] };
+      }
       return { kind: "each", callee, arg: this.parseAssignment() };
     }
 
@@ -336,7 +334,7 @@ export class Parser {
       (MONAD_KEYWORDS.has(monadName) || isDerivedAdverbName(monadName)) &&
       this.canStartPrimary(this.peek()) &&
       !this.isStopIdentifier(this.peek()) &&
-      !(this.peek().kind === "identifier" && WORD_DIAD_KEYWORDS.has(this.peek().value))
+      !(this.isBareWordDiad() && !(this.peek().kind === "identifier" && this.peek().value === "where"))
     ) {
       const arg = this.parseAssignment();
       return {
@@ -357,7 +355,7 @@ export class Parser {
 
     const adjacent: AstNode[] = [];
     while (this.canStartPrimary(this.peek()) && !this.isStopIdentifier(this.peek())) {
-      if (this.peek().kind === "identifier" && WORD_DIAD_KEYWORDS.has(this.peek().value)) {
+      if (this.isBareWordDiad()) {
         break;
       }
       if (
@@ -422,7 +420,7 @@ export class Parser {
         adjacent.length > 1 &&
         !this.isStopIdentifier(this.peek()) &&
         !this.isStopOperator(this.peek()) &&
-        ((this.peek().kind === "identifier" && WORD_DIAD_KEYWORDS.has(this.peek().value)) ||
+        (this.isBareWordDiad() ||
           (this.peek().kind === "operator" &&
             this.peek().value !== ":" &&
             this.peek().value !== ";"))
@@ -583,9 +581,14 @@ export class Parser {
         if (token.value === "delete") return this.parseDeleteExpression();
         return { kind: "identifier", name: this.consume("identifier").value };
       case "operator":
+        if (token.value === "::") {
+          this.consume("operator", "::");
+          return { kind: "null" };
+        }
         return this.parseOperatorValue();
       case "lparen": {
         this.consume("lparen");
+        this.skipNewlines();
         if (this.peek().kind === "rparen") {
           this.consume("rparen");
           return { kind: "list", items: [] };
@@ -600,14 +603,17 @@ export class Parser {
           const items = [first];
           while (this.peek().kind === "separator") {
             this.consume("separator");
+            this.skipNewlines();
             if (this.peek().kind === "rparen") {
               break;
             }
             items.push(this.parseExpression());
+            this.skipNewlines();
           }
           this.consume("rparen");
           return { kind: "list", items };
         }
+        this.skipNewlines();
         this.consume("rparen");
         return { kind: "group", value: first };
       }
@@ -624,7 +630,8 @@ export class Parser {
       base === ";" ||
       (base === ":" &&
         this.peek().kind !== "lbracket" &&
-        !(this.peek().kind === "operator" && this.peek().value === ":"))
+        !(this.peek().kind === "operator" && this.peek().value === ":") &&
+        !["separator", "rbracket", "rparen", "rbrace", "eof"].includes(this.peek().kind))
     ) {
       this.parseError(`Unexpected token: operator ${base}`);
     }
@@ -714,11 +721,11 @@ export class Parser {
       const statement = this.parseStatement();
       body.push(statement);
       sourceTokens.push(renderAst(statement));
-      this.skipSeparators();
       if (this.peek().kind === "separator") {
         this.consume("separator");
         sourceTokens.push(";");
       }
+      this.skipSeparators();
     }
     this.consume("rbrace");
     sourceTokens.push("}");
@@ -765,9 +772,12 @@ export class Parser {
   }
 
   private skipNewlines() {
+    let skipped = 0;
     while (this.peek().kind === "newline") {
       this.index += 1;
+      skipped += 1;
     }
+    return skipped;
   }
 
   private canStartPrimary(token: Token): boolean {
@@ -783,6 +793,14 @@ export class Parser {
       "lparen",
       "lbrace"
     ].includes(token.kind);
+  }
+
+  private isBareWordDiad() {
+    return (
+      this.peek().kind === "identifier" &&
+      WORD_DIAD_KEYWORDS.has(this.peek().value) &&
+      this.peek(1).kind !== "lbracket"
+    );
   }
 
   private peek(offset = 0): Token {
@@ -802,6 +820,11 @@ export class Parser {
     return token;
   }
 
+  consumeEofForTests() {
+    this.skipSeparators();
+    this.consume("eof");
+  }
+
   private parseError(message: string, token = this.peek()): never {
     throw new QRuntimeError("parse", message, tokenToRange(this.source, token));
   }
@@ -813,13 +836,27 @@ export class Parser {
     if (this.isStopOperator(this.peek())) {
       return left;
     }
-    if (this.peek().kind === "identifier" && WORD_DIAD_KEYWORDS.has(this.peek().value)) {
+    if (this.isBareWordDiad()) {
       const op = this.consume("identifier").value;
+      this.skipNewlines();
       const right = this.parseAssignment();
       return { kind: "binary", op, left, right };
     }
     if (this.peek().kind === "operator" && this.peek().value !== ":" && this.peek().value !== ";") {
+      const opToken = this.peek();
       const op = this.extendOperatorName(this.consume("operator").value);
+      const skippedNewlines = this.skipNewlines();
+      if (skippedNewlines > 0 && ["rparen", "rbracket", "rbrace", "eof"].includes(this.peek().kind)) {
+        this.parseError(`Unexpected token: operator ${op}`, { ...opToken, start: opToken.end, end: opToken.end });
+      }
+      if (this.peek().kind === "lbracket") {
+        const args = this.parseBracketArgs();
+        const projection: AstNode = { kind: "call", callee: { kind: "identifier", name: op }, args: [left, ...args] };
+        if (this.canStartPrimary(this.peek())) {
+          return { kind: "call", callee: projection, args: [this.parseAssignment()] };
+        }
+        return projection;
+      }
       if (["separator", "rparen", "rbracket", "rbrace", "eof"].includes(this.peek().kind)) {
         return { kind: "call", callee: { kind: "identifier", name: op }, args: [left] };
       }
@@ -874,6 +911,9 @@ const adaptKdbLexToken = (token: KdbLexToken): Token[] => {
     case "separator":
       return [{ kind: "separator", value: token.value, start: token.start, end: token.end }];
     case "identifier":
+      if (token.value === "." && token.end === token.start + 1) {
+        return [{ kind: "operator", value: token.value, start: token.start, end: token.end }];
+      }
       return [{ kind: "identifier", value: token.value, start: token.start, end: token.end }];
     case "symbol":
       return [{ kind: "symbol", value: token.value.slice(1), start: token.start, end: token.end }];
@@ -925,14 +965,14 @@ const enrichParseError = (error: unknown, source: string, tokens: Token[]): Erro
     return buildLocatedError(error, source, error.location);
   }
 
-  if (isPeggySyntaxError(error)) {
+  if (isParserSyntaxError(error)) {
     return buildLocatedError(error, source, tokenIndexRangeToSourceRange(source, tokens, error.location?.start?.offset ?? 0));
   }
 
   return error instanceof Error ? error : new Error(String(error));
 };
 
-const isPeggySyntaxError = (
+const isParserSyntaxError = (
   error: unknown
 ): error is Error & { location?: { start?: { offset?: number } } } => {
   return error instanceof Error && error.name === "SyntaxError";
@@ -1043,7 +1083,7 @@ const isShowExpression = (node: AstNode): boolean =>
 export const isSilentExpression = (node: AstNode): boolean =>
   node.kind === "assign" || node.kind === "assignGlobal" || isShowExpression(node);
 
-const renderAst = (node: AstNode): string => {
+export const renderAst = (node: AstNode): string => {
   switch (node.kind) {
     case "return":
       return `:${renderAst(node.value)}`;
@@ -1119,3 +1159,57 @@ const renderAst = (node: AstNode): string => {
   }
   throw new QRuntimeError("nyi", `Cannot render AST node ${(node as AstNode).kind}`);
 };
+
+const parseTreeAtomDisplay = (node: AstNode): string => {
+  if (node.kind === "identifier") return `\`${node.name}`;
+  if (node.kind === "call" && node.callee.kind === "identifier" && node.args.length === 1) {
+    return `(${parseTreeVerbName(node.callee.name)};${parseTreeAtomDisplay(node.args[0]!)})`;
+  }
+  return renderAst(node);
+};
+
+const parseTreeVerbName = (name: string) =>
+  name === "deltas" ? "-':" : name === "neg" ? "-:" : name;
+
+const parseTreeOperatorName = (op: string) => {
+  if (op.endsWith("/:")) return `(/:;${op.slice(0, -2)})`;
+  if (op.endsWith("\\:")) return `(\\:;${op.slice(0, -2)})`;
+  return op;
+};
+
+const parseTreeNestedDisplay = (node: AstNode): string => {
+  switch (node.kind) {
+    case "assign":
+      return `(:;\`${node.name};${parseTreeAtomDisplay(node.value)})`;
+    case "assignGlobal":
+      return `(::;\`${node.name};${parseTreeAtomDisplay(node.value)})`;
+    case "binary":
+      return `(${parseTreeOperatorName(node.op)};${parseTreeAtomDisplay(node.left)};${parseTreeAtomDisplay(node.right)})`;
+    default:
+      return parseTreeAtomDisplay(node);
+  }
+};
+
+const parseTreeDisplayNode = (node: AstNode): string => {
+  switch (node.kind) {
+    case "program":
+      if (node.statements.length === 1) return parseTreeDisplayNode(node.statements[0]!);
+      return [`";"`, ...node.statements.map(parseTreeNestedDisplay)].join("\n");
+    case "binary":
+      return [parseTreeOperatorName(node.op), parseTreeAtomDisplay(node.left), parseTreeAtomDisplay(node.right)].join("\n");
+    case "assign":
+      return [":", `\`${node.name}`, parseTreeAtomDisplay(node.value)].join("\n");
+    case "assignGlobal":
+      return ["::", `\`${node.name}`, parseTreeAtomDisplay(node.value)].join("\n");
+    case "call":
+      if (node.callee.kind === "identifier" && node.args.length === 1) {
+        return [parseTreeVerbName(node.callee.name), parseTreeAtomDisplay(node.args[0]!)].join("\n");
+      }
+      return renderAst(node);
+    default:
+      return parseTreeAtomDisplay(node);
+  }
+};
+
+export const parseTreeDisplay = (source: string): string =>
+  parseTreeDisplayNode(parse(source));

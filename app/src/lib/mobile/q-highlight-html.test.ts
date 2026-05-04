@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { highlightQSnippetHtml } from './q-highlight-html';
+import { listBuiltins } from '@qpad/engine';
 
 describe('q snippet highlighting', () => {
   it('does not turn adverb slashes before closing delimiters into comments', () => {
@@ -27,6 +28,24 @@ describe('q snippet highlighting', () => {
     expect(html).toContain('<span class="q-token-builtin">.Q.id</span>');
     expect(html).toContain('<span class="q-token-builtin">.z.P</span>');
     expect(html).toContain('<span class="q-token-builtin">.z.x</span>');
+  });
+
+  it('highlights wavg and every identifier-shaped engine builtin as builtins', () => {
+    const builtins = listBuiltins();
+    const names = [
+      ...builtins.monads,
+      ...builtins.diads,
+      ...builtins.triads,
+      ...builtins.quads,
+      'each',
+    ].filter((name) => /^[a-zA-Z.][a-zA-Z0-9_.]*$/.test(name));
+
+    expect(highlightQSnippetHtml('100 50 25 wavg 10 12 20f')).toContain(
+      '<span class="q-token-builtin">wavg</span>'
+    );
+    for (const name of names) {
+      expect(highlightQSnippetHtml(name), name).toContain(`<span class="q-token-builtin">${name}</span>`);
+    }
   });
 
   it('still highlights statement and trailing q comments', () => {

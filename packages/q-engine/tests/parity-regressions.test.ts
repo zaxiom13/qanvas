@@ -13,12 +13,20 @@ describe("parity regressions", () => {
     expect(formatValue(session.evaluate("med 3 1 4 2").value)).toBe("2.5\n");
     expect(formatValue(session.evaluate("med 1 0N 3").value)).toBe("1f\n");
     expect(formatValue(session.evaluate("2 mavg 1 2 3 4").value)).toBe("1 1.5 2.5 3.5\n");
-    expect(formatValue(session.evaluate("2 mcount 1 2 3 4").value)).toBe("1 2 2 2\n");
+    expect(formatValue(session.evaluate("2 mcount 1 2 3 4").value)).toBe("1 2 2 2i\n");
     expect(formatValue(session.evaluate("2 msum 1 2 3 4").value)).toBe("1 3 5 7\n");
     expect(formatValue(session.evaluate("2 mdev 1 2 3 4").value)).toBe("0 0.5 0.5 0.5\n");
     expect(formatValue(session.evaluate("3 mavg 1 0N 3 4 5").value)).toBe("1 1 2 3.5 4\n");
     expect(formatValue(session.evaluate("3 msum 1 0N 3 4 5").value)).toBe("1 1 4 7 12\n");
-    expect(formatValue(session.evaluate("3 mcount 1 0N 3 4 5").value)).toBe("1 1 2 2 3\n");
+    expect(formatValue(session.evaluate("3 mcount 1 0N 3 4 5").value)).toBe("1 1 2 2 3i\n");
+  });
+
+  it("rounds numeric casts like q", () => {
+    const session = createSession();
+    expect(formatValue(session.evaluate("`int$1.5 2.7").value)).toBe("2 3i\n");
+    expect(formatValue(session.evaluate("`int$-1.5 -2.7").value)).toBe("-2 -3i\n");
+    expect(formatValue(session.evaluate("`long$1.5 2.7").value)).toBe("2 3\n");
+    expect(formatValue(session.evaluate("`short$1.5 2.7").value)).toBe("2 3h\n");
   });
 
   it("supports remaining projection, control, keyed-table, and grouped qsql forms", () => {
@@ -73,6 +81,12 @@ describe("parity regressions", () => {
     expect(() => session.evaluate("select from ([]a:10 20 30) where 0 2")).toThrowError(
       "where expects a boolean vector"
     );
+    expect(() => session.evaluate("`z xkey ([]a:1 2;b:3 4)")).toThrowError("z");
+    expect(() => session.evaluate("`a xcols ([a:1 2]b:3 4)")).toThrowError("xcols expects a table");
+    expect(() => session.evaluate("kt:([a:1 2]b:10 20);`kt insert (2;200)")).toThrowError("insert");
+    expect(() => session.evaluate("kt:([a:1 2]b:10 20);`kt insert `a`b!2 200")).toThrowError("insert");
+    expect(() => session.evaluate("kt:([a:1 2]b:10 20);`kt insert ([]a:enlist 2;b:enlist 200)")).toThrowError("insert");
+    expect(() => session.evaluate("kt:([a:1 2]b:10 20);`kt insert ([a:enlist 2]b:enlist 200)")).toThrowError("insert");
     expect(
       formatValue(
         session.evaluate(

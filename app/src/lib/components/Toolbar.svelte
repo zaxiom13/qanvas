@@ -109,6 +109,14 @@
       >
         Practice
       </button>
+      <button
+        class="workspace-switch-btn"
+        type="button"
+        class:is-active={appState.workspaceMode === 'reference'}
+        onclick={() => appState.setWorkspaceMode('reference')}
+      >
+        Reference
+      </button>
     </div>
   </div>
 

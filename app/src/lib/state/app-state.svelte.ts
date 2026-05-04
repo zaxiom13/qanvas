@@ -73,7 +73,7 @@ const SKETCH_NOUNS = ['spiral', 'glow', 'bloom', 'ripple', 'drift', 'garden', 'e
 type OverlayMode = 'idle' | 'running' | 'stopped' | 'error' | 'runtime-missing';
 type ModalName = null | 'settings' | 'new-file' | 'examples' | 'projects' | 'export-gif' | 'unsaved' | 'info';
 type UnsavedDecision = 'continue' | 'discard' | 'cancel';
-type WorkspaceMode = 'studio' | 'practice';
+type WorkspaceMode = 'studio' | 'practice' | 'reference';
 type CanvasPanelTab = 'canvas' | 'compiled';
 type PracticeVerification = {
   status: 'idle' | 'match' | 'mismatch' | 'error';
@@ -96,6 +96,11 @@ function writeStored(key: string, value: string) {
   } catch {
     return;
   }
+}
+
+function readWorkspaceMode(): WorkspaceMode {
+  const value = readStored(STORAGE_KEYS.workspaceMode);
+  return value === 'practice' || value === 'reference' ? value : 'studio';
 }
 
 function readStoredNumber(key: string, fallback: number) {
@@ -148,7 +153,7 @@ class AppState {
   currentCanvasSize = $state<[number, number]>([1200, 800]);
   runtimeStartCommands = $state<Record<string, unknown>[]>([]);
   canvasPanelTab = $state<CanvasPanelTab>('canvas');
-  workspaceMode = $state<WorkspaceMode>(readStored(STORAGE_KEYS.workspaceMode) === 'practice' ? 'practice' : 'studio');
+  workspaceMode = $state<WorkspaceMode>(readWorkspaceMode());
   practiceChallengeId = $state(readStored(STORAGE_KEYS.practiceChallengeId) || PRACTICE_CHALLENGES[0].id);
   practiceAnswerVisible = $state(false);
   practiceVerification = $state<PracticeVerification | null>(null);

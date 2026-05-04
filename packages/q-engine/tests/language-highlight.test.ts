@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { qMonarchSyntax } from "../../q-language/src/syntax";
+import { listBuiltins } from "../src/index";
 
 describe("q language highlighting", () => {
   it("keeps dotted namespace identifiers intact", () => {
@@ -42,5 +43,21 @@ describe("q language highlighting", () => {
     expect(matchesAnyRoot("2010.01.25D14:17:46.962375000")).toBe(true);
     expect(matchesAnyRoot("0D14:17:45.519682000")).toBe(true);
     expect(matchesAnyRoot("1:")).toBe(true);
+  });
+
+  it("keeps identifier-shaped builtin highlighting in sync with the engine manifest", () => {
+    const builtins = listBuiltins();
+    const names = [
+      ...builtins.monads,
+      ...builtins.diads,
+      ...builtins.triads,
+      ...builtins.quads,
+      "each"
+    ].filter((name) => /^[a-zA-Z.][a-zA-Z0-9_.]*$/.test(name));
+
+    expect(qMonarchSyntax.keywords).toEqual(expect.arrayContaining(["wavg", "wsum"]));
+    for (const name of names) {
+      expect(qMonarchSyntax.keywords, name).toContain(name);
+    }
   });
 });

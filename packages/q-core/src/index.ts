@@ -11,6 +11,7 @@ export type QValue =
   | QLambda
   | QProjection
   | QBuiltin
+  | QParseTree
   | QNamespace
   | QNull
   | QError;
@@ -26,6 +27,7 @@ export interface QNumber {
   kind: "number";
   value: number;
   numericType: "short" | "int" | "long" | "real" | "float";
+  exactText?: string;
   special?:
     | "null"
     | "intNull"
@@ -51,7 +53,7 @@ export interface QSymbol {
 
 export interface QTemporal {
   kind: "temporal";
-  temporalType: "date";
+  temporalType: "date" | "month" | "minute" | "second" | "time" | "timespan" | "datetime" | "timestamp";
   value: string;
 }
 
@@ -65,6 +67,7 @@ export interface QList {
   items: QValue[];
   homogeneous?: boolean;
   attribute?: string;
+  foreignKey?: string;
 }
 
 export interface QDictionary {
@@ -104,6 +107,12 @@ export interface QBuiltin {
   arity: number;
 }
 
+export interface QParseTree {
+  kind: "parseTree";
+  source: string;
+  display: string;
+}
+
 export interface QNamespace {
   kind: "namespace";
   name: string;
@@ -127,6 +136,12 @@ export interface CanonicalNode {
 }
 
 export const qNull = (): QNull => ({ kind: "null" });
+
+export const qParseTree = (source: string, display: string): QParseTree => ({
+  kind: "parseTree",
+  source,
+  display
+});
 
 export const qBool = (value: boolean): QBoolean => ({ kind: "boolean", value });
 
@@ -193,12 +208,14 @@ export const qString = (value: string): QString => ({ kind: "string", value });
 export const qList = (
   items: QValue[],
   homogeneous = false,
-  attribute?: string
+  attribute?: string,
+  foreignKey?: string
 ): QList => ({
   kind: "list",
   items,
   homogeneous,
-  attribute
+  attribute,
+  foreignKey
 });
 
 export const qDictionary = (keys: QValue[], values: QValue[]): QDictionary => ({
@@ -265,7 +282,9 @@ export const canonicalize = (value: QValue): CanonicalNode => {
       return { kind: "atom", qType: "boolean", data: value.value };
     case "number": {
       const specialText =
-        value.special === "null"
+        value.exactText !== undefined
+          ? value.exactText
+        : value.special === "null"
           ? "0n"
           : value.special === "intNull"
             ? "0Ni"
@@ -368,6 +387,12 @@ export const canonicalize = (value: QValue): CanonicalNode => {
         qType: "builtin",
         data: { name: value.name, arity: value.arity }
       };
+    case "parseTree":
+      return {
+        kind: "parseTree",
+        qType: "parseTree",
+        data: { source: value.source, display: value.display }
+      };
     case "namespace":
       return {
         kind: "namespace",
@@ -408,14 +433,53 @@ export const qTypeNumber = (value: QValue): number => {
     case "symbol":
       return -11;
     case "temporal":
-      return -14;
+      switch (value.temporalType) {
+        case "timestamp":
+          return -12;
+        case "month":
+          return -13;
+        case "date":
+          return -14;
+        case "datetime":
+          return -15;
+        case "timespan":
+          return -16;
+        case "minute":
+          return -17;
+        case "second":
+          return -18;
+        case "time":
+          return -19;
+      }
     case "string":
       return 10;
     case "list":
       if (value.items.length === 0) {
+        switch (value.attribute) {
+          case "boolean":
+            return 1;
+          case "short":
+            return 5;
+          case "int":
+            return 6;
+          case "long":
+            return 7;
+          case "real":
+            return 8;
+          case "float":
+            return 9;
+          case "symbol":
+            return 11;
+        }
         return 0;
       }
-      return Math.abs(qTypeNumber(value.items[0]));
+      if (value.items.some((item) => item.kind === "list" || item.kind === "string")) {
+        return 0;
+      }
+      {
+        const firstType = Math.abs(qTypeNumber(value.items[0]));
+        return value.items.every((item) => Math.abs(qTypeNumber(item)) === firstType) ? firstType : 0;
+      }
     case "dictionary":
       return 99;
     case "table":
@@ -428,6 +492,8 @@ export const qTypeNumber = (value: QValue): number => {
       return 104;
     case "builtin":
       return 101;
+    case "parseTree":
+      return 0;
     case "namespace":
       return 97;
     case "null":

@@ -78,6 +78,10 @@
       document.title = `${appState.activePracticeChallenge.title} · Practice · ${base}`;
       return;
     }
+    if (appState.workspaceMode === 'reference') {
+      document.title = `Reference · ${base}`;
+      return;
+    }
     const dirty = appState.unsaved ? ' (unsaved)' : '';
     document.title = `${appState.projectName}${dirty} · ${base}`;
   });

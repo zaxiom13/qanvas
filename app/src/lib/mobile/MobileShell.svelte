@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onDestroy, onMount, tick } from 'svelte';
   import CanvasPanel from '$lib/components/CanvasPanel.svelte';
+  import ReferencePanel from '$lib/components/ReferencePanel.svelte';
   import FileTabs from '$lib/components/FileTabs.svelte';
   import { formatDisplayValue } from '$lib/formatting/value-format';
   import { getAllExamplePreviewSrcs, getExamplePreviewSrc } from '$lib/example-previews';
@@ -13,7 +14,7 @@
   import { browserGateway } from '$lib/browser';
   import { projectsLibraryBlurb } from '$lib/projects-display';
 
-  type MobileTab = 'editor' | 'canvas' | 'examples' | 'library' | 'settings';
+  type MobileTab = 'editor' | 'canvas' | 'examples' | 'reference' | 'library' | 'settings';
   type MobileConsoleFilter = 'all' | 'stdout' | 'stderr' | 'info';
 
   let activeTab = $state<MobileTab>('editor');
@@ -39,11 +40,15 @@
   });
 
   let bottomTabs = $derived.by(() => {
-    const tabs: { id: MobileTab; label: string; icon: string }[] = [
-      { id: 'editor', label: 'Editor', icon: 'code' },
-      { id: 'canvas', label: appState.workspaceMode === 'practice' ? 'Output' : 'Canvas', icon: appState.workspaceMode === 'practice' ? 'terminal' : 'palette' },
-      { id: 'examples', label: appState.workspaceMode === 'practice' ? 'Lessons' : 'Examples', icon: 'cube' },
-    ];
+    const tabs: { id: MobileTab; label: string; icon: string }[] = [];
+    if (appState.workspaceMode !== 'reference') {
+      tabs.push(
+        { id: 'editor', label: 'Editor', icon: 'code' },
+        { id: 'canvas', label: appState.workspaceMode === 'practice' ? 'Output' : 'Canvas', icon: appState.workspaceMode === 'practice' ? 'terminal' : 'palette' },
+        { id: 'examples', label: appState.workspaceMode === 'practice' ? 'Lessons' : 'Examples', icon: 'cube' }
+      );
+    }
+    tabs.push({ id: 'reference', label: 'Reference', icon: 'file' });
     if (appState.workspaceMode === 'studio') {
       tabs.push({ id: 'library', label: 'Library', icon: 'library' });
     }
@@ -221,8 +226,12 @@
     await appState.runSketch();
   }
 
-  async function chooseWorkspaceMode(mode: 'studio' | 'practice') {
+  async function chooseWorkspaceMode(mode: 'studio' | 'practice' | 'reference') {
     await appState.setWorkspaceMode(mode);
+    if (mode === 'reference') {
+      setActiveTab('reference');
+      return;
+    }
     if (mode === 'practice') {
       appState.setCanvasPanelTab('compiled');
       setActiveTab('editor');
@@ -697,6 +706,10 @@
           </div>
         {/if}
       </section>
+    {:else if activeTab === 'reference'}
+      <section class="mobile-reference">
+        <ReferencePanel />
+      </section>
     {:else if activeTab === 'library'}
       <section class="mobile-library" aria-label="Sketch library">
         <div class="mobile-library-head">
@@ -731,6 +744,7 @@
           <div id="mobile-workspace-switch" class="mobile-segmented" role="group" aria-label="Workspace mode">
             <button type="button" class:active={appState.workspaceMode === 'studio'} onclick={() => void chooseWorkspaceMode('studio')}>Studio</button>
             <button type="button" class:active={appState.workspaceMode === 'practice'} onclick={() => void chooseWorkspaceMode('practice')}>Practice</button>
+            <button type="button" class:active={appState.workspaceMode === 'reference'} onclick={() => void chooseWorkspaceMode('reference')}>Reference</button>
           </div>
         </div>
 
@@ -1044,6 +1058,7 @@
 
   .mobile-canvas,
   .mobile-examples,
+  .mobile-reference,
   .mobile-empty-panel,
   .mobile-settings {
     overscroll-behavior: contain;
@@ -1056,6 +1071,7 @@
   }
 
   .mobile-examples,
+  .mobile-reference,
   .mobile-empty-panel,
   .mobile-settings {
     height: 100%;

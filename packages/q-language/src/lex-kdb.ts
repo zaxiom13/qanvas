@@ -79,7 +79,7 @@ const pushToken = (
 
 /**
  * Walks the source with the same rule order as KDBLex / qMonarchSyntax (root + strings).
- * Invoked before the Peggy parse entry so the editor lexer and runtime share one lexical front-end.
+ * Invoked before runtime parsing so the editor lexer and runtime share one lexical front-end.
  */
 export function lexKdbLex(source: string): KdbLexToken[] {
   const tokens: KdbLexToken[] = [];
@@ -209,6 +209,12 @@ export function lexKdbLex(source: string): KdbLexToken[] {
         start + booleanMatch[0].length
       );
       i += booleanMatch[0].length;
+      continue;
+    }
+
+    if (rest.startsWith("0Nd")) {
+      pushToken(tokens, "date", "0Nd", start, start + 3);
+      i += 3;
       continue;
     }
 

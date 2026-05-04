@@ -139,13 +139,61 @@ describe("q engine smoke tests", () => {
     expect(formatValue(session.evaluate(program).value)).toBe("()\n");
     expect(formatValue(session.evaluate("key `.qv").value)).toBe("``cmds`state`config`append`init`frame\n");
     expect(formatValue(session.evaluate(".qv.frame").value)).toBe(
-      "{[a;b;c].qv.cmds:()state1:draw[.qv.state;a;b;c].qv.state:state1:1_.qv.cmds}\n"
+      "{[a;b;c].qv.cmds:();state1:draw[.qv.state;a;b;c];.qv.state:state1;:1_.qv.cmds}\n"
     );
   });
 
   it("deduplicates vectors", () => {
     const session = createSession();
     expect(formatValue(session.evaluate("distinct 2 3 7 3 5 3").value)).toBe("2 3 7 5\n");
+  });
+
+  it("keeps rand atom results in q-compatible type and range envelopes", () => {
+    const session = createSession();
+
+    expect(formatValue(session.evaluate("type rand 10h").value)).toBe("-5h\n");
+    expect(formatValue(session.evaluate("type rand 10i").value)).toBe("-6h\n");
+    expect(formatValue(session.evaluate("type rand 10").value)).toBe("-7h\n");
+    expect(formatValue(session.evaluate("type rand 1b").value)).toBe("-1h\n");
+    expect(formatValue(session.evaluate("type rand 2026.05.04").value)).toBe("-14h\n");
+    expect(formatValue(session.evaluate("type rand 2026.05m").value)).toBe("-13h\n");
+    expect(formatValue(session.evaluate("type rand 12:34").value)).toBe("-17h\n");
+    expect(formatValue(session.evaluate("type rand 12:34:56").value)).toBe("-18h\n");
+    expect(formatValue(session.evaluate("type rand 12:34:56.789").value)).toBe("-19h\n");
+    expect(formatValue(session.evaluate("type rand 0D12:34:56.789123456").value)).toBe("-16h\n");
+    expect(formatValue(session.evaluate("type rand 2026.05.04D12:34:56.789123456").value)).toBe("-12h\n");
+    expect(formatValue(session.evaluate("type rand 2026.05.04T12:34:56.789").value)).toBe("-15h\n");
+    expect(formatValue(session.evaluate("type rand `3").value)).toBe("-11h\n");
+    expect(formatValue(session.evaluate("count string rand `6").value)).toBe("6\n");
+    expect(formatValue(session.evaluate("type rand \" \"").value)).toBe("10h\n");
+    expect(formatValue(session.evaluate("(rand 10) within 0 9").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 10i) within 0 9").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 10h) within 0 9").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 0.5) within 0 0.5").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 2026.05.04) within 2000.01.01 2026.05.04").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 12:34) within 00:00 12:34").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 12:34:56) within 00:00:00 12:34:56").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 12:34:56.789) within 00:00:00.000 12:34:56.789").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 2026.05.04D12:34:56.789123456) within 2000.01.01D00:00:00.000000000 2026.05.04D12:34:56.789123456").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("(rand 2026.05.04T12:34:56.789) within 2000.01.01T00:00:00.000 2026.05.04T12:34:56.789").value)).toBe("1b\n");
+  });
+
+  it("keeps roll, deal, and permute shape/range contracts", () => {
+    const session = createSession();
+
+    expect(formatValue(session.evaluate("count 5?3").value)).toBe("5\n");
+    expect(formatValue(session.evaluate("all (5?3) within 0 2").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("count -3?10").value)).toBe("3\n");
+    expect(formatValue(session.evaluate("count distinct -3?10").value)).toBe("3\n");
+    expect(formatValue(session.evaluate("all (-3?10) within 0 9").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("count 0N?5").value)).toBe("5\n");
+    expect(formatValue(session.evaluate("count distinct 0N?5").value)).toBe("5\n");
+    expect(formatValue(session.evaluate("all (0N?5) within 0 4").value)).toBe("1b\n");
+    expect(formatValue(session.evaluate("asc 0N?\"abcde\"").value)).toBe("\"abcde\"\n");
+    expect(formatValue(session.evaluate("count 0N?5 4 2").value)).toBe("3\n");
+    expect(formatValue(session.evaluate("count distinct 0N?5 4 2").value)).toBe("3\n");
+    expect(formatValue(session.evaluate("all (0N?5 4 2) in 5 4 2").value)).toBe("1b\n");
+    expect(() => session.evaluate("-4?`a`b`c")).toThrowError(/length/);
   });
 
   it("builds and formats simple tables", () => {
@@ -178,7 +226,7 @@ describe("q engine smoke tests", () => {
       formatValue(
         session.evaluate("canvas:(enlist `size)!enlist 800 600; ([] p:(0.5*canvas`size)+(0;72); r:44 28)").value
       )
-    ).toBe("p    r\n------\n400f 44\n372f 28\n");
+    ).toBe("p   r\n-----\n400 44\n372 28\n");
     expect(
       formatValue(
         session.evaluate("canvas:(enlist `size)!enlist 800 600; ([] p:(2#enlist 0.5*canvas`size)+(0 0;72 72); r:44 28)").value
@@ -263,13 +311,13 @@ describe("q engine smoke tests", () => {
 
   it("supports the common q casts used by practice starters", () => {
     const session = createSession();
-    expect(formatValue(session.evaluate("`symbol$()").value)).toBe("()\n");
-    expect(formatValue(session.evaluate("`long$()").value)).toBe("()\n");
+    expect(formatValue(session.evaluate("`symbol$()").value)).toBe("`symbol$()\n");
+    expect(formatValue(session.evaluate("`long$()").value)).toBe("`long$()\n");
     expect(formatValue(session.evaluate("11h$(\"ab\";\"cd\")").value)).toBe("`ab`cd\n");
     expect(formatValue(session.evaluate("`boolean$1 0 2").value)).toBe("101b\n");
-    expect(formatValue(session.evaluate("5h$1.9 2.1").value)).toBe("1 2h\n");
-    expect(formatValue(session.evaluate("`short$1.9 2.1").value)).toBe("1 2h\n");
-    expect(formatValue(session.evaluate("`int$1.9 2.1").value)).toBe("1 2i\n");
+    expect(formatValue(session.evaluate("5h$1.9 2.1").value)).toBe("2 2h\n");
+    expect(formatValue(session.evaluate("`short$1.9 2.1").value)).toBe("2 2h\n");
+    expect(formatValue(session.evaluate("`int$1.9 2.1").value)).toBe("2 2i\n");
     expect(formatValue(session.evaluate("`float$1 2 3").value)).toBe("1 2 3f\n");
     expect(formatValue(session.evaluate("`string$97 98 99").value)).toBe("\"abc\"\n");
     expect(formatValue(session.evaluate("`symbol$(\"ab\";\"cd\")").value)).toBe("`ab`cd\n");
@@ -556,7 +604,7 @@ describe("q engine smoke tests", () => {
     expect(formatValue(session.evaluate("signum -3 0 5").value)).toBe("-1 0 1i\n");
     expect(formatValue(session.evaluate("reciprocal 2 4").value)).toBe("0.5 0.25\n");
     expect(formatValue(session.evaluate("cols ([]a:1 2;b:3 4)").value)).toBe("`a`b\n");
-    expect(formatValue(session.evaluate("asc 3 1 2").value)).toBe("1 2 3\n");
+    expect(formatValue(session.evaluate("asc 3 1 2").value)).toBe("`s#1 2 3\n");
     expect(formatValue(session.evaluate("avg 1 0n 2 3").value)).toBe("2f\n");
     expect(formatValue(session.evaluate("asin 0").value)).toBe("0f\n");
     expect(formatValue(session.evaluate("atan 1").value)).toBe("0.7853982\n");

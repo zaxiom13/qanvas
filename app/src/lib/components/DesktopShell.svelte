@@ -3,6 +3,7 @@
   import EditorPanel from './EditorPanel.svelte';
   import CanvasPanel from './CanvasPanel.svelte';
   import PracticePanel from './PracticePanel.svelte';
+  import ReferencePanel from './ReferencePanel.svelte';
   import ConsolePanel from './ConsolePanel.svelte';
   import { appState } from '$lib/state/app-state.svelte';
 </script>
@@ -14,6 +15,8 @@
     {#if appState.workspaceMode === 'practice'}
       <EditorPanel />
       <PracticePanel />
+    {:else if appState.workspaceMode === 'reference'}
+      <ReferencePanel />
     {:else}
       <EditorPanel />
       <CanvasPanel />

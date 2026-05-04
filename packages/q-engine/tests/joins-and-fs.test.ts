@@ -11,8 +11,8 @@ describe("asof / window / equi joins", () => {
       [
         "sym time size bid",
         "-----------------",
-        "a   10   100  1f",
-        "b   10   200  2f",
+        "a   10   100  1",
+        "b   10   200  2",
         "a   20   300  1.1",
         ""
       ].join("\n")
@@ -29,7 +29,7 @@ describe("asof / window / equi joins", () => {
 
     session.evaluate("t2:([] sym:`a`a; time:10 20; bid:0N 5f)");
     const filled = session.evaluate("ajf[`sym`time; t2; q]");
-    expect(formatValue(filled.value)).toContain("1f");
+    expect(formatValue(filled.value)).toContain("1");
     expect(formatValue(filled.value)).toContain("1.1");
   });
 

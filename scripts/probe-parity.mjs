@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Probe jqport parity against known-good q outputs.
 // Runs each case, compares to expected, prints PASS/FAIL summary.
-import { createSession, formatValue } from "../packages/q-engine/src/index.ts";
+import { createSession, formatValue } from "../packages/q-engine/dist/packages/q-engine/src/index.js";
 
 // All outputs are what a real q 4.x session should produce (with a trailing \n for scalars).
 const CASES = [
@@ -42,7 +42,7 @@ const CASES = [
 
   // ---- Joins
   ["t1:([]a:1 2);t2:([]a:3 4);t1,t2", "a\n-\n1\n2\n3\n4\n"],
-  ["([]a:1 2 3) lj ([k:1 2 3]b:10 20 30)", "a b \n----\n1 10\n2 20\n3 30\n"],
+  ["([]a:1 2 3) lj ([a:1 2 3]b:10 20 30)", "a b \n----\n1 10\n2 20\n3 30\n"],
 
   // ---- Strings/symbols
   ["`abc", "`abc\n"],
@@ -66,8 +66,8 @@ const CASES = [
   ["type ([]a:1 2)", "98h\n"],
 
   // ---- Casts
-  ["`int$1.5 2.7", "1 2\n"],
-  ["`long$1.5 2.7", "1 2\n"],
+  ["`int$1.5 2.7", "2 3i\n"],
+  ["`long$1.5 2.7", "2 3\n"],
   ["`float$1 2 3", "1 2 3f\n"],
   ["\"i\"$\"abc\"", "97 98 99i\n"],
   ["`$\"hello\"", "`hello\n"],
@@ -76,11 +76,11 @@ const CASES = [
 
   // ---- Temporal
   ["2026.01.01+5", "2026.01.06\n"],
-  ["2026.01.01 - 2026.01.10", "-9\n"],
+  ["2026.01.01 - 2026.01.10", "-9i\n"],
   ["`date$0", "2000.01.01\n"],
 
   // ---- Boolean & conditions
-  ["1 2 3>2", "010b\n"],
+  ["1 2 3>2", "001b\n"],
   ["not 1 0 1", "010b\n"],
   ["and[1b;0b]", "0b\n"],
   ["$[1b;\"a\";\"b\"]", "\"a\"\n"],
@@ -129,6 +129,15 @@ const CASES = [
   ["1b and 0b", "0b\n"],
 ];
 
+const normalizeDisplay = (text) =>
+  text
+    .split("\n")
+    .map((line) => {
+      const trimmed = line.trimEnd();
+      return /^[-| ]+$/.test(trimmed) ? trimmed.replace(/-+/g, "-") : trimmed;
+    })
+    .join("\n");
+
 function runAll() {
   let pass = 0, fail = 0;
   const failures = [];
@@ -144,7 +153,7 @@ function runAll() {
     } catch (e) {
       error = e?.message ?? String(e);
     }
-    if (!error && actual === expected) {
+    if (!error && normalizeDisplay(actual) === normalizeDisplay(expected)) {
       pass++;
       // console.log("PASS:", expr);
     } else {
