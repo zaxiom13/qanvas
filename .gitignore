@@ -10,6 +10,8 @@ packages/*/dist/
 .env
 .env.local
 tmp/
+# Local clone of uiua (separate fork work); do not track in this repo.
+uiua-fork-77c5/
 .vite/
 .parcel-cache/
 q.k
