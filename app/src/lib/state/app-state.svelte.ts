@@ -16,6 +16,11 @@ import {
   getPracticeSolutionSource,
 } from '$lib/practice-challenges';
 import { DEFAULT_PROJECT_NAME, ProjectSessionController } from '$lib/state/project-session';
+import {
+  loadBrowserEngineMode,
+  saveBrowserEngineMode,
+  type BrowserEngineMode,
+} from '$lib/state/browser-engine-mode';
 import { RuntimeCoordinator, type RuntimeProjectSource } from '$lib/state/runtime-coordinator';
 import {
   createRuntimeControlState,
@@ -34,6 +39,7 @@ const STORAGE_KEYS = {
   practiceCompleted: 'qanvas5:practiceCompleted',
   practiceStepsExpanded: 'qanvas5:practiceStepsExpanded',
   debugConsole: 'qanvas5:debugConsole',
+  browserEngineMode: 'qanvas5:browserEngineMode',
   consoleHeight: 'qanvas5:consoleHeight',
   consoleCollapsed: 'qanvas5:consoleCollapsed',
   mobileConsoleCollapsed: 'qanvas5:mobileConsoleCollapsed',
@@ -149,6 +155,8 @@ class AppState {
   overlayMessage = $state('');
   showFps = $state(false);
   debugConsole = $state(readStored(STORAGE_KEYS.debugConsole) === '1');
+  browserEngineMode = $state<BrowserEngineMode>(loadBrowserEngineMode());
+  activeSketchBackend = $state<RuntimeBackend | null>(null);
   fps = $state(0);
   currentCanvasSize = $state<[number, number]>([1200, 800]);
   runtimeStartCommands = $state<Record<string, unknown>[]>([]);
@@ -431,6 +439,15 @@ class AppState {
     this.debugConsole = !this.debugConsole;
     writeStored(STORAGE_KEYS.debugConsole, this.debugConsole ? '1' : '0');
     this.appendConsole('info', this.debugConsole ? 'Debug console enabled.' : 'Debug console disabled.');
+  }
+
+  setBrowserEngineMode(mode: BrowserEngineMode) {
+    this.browserEngineMode = mode;
+    saveBrowserEngineMode(mode);
+  }
+
+  setActiveSketchBackend(backend: RuntimeBackend | null) {
+    this.activeSketchBackend = backend;
   }
 
   async setWorkspaceMode(mode: WorkspaceMode) {
@@ -857,6 +874,7 @@ class AppState {
         files: runtimeFiles.map((file) => ({ ...file })),
         expression: challenge.answerExpression,
         debugConsole: this.debugConsole,
+        backendMode: this.browserEngineMode,
       });
 
       if (!result.ok) {

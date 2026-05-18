@@ -1,5 +1,6 @@
 import type { BrowserGateway } from '$lib/browser';
 import { compileSketch } from '$lib/compiler/compiled-output';
+import { loadBrowserEngineMode, runtimeBackendLabel } from '$lib/state/browser-engine-mode';
 import {
   beginRuntimeStart,
   beginRuntimeStop,
@@ -35,6 +36,7 @@ type RuntimeHost = {
   currentCanvasSize: [number, number];
   runtimeStartCommands: Record<string, unknown>[];
   runNonce: number;
+  setActiveSketchBackend?: (backend: RuntimeBackend | null) => void;
   appendConsole: (type: ConsoleType, text: string) => void;
   flushPendingStructuredStdout: () => void;
 };
@@ -235,7 +237,7 @@ export class RuntimeCoordinator {
         projectPath: source.projectPath,
         files: source.files.map((file) => ({ ...file })),
         debugConsole: host.debugConsole,
-        backendMode: 'auto',
+        backendMode: loadBrowserEngineMode(),
         compiled,
       });
       host.runtimeStartCommands = [];
@@ -243,13 +245,12 @@ export class RuntimeCoordinator {
       host.overlayMode = 'running';
       host.overlayMessage = '';
       host.runNonce += 1;
-      if (startResult.backend === 'rust-wasm') {
-        host.appendConsole('info', 'Rust WASM q runtime active.');
-      } else if (startResult.backend === 'compiled-js') {
-        host.appendConsole('info', 'Compiled JS backend active.');
-      } else if (startResult.fallbackReason) {
-        host.appendConsole('info', `Compiled JS unavailable. Falling back to interpreter: ${startResult.fallbackReason}`);
-      }
+      host.setActiveSketchBackend?.(startResult.backend);
+      const preference = loadBrowserEngineMode();
+      host.appendConsole(
+        'info',
+        `Sketch engine: ${runtimeBackendLabel(startResult.backend)} (preference: ${preference})${startResult.fallbackReason ? ` — ${startResult.fallbackReason}` : ''}`
+      );
       void this.loadStartCommands(host, host.runNonce);
       return true;
     } catch (error) {

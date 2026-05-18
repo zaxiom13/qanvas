@@ -11,7 +11,9 @@
   import { highlightQSnippetHtml } from '$lib/mobile/q-highlight-html';
   import CodeMirrorEditor from '$lib/components/CodeMirrorEditor.svelte';
   import ProjectLibraryList from '$lib/components/ProjectLibraryList.svelte';
+  import BrowserEnginePicker from '$lib/components/BrowserEnginePicker.svelte';
   import { browserGateway } from '$lib/browser';
+  import { browserEngineModeLabel } from '$lib/state/browser-engine-mode';
   import { projectsLibraryBlurb } from '$lib/projects-display';
 
   type MobileTab = 'editor' | 'canvas' | 'examples' | 'reference' | 'library' | 'settings';
@@ -790,6 +792,20 @@
             </button>
           </div>
         {/if}
+
+        <div class="mobile-settings-section">
+          <h2>Browser q engine</h2>
+          <p class="mobile-settings-hint">
+            Preference: <strong>{browserEngineModeLabel(appState.browserEngineMode)}</strong>.
+            Applies to studio sketches and practice verification.
+          </p>
+          <BrowserEnginePicker
+            compact
+            value={appState.browserEngineMode}
+            onchange={(mode) => appState.setBrowserEngineMode(mode)}
+            activeBackend={appState.activeSketchBackend}
+          />
+        </div>
 
         <div class="mobile-settings-section">
           <h2>Canvas & console</h2>

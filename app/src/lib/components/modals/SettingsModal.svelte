@@ -1,6 +1,8 @@
 <script lang="ts">
+  import BrowserEnginePicker from '$lib/components/BrowserEnginePicker.svelte';
   import { appState } from '$lib/state/app-state.svelte';
   import { backendState } from '$lib/state/backend-state.svelte';
+  import { browserEngineModeLabel } from '$lib/state/browser-engine-mode';
 
   function choose(kind: 'browser' | 'local-q' | 'cloud-q') {
     backendState.setDraftKind(kind);
@@ -108,6 +110,21 @@
         <div style="margin-top:0.75rem; font-size:0.8rem; opacity:0.7;">
           Current: <strong>{backendState.activeLabel}</strong>
         </div>
+
+        {#if backendState.draft.kind === 'browser'}
+          <div class="settings-engine-block">
+            <h3 class="settings-subheading">Browser q engine</h3>
+            <p class="settings-description settings-engine-intro">
+              Choose how sketches run in the worker. Preference:
+              <strong>{browserEngineModeLabel(appState.browserEngineMode)}</strong>.
+            </p>
+            <BrowserEnginePicker
+              value={appState.browserEngineMode}
+              onchange={(mode) => appState.setBrowserEngineMode(mode)}
+              activeBackend={appState.activeSketchBackend}
+            />
+          </div>
+        {/if}
       </div>
     </div>
     <div class="modal-footer">
@@ -158,5 +175,18 @@
     font-size: 0.8rem;
     line-height: 1.35;
     opacity: 0.85;
+  }
+  .settings-subheading {
+    font-size: 0.95rem;
+    font-weight: 600;
+    margin: 0 0 0.35rem;
+  }
+  .settings-engine-block {
+    margin-top: 1.25rem;
+    padding-top: 1rem;
+    border-top: 1px solid #e5e5e5;
+  }
+  .settings-engine-intro {
+    margin-bottom: 0.75rem;
   }
 </style>

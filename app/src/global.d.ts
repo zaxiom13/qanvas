@@ -45,7 +45,7 @@ declare global {
     assetCount: number;
   };
 
-  type RuntimeBackendMode = 'interpreter' | 'compiled-js' | 'auto';
+  type RuntimeBackendMode = 'interpreter' | 'compiled-js' | 'rust-wasm' | 'auto';
 
   type RuntimeBackend = 'interpreter' | 'compiled-js' | 'rust-wasm';
 
@@ -97,6 +97,7 @@ declare global {
     files: SketchFile[];
     expression: string;
     debugConsole?: boolean;
+    backendMode?: RuntimeBackendMode;
   };
 
   type RuntimeQueryResult = {
