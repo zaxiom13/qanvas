@@ -17,6 +17,11 @@ async function ensureWasm() {
   await wasmReady;
 }
 
+/** Warm WASM in the worker so the first sketch run can use Rust without a cold-start miss. */
+export function preloadRustWasm() {
+  return ensureWasm();
+}
+
 export async function createRustWasmRuntime(files: SketchFile[], fs: HostFileSystem) {
   await ensureWasm();
   installQrustHost(fs);

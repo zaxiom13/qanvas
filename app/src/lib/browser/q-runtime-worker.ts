@@ -6,11 +6,14 @@ import { normalizeQScript } from './q-script-normalize';
 import {
   createRustWasmRuntime,
   disposeRustWasmRuntime,
+  preloadRustWasm,
   runRustWasmFrame,
   rustWasmQuery,
   rustWasmStartCommands,
   type QRuntime,
 } from './q-rust-runtime';
+
+void preloadRustWasm();
 
 const FS_STORAGE_PREFIX = 'qanvas5:browser:fs:';
 
@@ -455,6 +458,20 @@ function isBrowserRuntime(runtimePath: string) {
   return runtimePath.trim().startsWith('browser://');
 }
 
+function formatRustWasmError(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function withRustFallbackReason(bundle: RuntimeStartBundle, rustFailure?: string): RuntimeStartBundle {
+  if (!rustFailure || bundle.fallbackReason) {
+    return bundle;
+  }
+  return {
+    ...bundle,
+    fallbackReason: `Rust WASM unavailable: ${rustFailure}`,
+  };
+}
+
 type RuntimeStartBundle = {
   runtime: RuntimeSession;
   config: Record<string, unknown>;
@@ -530,22 +547,27 @@ async function createRuntimeSession(payload: RuntimeStartPayload) {
     }
 
     // auto: rust → compiled → interpreter
+    let rustFailure: string | undefined;
     try {
       return await startRustWasmSession(payload);
-    } catch {
-      // try next backend
+    } catch (error) {
+      rustFailure = formatRustWasmError(error);
     }
 
     if (payload.compiled?.status === 'compiled' && payload.compiled.code) {
       try {
-        return startCompiledSession(payload, payload.compiled.code);
+        return withRustFallbackReason(
+          startCompiledSession(payload, payload.compiled.code),
+          rustFailure
+        );
       } catch (error) {
         const message = formatCompiledRuntimeError(error, payload.compiled.code);
-        return startInterpreterSession(payload, message);
+        const compiledFailure = rustFailure ? `${rustFailure}; ${message}` : message;
+        return startInterpreterSession(payload, compiledFailure);
       }
     }
 
-    return startInterpreterSession(payload);
+    return withRustFallbackReason(startInterpreterSession(payload), rustFailure);
   }
 
   if (mode !== 'interpreter' && payload.compiled?.status === 'compiled' && payload.compiled.code) {
