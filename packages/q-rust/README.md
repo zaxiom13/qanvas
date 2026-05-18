@@ -11,11 +11,17 @@ In the browser, `q_wasm` orchestrates sketch lifecycle in Rust and evaluates q t
 
 ## Build WASM for the app
 
+Prebuilt artifacts are committed under `app/src/lib/browser/q-rust/pkg/`, so Netlify and `npm run build` do not need Rust.
+
+Rebuild after changing Rust sources:
+
 ```bash
 npm run build:wasm --workspace @qpad/q-rust
+# or from the app workspace:
+npm run build:wasm --workspace @qanvas/app
 ```
 
-Output is copied to `app/src/lib/browser/q-rust/pkg/`.
+Output is copied to `app/src/lib/browser/q-rust/pkg/`. If `cargo` is missing, the script exits successfully when those files already exist.
 
 ## Tests
 

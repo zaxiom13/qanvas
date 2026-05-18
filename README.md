@@ -168,7 +168,7 @@ npm run build         # build app
 npm run preview       # same host/port as dev: 127.0.0.1:4173
 npm run static        # build zero-install static site to ./dist-static
 npm run typecheck     # Svelte/TS check for the app workspace
-npm run build:q-rust  # build WASM runtime copied into the app
+npm run build:q-rust  # optional: rebuild WASM (committed artifacts used by default)
 npm run test:q-rust   # Rust crate unit tests
 npm run q:serve       # node server/q-bridge.js
 npm run q:direct      # q server/qanvas-boot.q -p 5042
