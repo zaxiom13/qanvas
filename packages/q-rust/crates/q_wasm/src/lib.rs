@@ -12,6 +12,9 @@ extern "C" {
 
     #[wasm_bindgen(js_namespace = ["globalThis", "__q_rust_host__"], js_name = reset)]
     fn host_reset();
+
+    #[wasm_bindgen(js_namespace = ["globalThis", "__q_rust_host__"], js_name = toQLiteralJson)]
+    fn host_to_q_literal_json(json: &str) -> String;
 }
 
 struct WasmHost;
@@ -35,6 +38,12 @@ impl q_eval::QHost for WasmHost {
 
     fn reset(&mut self) {
         host_reset();
+    }
+
+    fn q_literal(&mut self, value: &Value) -> String {
+        let json =
+            serde_json::to_string(value).unwrap_or_else(|_| "null".to_string());
+        host_to_q_literal_json(&json)
     }
 }
 

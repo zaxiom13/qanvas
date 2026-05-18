@@ -9,6 +9,8 @@ Rust q tooling for Qanvas:
 
 In the browser, `q_wasm` orchestrates sketch lifecycle in Rust and evaluates q through the jqport host (`__q_rust_host__`), so studio examples and practice challenges stay compatible with the TypeScript engine while the runtime path is Rust/WASM.
 
+The host bridge uses the same sketch loader and Q literal serializer as the interpreter worker (`sketch-source-loader`, `sketch-q-literals`), including statement splitting and `enlist` forms for frame payloads. Regression coverage lives in `packages/q-engine/tests/examples-rust-host-parity.test.ts` (all gallery examples).
+
 ## Build WASM for the app
 
 Prebuilt artifacts are committed under `app/src/lib/browser/q-rust/pkg/`, so Netlify and `npm run build` do not need Rust.

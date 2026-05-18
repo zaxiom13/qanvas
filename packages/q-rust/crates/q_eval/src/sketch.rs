@@ -177,12 +177,14 @@ impl SketchRuntime {
         input: &Value,
         canvas: &Value,
     ) -> Result<Vec<Value>, String> {
-        let expr = format!(
-            ".qv.frame[{frame};{input};{canvas}]",
-            frame = to_q_literal(frame_info),
-            input = to_q_literal(input),
-            canvas = to_q_literal(canvas),
-        );
+        let expr = crate::host::with_host(|host| {
+            format!(
+                ".qv.frame[{frame};{input};{canvas}]",
+                frame = host.q_literal(frame_info),
+                input = host.q_literal(input),
+                canvas = host.q_literal(canvas),
+            )
+        });
         let result = evaluate_source(&expr)?;
         commands_from_value(&result.value)
     }
@@ -341,6 +343,10 @@ mod tests {
         }
 
         fn reset(&mut self) {}
+
+        fn q_literal(&mut self, value: &Value) -> String {
+            super::to_q_literal(value)
+        }
     }
 
     #[test]

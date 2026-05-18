@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { spawnSync } from 'node:child_process';
-import { cpSync, existsSync, mkdirSync, rmSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,4 +60,21 @@ run('wasm-bindgen', [
 rmSync(appPkg, { recursive: true, force: true });
 mkdirSync(dirname(appPkg), { recursive: true });
 cpSync(outDir, appPkg, { recursive: true });
+writeWasmTypes(appPkg);
 console.log(`[q-rust] copied wasm package to ${appPkg}`);
+
+function writeWasmTypes(pkgDir) {
+  const dts = `export default function init(module_or_path?: { module_or_path?: string } | string): Promise<void>;
+
+export class QRuntime {
+  constructor();
+  loadFiles(files_json: string): void;
+  initSketch(): string;
+  startCommands(): string;
+  runFrame(frame_json: string, input_json: string, canvas_json: string): string;
+  query(expression: string): string;
+  reset(): void;
+}
+`;
+  writeFileSync(resolve(pkgDir, 'q_wasm.d.ts'), dts);
+}

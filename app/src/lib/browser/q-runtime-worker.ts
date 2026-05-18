@@ -2,7 +2,8 @@
 
 import { createSession, type HostFileSystem } from '@qpad/engine';
 import { createCompiledRuntimeHelpers, isPlainObject, type CompiledRuntimeHelpers } from '../runtime/compiled-runtime-helpers';
-import { normalizeQScript } from './q-script-normalize';
+import { loadSketchSource } from './sketch-source-loader';
+import { toQLiteral } from './sketch-q-literals';
 import {
   createRustWasmRuntime,
   disposeRustWasmRuntime,
@@ -698,21 +699,12 @@ function getCompiledSnippet(code: string, lineNumber: number) {
 }
 
 function loadSource(session: ReturnType<typeof createSession>, source: string, fileName?: string) {
-  for (const statement of normalizeQScript(rewriteQanvasCompat(source))) {
-    try {
-      const result = session.evaluate(statement);
-      if (isExplicitShowStatement(statement)) {
-        emitStdout(result.formatted);
-      }
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      throw new Error(fileName ? `${fileName}: ${message}` : message);
-    }
-  }
-}
-
-function rewriteQanvasCompat(source: string) {
-  return source.replace(/\b0x([0-9a-fA-F]{1,8})\b/g, (_match, hex: string) => `${Number.parseInt(hex, 16)}`);
+  loadSketchSource(session, source, {
+    fileName,
+    hooks: {
+      onShowOutput: (formatted) => emitStdout(formatted),
+    },
+  });
 }
 
 function buildFrameExpression(payload: RuntimeFramePayload) {
@@ -863,45 +855,3 @@ function getColumnItem(value: any, index: number) {
   return convertValue(value, 'columns');
 }
 
-function toQLiteral(value: unknown): string {
-  if (value === null || value === undefined) return '()';
-
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) return '0n';
-    return Number.isInteger(value) ? `${value}` : `${value}`;
-  }
-
-  if (typeof value === 'boolean') {
-    return value ? '1b' : '0b';
-  }
-
-  if (typeof value === 'string') {
-    return qString(value);
-  }
-
-  if (Array.isArray(value)) {
-    if (value.length === 0) return '()';
-    return `(${value.map((entry) => toQLiteral(entry)).join(';')})`;
-  }
-
-  if (typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>);
-    if (entries.length === 0) {
-      return '()!()';
-    }
-
-    const keys = entries.map(([key]) => `\`${sanitizeSymbol(key)}`).join('');
-    const values = `(${entries.map(([, entry]) => toQLiteral(entry)).join(';')})`;
-    return `${keys}!${values}`;
-  }
-
-  return '()';
-}
-
-function sanitizeSymbol(value: string) {
-  return value.replace(/[^\w]/g, '_');
-}
-
-function qString(value: string) {
-  return `"${value.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
-}

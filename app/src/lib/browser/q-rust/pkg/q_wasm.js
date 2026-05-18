@@ -268,6 +268,13 @@ function __wbg_get_imports() {
     imports.wbg.__wbg_reset_d3c65fe399b6e1b5 = function() {
         globalThis.__q_rust_host__.reset();
     };
+    imports.wbg.__wbg_toQLiteralJson_486b75a3920e7945 = function(arg0, arg1, arg2) {
+        const ret = globalThis.__q_rust_host__.toQLiteralJson(getStringFromWasm0(arg1, arg2));
+        const ptr1 = passStringToWasm0(ret, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        getDataViewMemory0().setInt32(arg0 + 4 * 1, len1, true);
+        getDataViewMemory0().setInt32(arg0 + 4 * 0, ptr1, true);
+    };
     imports.wbg.__wbindgen_init_externref_table = function() {
         const table = wasm.__wbindgen_export_2;
         const offset = table.grow(4);

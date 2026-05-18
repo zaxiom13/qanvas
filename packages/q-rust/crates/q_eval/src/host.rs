@@ -14,6 +14,7 @@ pub struct EvalResult {
 pub trait QHost {
     fn evaluate(&mut self, source: &str) -> Result<EvalResult, String>;
     fn reset(&mut self);
+    fn q_literal(&mut self, value: &Value) -> String;
 }
 
 thread_local! {
