@@ -47,7 +47,7 @@ declare global {
 
   type RuntimeBackendMode = 'interpreter' | 'compiled-js' | 'auto';
 
-  type RuntimeBackend = 'interpreter' | 'compiled-js';
+  type RuntimeBackend = 'interpreter' | 'compiled-js' | 'rust-wasm';
 
   type CompileDiagnostic = {
     message: string;

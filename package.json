@@ -17,7 +17,9 @@
     "static": "node scripts/build-static.mjs",
     "q:serve": "node server/q-bridge.js",
     "q:direct": "q server/qanvas-boot.q -p 5042",
-    "typecheck": "npm run check --workspace app"
+    "typecheck": "npm run check --workspace app",
+    "build:q-rust": "npm run build:wasm --workspace @qpad/q-rust",
+    "test:q-rust": "npm run test --workspace @qpad/q-rust"
   },
   "dependencies": {
     "@chenglou/pretext": "^0.0.6",

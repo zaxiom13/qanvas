@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1 --port 4173",
-    "build": "vite build",
+    "build": "npm run build:wasm --workspace @qpad/q-rust && vite build",
     "preview": "vite preview --host 127.0.0.1 --port 4173",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",

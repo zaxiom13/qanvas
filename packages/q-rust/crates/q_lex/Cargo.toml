@@ -1,0 +1,9 @@
+[package]
+name = "q_lex"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+regex = "1"
+thiserror.workspace = true

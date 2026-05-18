@@ -1,0 +1,12 @@
+{
+  "name": "@qpad/q-rust",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Rust q lexer, native subset interpreter, and WASM sketch runtime for Qanvas",
+  "type": "module",
+  "scripts": {
+    "build:wasm": "node scripts/build-wasm.mjs",
+    "test": "cargo test --workspace",
+    "test:native": "cargo test --workspace"
+  }
+}

@@ -1,0 +1,18 @@
+[package]
+name = "q_wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+q_eval = { path = "../q_eval" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+wasm-bindgen = "=0.2.100"
+serde-wasm-bindgen = "0.6"
+
+[dev-dependencies]
+wasm-bindgen-test = "0.3"

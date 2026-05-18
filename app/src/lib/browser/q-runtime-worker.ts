@@ -3,6 +3,14 @@
 import { createSession, type HostFileSystem } from '@qpad/engine';
 import { createCompiledRuntimeHelpers, isPlainObject, type CompiledRuntimeHelpers } from '../runtime/compiled-runtime-helpers';
 import { normalizeQScript } from './q-script-normalize';
+import {
+  createRustWasmRuntime,
+  disposeRustWasmRuntime,
+  runRustWasmFrame,
+  rustWasmQuery,
+  rustWasmStartCommands,
+  type QRuntime,
+} from './q-rust-runtime';
 
 const FS_STORAGE_PREFIX = 'qanvas5:browser:fs:';
 
@@ -126,6 +134,12 @@ type InterpreterRuntimeSession = {
   files: SketchFile[];
 };
 
+type RustWasmRuntimeSession = {
+  mode: 'rust-wasm';
+  runtime: QRuntime;
+  files: SketchFile[];
+};
+
 type CompiledRuntimeSession = {
   mode: 'compiled-js';
   files: SketchFile[];
@@ -140,7 +154,7 @@ type CompiledRuntimeSession = {
   helpers: CompiledRuntimeHelpers;
 };
 
-type RuntimeSession = InterpreterRuntimeSession | CompiledRuntimeSession;
+type RuntimeSession = InterpreterRuntimeSession | CompiledRuntimeSession | RustWasmRuntimeSession;
 
 type RuntimeRequest =
   | { id: number; type: 'start'; payload: RuntimeStartPayload }
@@ -265,27 +279,18 @@ self.onmessage = (event: MessageEvent<RuntimeRequest>) => {
 
   try {
     if (message.type === 'start') {
-      const nextRuntime = createRuntimeSession(message.payload);
-      runtime = nextRuntime.runtime;
-      emitStdout(nextRuntime.stdout);
-      postMessage({
-        id: message.id,
-        ok: true,
-        type: 'start',
-        value: {
-          config: nextRuntime.config,
-          backend: nextRuntime.backend,
-          fallbackReason: nextRuntime.fallbackReason ?? null,
-        },
-      } satisfies RuntimeResponse);
+      void handleRuntimeStart(message);
       return;
     }
 
     if (message.type === 'start-commands') {
       const activeRuntime = getRuntime();
-      const commands = activeRuntime.mode === 'compiled-js'
-        ? activeRuntime.startCommands
-        : convertValue(activeRuntime.session.evaluate('.qv.result:1_ .qv.cmds').value, 'rows') as Record<string, unknown>[];
+      const commands =
+        activeRuntime.mode === 'compiled-js'
+          ? activeRuntime.startCommands
+          : activeRuntime.mode === 'rust-wasm'
+            ? rustWasmStartCommands(activeRuntime.runtime)
+            : convertValue(activeRuntime.session.evaluate('.qv.result:1_ .qv.cmds').value, 'rows') as Record<string, unknown>[];
       postMessage({
         id: message.id,
         ok: true,
@@ -297,9 +302,17 @@ self.onmessage = (event: MessageEvent<RuntimeRequest>) => {
 
     if (message.type === 'frame') {
       const activeRuntime = getRuntime();
-      const commands = activeRuntime.mode === 'compiled-js'
-        ? runCompiledFrame(activeRuntime, message.payload)
-        : runInterpreterFrame(activeRuntime, message.payload);
+      const commands =
+        activeRuntime.mode === 'compiled-js'
+          ? runCompiledFrame(activeRuntime, message.payload)
+          : activeRuntime.mode === 'rust-wasm'
+            ? runRustWasmFrame(
+                activeRuntime.runtime,
+                message.payload.frameInfo,
+                message.payload.input,
+                message.payload.canvas
+              )
+            : runInterpreterFrame(activeRuntime, message.payload);
       postMessage({
         id: message.id,
         ok: true,
@@ -310,37 +323,14 @@ self.onmessage = (event: MessageEvent<RuntimeRequest>) => {
     }
 
     if (message.type === 'query') {
-      try {
-        const session = createInterpreterRuntimeSession(message.payload.files);
-        const result = session.session.evaluate(message.payload.expression);
-        if (message.payload.debugConsole || isExplicitShowStatement(message.payload.expression)) {
-          emitStdout(result.formatted);
-        }
-        postMessage({
-          id: message.id,
-          ok: true,
-          type: 'query',
-          value: {
-            ok: true,
-            value: convertValue(result.value, 'columns'),
-          },
-        } satisfies RuntimeResponse);
-      } catch (error) {
-        const messageText = error instanceof Error ? error.message : String(error);
-        postMessage({
-          id: message.id,
-          ok: true,
-          type: 'query',
-          value: {
-            ok: false,
-            error: messageText,
-          },
-        } satisfies RuntimeResponse);
-      }
+      void handleRuntimeQuery(message);
       return;
     }
 
     if (message.type === 'stop') {
+      if (runtime?.mode === 'rust-wasm') {
+        disposeRustWasmRuntime();
+      }
       runtime = null;
       postMessage({
         id: message.id,
@@ -375,7 +365,118 @@ function getRuntime() {
   return runtime as RuntimeSession;
 }
 
-function createRuntimeSession(payload: RuntimeStartPayload) {
+async function handleRuntimeStart(message: Extract<RuntimeRequest, { type: 'start' }>) {
+  try {
+    const nextRuntime = await createRuntimeSession(message.payload);
+    runtime = nextRuntime.runtime;
+    emitStdout(nextRuntime.stdout);
+    postMessage({
+      id: message.id,
+      ok: true,
+      type: 'start',
+      value: {
+        config: nextRuntime.config,
+        backend: nextRuntime.backend,
+        fallbackReason: nextRuntime.fallbackReason ?? null,
+      },
+    } satisfies RuntimeResponse);
+  } catch (error) {
+    const messageText = error instanceof Error ? error.message : String(error);
+    postMessage({
+      id: message.id,
+      ok: false,
+      error: messageText,
+    } satisfies RuntimeResponse);
+  }
+}
+
+async function handleRuntimeQuery(message: Extract<RuntimeRequest, { type: 'query' }>) {
+  try {
+    if (shouldUseRustWasm({ runtimePath: 'browser://q-engine', files: message.payload.files })) {
+      const fs = createWorkerFileSystem(message.payload.files);
+      const { runtime: rustRuntime } = await createRustWasmRuntime(message.payload.files, fs);
+      const result = await rustWasmQuery(rustRuntime, message.payload.expression);
+      disposeRustWasmRuntime();
+      if (!result.ok) {
+        throw new Error(result.error ?? 'query failed');
+      }
+      if (message.payload.debugConsole || isExplicitShowStatement(message.payload.expression)) {
+        emitStdout(JSON.stringify(result.value));
+      }
+      postMessage({
+        id: message.id,
+        ok: true,
+        type: 'query',
+        value: {
+          ok: true,
+          value: result.value,
+        },
+      } satisfies RuntimeResponse);
+      return;
+    }
+
+    const session = createInterpreterRuntimeSession(message.payload.files);
+    const result = session.session.evaluate(message.payload.expression);
+    if (message.payload.debugConsole || isExplicitShowStatement(message.payload.expression)) {
+      emitStdout(result.formatted);
+    }
+    postMessage({
+      id: message.id,
+      ok: true,
+      type: 'query',
+      value: {
+        ok: true,
+        value: convertValue(result.value, 'columns'),
+      },
+    } satisfies RuntimeResponse);
+  } catch (error) {
+    const messageText = error instanceof Error ? error.message : String(error);
+    postMessage({
+      id: message.id,
+      ok: true,
+      type: 'query',
+      value: {
+        ok: false,
+        error: messageText,
+      },
+    } satisfies RuntimeResponse);
+  }
+}
+
+function shouldUseRustWasm(payload: Pick<RuntimeStartPayload, 'runtimePath' | 'files'>) {
+  const path = payload.runtimePath.trim();
+  return path === 'browser://q-engine' || path === 'browser://q-rust' || path.startsWith('browser://');
+}
+
+async function createRuntimeSession(payload: RuntimeStartPayload) {
+  if (shouldUseRustWasm(payload)) {
+    try {
+      const fs = createWorkerFileSystem(payload.files);
+      const { runtime: rustRuntime, config } = await createRustWasmRuntime(payload.files, fs);
+      return {
+        runtime: {
+          mode: 'rust-wasm' as const,
+          runtime: rustRuntime,
+          files: payload.files.map((file) => ({ ...file })),
+        } satisfies RustWasmRuntimeSession,
+        config,
+        backend: 'rust-wasm' as const,
+        stdout: '',
+      };
+    } catch (error) {
+      const fallbackReason = error instanceof Error ? error.message : String(error);
+      const interpreted = createInterpreterRuntimeSession(payload.files);
+      const initResult = interpreted.session.evaluate('.qv.result:.qv.init[]');
+      return {
+        runtime: interpreted as RuntimeSession,
+        config: convertValue(initResult.value, 'columns') as Record<string, unknown>,
+        backend: 'interpreter' as const,
+        fallbackReason: `Rust WASM runtime unavailable: ${fallbackReason}`,
+        stdout: initResult.formatted,
+      };
+    }
+  }
+
   if (payload.backendMode !== 'interpreter' && payload.compiled?.status === 'compiled' && payload.compiled.code) {
     try {
       const compiled = createCompiledRuntimeSession(payload.files, payload.compiled.code);

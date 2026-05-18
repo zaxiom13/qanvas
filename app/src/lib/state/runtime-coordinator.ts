@@ -243,7 +243,9 @@ export class RuntimeCoordinator {
       host.overlayMode = 'running';
       host.overlayMessage = '';
       host.runNonce += 1;
-      if (startResult.backend === 'compiled-js') {
+      if (startResult.backend === 'rust-wasm') {
+        host.appendConsole('info', 'Rust WASM q runtime active.');
+      } else if (startResult.backend === 'compiled-js') {
         host.appendConsole('info', 'Compiled JS backend active.');
       } else if (startResult.fallbackReason) {
         host.appendConsole('info', `Compiled JS unavailable. Falling back to interpreter: ${startResult.fallbackReason}`);

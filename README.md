@@ -7,7 +7,7 @@ _kdb+ is a trademark of KX Systems. This project is not affiliated with or endor
 
 | Backend     | q license?  | Network?  | What runs your code                                                          |
 | ----------- | ----------- | --------- | ---------------------------------------------------------------------------- |
-| **Browser** | No          | No        | **[jqport](./packages/q-engine)** — q interpreter in a Web Worker |
+| **Browser** | No          | No        | **[jqport](./packages/q-engine)** via **[q-rust WASM](./packages/q-rust)** in a Web Worker |
 | **Local q** | Yes         | localhost | Your own `q` process over WebSocket (`server/q-bridge.js`)                   |
 | **Cloud q** | Server-side | Yes       | A hosted `q` (see `deploy/docker-cloud-q/`)                                  |
 
@@ -136,6 +136,7 @@ Monorepo packages:
 
 - `app/` — Svelte UI, CodeMirror editor with q highlighting, runtime adapters. Optional **Capacitor** wrappers live under `app/ios/` and `app/android/` for native shells (`npm run mobile:ios` / `mobile:android` from `app/` after a build).
 - `packages/q-core` (`@qpad/core`), `packages/q-engine` (`@qpad/engine`), `packages/q-language` (`@qpad/language`) — TypeScript jqport engine, shared core, and editor language support for browser execution.
+- `packages/q-rust` (`@qpad/q-rust`) — Rust lexer, sketch runtime shell, and WASM bindings for the browser canvas worker.
 - `server/qanvas-boot.q` — q script implementing the protocol.
 - `server/q-bridge.js` — Node WS server; optionally spawns q and proxies.
 - `deploy/docker-cloud-q/` — Dockerized cloud deployment.
@@ -167,6 +168,8 @@ npm run build         # build app
 npm run preview       # same host/port as dev: 127.0.0.1:4173
 npm run static        # build zero-install static site to ./dist-static
 npm run typecheck     # Svelte/TS check for the app workspace
+npm run build:q-rust  # build WASM runtime copied into the app
+npm run test:q-rust   # Rust crate unit tests
 npm run q:serve       # node server/q-bridge.js
 npm run q:direct      # q server/qanvas-boot.q -p 5042
 ```
