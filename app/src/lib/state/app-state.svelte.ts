@@ -41,7 +41,6 @@ const STORAGE_KEYS = {
   editorPanelWidth: 'qanvas5:editorPanelWidth',
   lastExampleId: 'qanvas5:lastExampleId',
   tourCompleted: 'qanvas5:tourCompleted',
-  infoModalOpened: 'qanvas5:infoModalOpened',
 };
 
 const PRACTICE_FILE_NAME = 'practice.q';
@@ -178,7 +177,6 @@ class AppState {
   renamingProject = $state(false);
   runNonce = $state(0);
 
-  infoModalPreviouslyOpened = $state(readStored(STORAGE_KEYS.infoModalOpened) === '1');
   uxTourActive = $state(false);
   uxTourStepIndex = $state(0);
 
@@ -525,12 +523,6 @@ class AppState {
     if (!name || this.activeModal === name) {
       this.activeModal = null;
     }
-  }
-
-  markInfoModalOpened() {
-    if (readStored(STORAGE_KEYS.infoModalOpened) === '1') return;
-    writeStored(STORAGE_KEYS.infoModalOpened, '1');
-    this.infoModalPreviouslyOpened = true;
   }
 
   startUxTourFromModal() {

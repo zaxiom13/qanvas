@@ -315,7 +315,7 @@
         <p class="mobile-header-subtitle">Creative coding for q</p>
       </div>
       <div class="mobile-header-actions">
-        <div class="mobile-info-cluster" data-nudge-visible={!appState.infoModalPreviouslyOpened ? 'true' : undefined}>
+        <div class="mobile-info-cluster">
           <button
             id="mobile-btn-info"
             class="mobile-action mobile-info-action"
@@ -328,21 +328,6 @@
               <path d="M12 11v5M12 8h.01" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" />
             </svg>
           </button>
-          {#if !appState.infoModalPreviouslyOpened}
-            <div class="info-btn-nudge info-btn-nudge--mobile" aria-hidden="true">
-              <span class="info-btn-nudge__text">Try me</span>
-              <svg class="info-btn-nudge__arrow" viewBox="0 0 24 24" aria-hidden="true">
-                <path
-                  d="M4 12h13M13 8l4 4-4 4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                />
-              </svg>
-            </div>
-          {/if}
         </div>
       </div>
     </div>
@@ -981,18 +966,6 @@
     display: inline-flex;
     align-items: center;
     gap: 6px;
-  }
-
-  .info-btn-nudge--mobile {
-    flex-direction: column;
-    align-items: flex-end;
-    font-size: 9.5px;
-  }
-
-  .info-btn-nudge--mobile .info-btn-nudge__arrow {
-    width: 30px;
-    height: 18px;
-    transform: rotate(90deg);
   }
 
   .mobile-brand {

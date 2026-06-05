@@ -202,39 +202,6 @@ button {
   gap: 8px;
 }
 
-.info-btn-nudge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--accent-strong, #c9357a);
-  animation: info-nudge-pulse 1.65s ease-in-out infinite;
-}
-
-.info-btn-nudge__text {
-  white-space: nowrap;
-}
-
-.info-btn-nudge__arrow {
-  width: 26px;
-  height: 26px;
-}
-
-@keyframes info-nudge-pulse {
-  0%,
-  100% {
-    opacity: 0.45;
-    transform: translateX(-1px);
-  }
-  45% {
-    opacity: 1;
-    transform: translateX(4px);
-  }
-}
-
 .project-info {
   display: inline-flex;
   align-items: center;
