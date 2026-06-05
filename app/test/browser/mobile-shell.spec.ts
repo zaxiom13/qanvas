@@ -116,41 +116,11 @@ test('does not cancel default touch handling on editor tap (soft keyboard)', asy
   expect(defaultPrevented).toBe(false);
 });
 
-test('selects code with a touch drag instead of panning the mobile editor', async ({ page }) => {
+test('allows native touch gestures on the mobile editor content', async ({ page }) => {
   await page.goto('/');
 
-  const line = page.locator('.mobile-code-editor .cm-line').first();
-  await expect(line).toBeVisible();
-  const box = await line.boundingBox();
-  expect(box).not.toBeNull();
-
-  const start = { x: box!.x + 24, y: box!.y + box!.height / 2 };
-  const end = { x: box!.x + 160, y: box!.y + box!.height / 2 };
-  await line.evaluate((node, points) => {
-    const fire = (type: 'touchstart' | 'touchmove' | 'touchend', point: { x: number; y: number }) => {
-      const touch = new Touch({
-        identifier: 1,
-        target: node,
-        clientX: point.x,
-        clientY: point.y,
-      });
-      node.dispatchEvent(
-        new TouchEvent(type, {
-          bubbles: true,
-          cancelable: true,
-          touches: type === 'touchend' ? [] : [touch],
-          targetTouches: type === 'touchend' ? [] : [touch],
-          changedTouches: [touch],
-        })
-      );
-    };
-
-    fire('touchstart', points.start);
-    fire('touchmove', points.end);
-    fire('touchend', points.end);
-  }, { start, end });
-
-  await expect(page.locator('.mobile-code-editor')).not.toHaveAttribute('data-selection-length', '0');
+  const touchAction = await page.locator('.mobile-code-editor .cm-content').evaluate((el) => getComputedStyle(el).touchAction);
+  expect(touchAction).toBe('pan-x pan-y');
 });
 
 test('scrolls the mobile editor with two-finger pan on the code surface', async ({ page }) => {

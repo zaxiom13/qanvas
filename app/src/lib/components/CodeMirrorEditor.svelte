@@ -66,16 +66,6 @@
   let inlineColorPickrAnchor = '';
   let inlineColorPickrIsSyncing = false;
   let pickrModulePromise: Promise<typeof import('@simonwep/pickr')> | null = null;
-  let touchSelection:
-    | {
-        identifier: number;
-        anchor: number;
-        moved: boolean;
-        startX: number;
-        startY: number;
-      }
-    | null = null;
-
   let twoFingerPan:
     | {
         id0: number;
@@ -85,10 +75,8 @@
       }
     | null = null;
 
-  /** True while a touch gesture should not raise the virtual keyboard (scroll or select-drag). */
+  /** True while a touch gesture should not raise the virtual keyboard (scroll). */
   let suppressKeyboardForScroll = false;
-
-  const touchSelectMoveThreshold = 6;
 
   const completionUiTheme = EditorView.theme({
     '.cm-tooltip.cm-tooltip-autocomplete > ul': {
@@ -225,11 +213,6 @@
     return tagName === 'INPUT' || tagName === 'TEXTAREA' || target.isContentEditable;
   }
 
-  function isEditorContentTarget(target: EventTarget | null) {
-    if (!(target instanceof HTMLElement)) return false;
-    return Boolean(target.closest('.cm-content')) && !Boolean(target.closest('.qanvas-inline-control'));
-  }
-
   /** Gutter or scroller chrome (not `.cm-content`): native one-finger pan scroll. */
   function isScrollerChromeTarget(target: EventTarget | null) {
     if (!(target instanceof HTMLElement)) return false;
@@ -313,24 +296,8 @@
     if (event.touches.length < 2) twoFingerPan = null;
   }
 
-  function selectEditorRange(anchor: number, head: number, scrollIntoView = false) {
-    if (!view) return;
-    view.dispatch({
-      selection: { anchor, head },
-      scrollIntoView,
-      userEvent: 'select.pointer',
-    });
-  }
-
-  function updateSelectionMetadata() {
-    if (!host || !view) return;
-    const range = view.state.selection.main;
-    host.dataset.selectionLength = String(Math.abs(range.head - range.anchor));
-  }
-
-  function startTouchSelection(event: TouchEvent, currentView: EditorView) {
+  function handleTouchStart(event: TouchEvent, currentView: EditorView) {
     if (event.touches.length >= 2 && isEditorTarget(event.target)) {
-      touchSelection = null;
       beginScrollGestureKeyboardSuppression(currentView);
       initTwoFingerPanFromTouches(event.touches);
       return;
@@ -338,84 +305,19 @@
 
     if (event.touches.length === 1 && isScrollerChromeTarget(event.target)) {
       beginScrollGestureKeyboardSuppression(currentView);
-      return;
     }
-
-    if (event.touches.length !== 1 || !isEditorContentTarget(event.target)) return;
-
-    const touch = event.touches.item(0);
-    if (!touch) return;
-    const pos = currentView.posAtCoords({ x: touch.clientX, y: touch.clientY });
-    if (pos == null) return;
-
-    touchSelection = {
-      identifier: touch.identifier,
-      anchor: pos,
-      moved: false,
-      startX: touch.clientX,
-      startY: touch.clientY,
-    };
-    // Do not preventDefault on touchstart: iOS/Android need the default touch
-    // path on the contenteditable surface for a simple tap (caret + keyboard).
-    // Suppress keyboard until touchend; selection updates do not require focus.
-    beginScrollGestureKeyboardSuppression(currentView);
-    selectEditorRange(pos, pos);
   }
 
-  function moveTouchSelection(event: TouchEvent, currentView: EditorView) {
+  function handleTouchMove(event: TouchEvent, currentView: EditorView) {
     if (event.touches.length >= 2 && isEditorTarget(event.target)) {
-      touchSelection = null;
+      beginScrollGestureKeyboardSuppression(currentView);
       applyTwoFingerPan(event, currentView);
-      return;
     }
-
-    if (!touchSelection) return;
-    const touch = getTouchByIdentifier(event.changedTouches, touchSelection.identifier);
-    if (!touch) return;
-
-    const deltaX = Math.abs(touch.clientX - touchSelection.startX);
-    const deltaY = Math.abs(touch.clientY - touchSelection.startY);
-    if (!touchSelection.moved && Math.max(deltaX, deltaY) < touchSelectMoveThreshold) return;
-
-    beginScrollGestureKeyboardSuppression(currentView);
-
-    // Only preventDefault once the finger moves past the tap threshold so the
-    // browser can still run default touch handling on a simple tap (soft keyboard).
-    event.preventDefault();
-    event.stopPropagation();
-
-    const pos = currentView.posAtCoords({ x: touch.clientX, y: touch.clientY });
-    if (pos == null) return;
-
-    touchSelection.moved = true;
-    selectEditorRange(touchSelection.anchor, pos, true);
   }
 
-  function endTouchSelection(event: TouchEvent) {
-    const activeTouchSelection = touchSelection;
-    const shouldFocusAfterTap =
-      event.type === 'touchend' &&
-      activeTouchSelection !== null &&
-      !activeTouchSelection.moved &&
-      Boolean(getTouchByIdentifier(event.changedTouches, activeTouchSelection.identifier)) &&
-      event.touches.length === 0;
-
+  function handleTouchEnd(event: TouchEvent) {
     clearScrollKeyboardSuppressionIfIdle(event);
     clearTwoFingerPanIfNeeded(event);
-
-    if (!touchSelection) return;
-    const touch = getTouchByIdentifier(event.changedTouches, touchSelection.identifier);
-    if (!touch) return;
-
-    if (touchSelection.moved) {
-      event.preventDefault();
-      event.stopPropagation();
-    }
-    touchSelection = null;
-
-    if (shouldFocusAfterTap && view) {
-      view.focus();
-    }
   }
 
   function toggleLineComments() {
@@ -792,23 +694,22 @@
           ]),
           EditorView.lineWrapping,
           EditorView.updateListener.of((update) => {
-            if (update.selectionSet) updateSelectionMetadata();
             if (!update.docChanged || isApplyingExternalValue) return;
             lastValue = update.state.doc.toString();
             emitEditorChange(lastValue);
           }),
           EditorView.domEventHandlers({
             touchstart(event, currentView) {
-              startTouchSelection(event, currentView);
+              handleTouchStart(event, currentView);
             },
             touchmove(event, currentView) {
-              moveTouchSelection(event, currentView);
+              handleTouchMove(event, currentView);
             },
             touchend(event) {
-              endTouchSelection(event);
+              handleTouchEnd(event);
             },
             touchcancel(event) {
-              endTouchSelection(event);
+              handleTouchEnd(event);
             },
             mousemove(event, currentView) {
               const pos = currentView.posAtCoords({ x: event.clientX, y: event.clientY });
@@ -832,7 +733,6 @@
     });
     lastValue = value;
     currentKey = activeKey;
-    updateSelectionMetadata();
 
     window.addEventListener('keydown', handleWindowShortcuts, true);
     removeWindowShortcuts = () => window.removeEventListener('keydown', handleWindowShortcuts, true);
@@ -921,7 +821,7 @@
     overflow: hidden;
     user-select: text;
     -webkit-user-select: text;
-    touch-action: none;
+    touch-action: pan-x pan-y;
   }
 
   .qanvas-code-editor :global(.cm-editor) {
@@ -942,7 +842,7 @@
   .qanvas-code-editor :global(.cm-line) {
     user-select: text;
     -webkit-user-select: text;
-    touch-action: none;
+    touch-action: pan-x pan-y;
     -webkit-touch-callout: default;
   }
 </style>
