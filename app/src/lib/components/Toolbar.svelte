@@ -22,14 +22,6 @@
           <path d="M8 7.2v4.2M8 4.8h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" />
         </svg>
       </button>
-      {#if !appState.infoModalPreviouslyOpened}
-        <div class="info-btn-nudge" aria-hidden="true">
-          <span class="info-btn-nudge__text">Try me</span>
-          <svg class="info-btn-nudge__arrow" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M4 12h13M13 8l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-          </svg>
-        </div>
-      {/if}
     </div>
     {#if appState.workspaceMode === 'studio'}
       <div class="toolbar-divider"></div>

@@ -1,11 +1,5 @@
 <script lang="ts">
   import { appState } from '$lib/state/app-state.svelte';
-
-  $effect(() => {
-    if (appState.activeModal === 'info') {
-      appState.markInfoModalOpened();
-    }
-  });
 </script>
 
 {#if appState.activeModal === 'info'}
