@@ -190,16 +190,8 @@ export function lex(src: string): Tok[] {
       let j = i + 1;
       while (j < n && (src[j] === "\r")) j++;
       const nextIndented = j < n && (isSpace(src[j]) || src[j] === "\n");
-      if (top === "(" || top === "[") {
-        // whitespace
-      } else if (top === "{") {
-        // statement separator unless the next non-space char closes the lambda
-        let k = j;
-        while (k < n && (isSpace(src[k]) || src[k] === "\n")) k++;
-        if (src[k] !== "}") {
-          const p = toks[toks.length - 1];
-          if (p && p.k !== ";" && p.k !== "{" && p.k !== "nl") push("nl", i, i + 1);
-        }
+      if (top) {
+        // inside any bracket a newline is just whitespace (q requires ';' between statements)
       } else if (!nextIndented) {
         const p = toks[toks.length - 1];
         if (p && p.k !== "nl") push("nl", i, i + 1);

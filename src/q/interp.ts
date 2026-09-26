@@ -69,6 +69,9 @@ export class Session {
   /** set by hosts to interrupt long loops */
   interrupt = false;
   steps = 0;
+  /** performance.now() deadline after which evaluation stops with 'stop (0 = none) */
+  deadline = 0;
+  budgetHint = "";
 
   constructor(host: SessionHost = {}) {
     this.host = host;
@@ -182,14 +185,15 @@ export class Session {
 
   lookupGlobal(name: string, ns: string): QValue | undefined {
     if (name[0] === ".") return this.lookupAbs(name);
+    // q keywords are reserved words: they win over any namespace variable of the same name
+    let v = this.ns.get(".q")!.get(name);
+    if (v !== undefined) return v;
     if (ns) {
-      const v = this.ns.get(ns)?.get(name);
+      v = this.ns.get(ns)?.get(name);
       if (v !== undefined) return v;
     }
     const root = this.ns.get("")!;
-    let v = root.get(name);
-    if (v !== undefined) return v;
-    v = this.ns.get(".q")!.get(name);
+    v = root.get(name);
     if (v !== undefined) return v;
     for (const imp of this.imports) {
       v = this.ns.get(imp)?.get(name);
@@ -468,7 +472,13 @@ export class Session {
   }
 
   tick() {
-    if ((++this.steps & 0xfff) === 0 && this.interrupt) throw new QError("stop", "Stopped.");
+    if ((++this.steps & 0x3ff) === 0) {
+      if (this.interrupt) throw new QError("stop", "Stopped.");
+      if (this.deadline && performance.now() > this.deadline) {
+        this.deadline = 0;
+        throw new QError("stop", this.budgetHint || "This took too long, so it was stopped.");
+      }
+    }
   }
 
   assign(n: NodeOf<"assign">, fr: Frame): QValue {
@@ -576,6 +586,7 @@ export class Session {
   }
 
   callLambda(f: Lambda, args: QValue[]): QValue {
+    this.tick();
     const node = f.node;
     const ps = node.params;
     if (args.length > ps.length) throw rankErr(rankMsg(f, args.length));

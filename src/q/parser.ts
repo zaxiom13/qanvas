@@ -25,6 +25,7 @@ const CTL = new Set(["if", "do", "while"]);
 interface Item {
   node: Node;
   verb: boolean;
+  paren?: boolean;
 }
 
 interface LambdaCtx {
@@ -118,7 +119,7 @@ export class Parser {
     while (!this.isStop(stops)) {
       const it = this.item(stops);
       items.push(it);
-      if (it.node.k === "assign" || it.node.k === "ret" || it.node.k === "sig") break;
+      if (!it.paren && (it.node.k === "assign" || it.node.k === "ret" || it.node.k === "sig")) break;
     }
     if (!items.length) return null;
     return this.build(items, 0);
@@ -223,7 +224,7 @@ export class Parser {
         throw this.err(`The iterator '${t.text}' needs a function on its left.`);
       }
       case "(":
-        it = { node: this.paren(), verb: false };
+        it = { node: this.paren(), verb: false, paren: true };
         break;
       case "{":
         it = { node: this.lambda(), verb: false };
