@@ -1,0 +1,14 @@
+// Result-type tables captured from real q (KDB-X). Row = left type char, col = right type char, "." = type error.
+export const TYPE_ORDER = "bxhijefcpmdznuvt";
+export const RESULT_TYPES: Record<string, string> = {
+  "+": "iiiijef.pmdznuvtiiiijef.pmdznuvtiiiijef.pmdznuvtiiiijef.pmdznuvtjjjjjef.pmdznuvteeeeeef.pmdznuvtffffffffffzzffff......f.pmdznuvtppppppfpn...ppppmmmmmmfm.i..ppppddddddzd..i.ppppzzzzzzzz...fpzzznnnnnnfnppppnnnnuuuuuufupppznuvtvvvvvvfvpppznvvtttttttftpppznttt",
+  "-": "iiiijefipmdznuvtiiiijefipmdznuvtiiiijefipmdznuvtiiiijefipmdznuvtjjjjjefjpmdznuvteeeeeefepmdznuvtffffffffffzzffff......f.pmdznuvtppppppfpn...ppppmmmmmmfm.i..ppppddddddzd..i.ppppzzzzzzzz...fpzzznnnnnnfnppppnnnnuuuuuufupppznuvtvvvvvvfvpppznvvtttttttftpppznttt",
+  "*": "iiiijef.pmdznuvtiiiijef.pmdznuvtiiiijef.pmdznuvtiiiijef.pmdznuvtjjjjjef.pmdznuvteeeeeef.pmdznuvtffffffffffzzffff......f.pmdznuvtppppppfp........mmmmmmfm........ddddddzd........zzzzzzzz........nnnnnnfn........uuuuuufu........vvvvvvfv........ttttttft........",
+  "%": "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+  "&": "bxhijefcpmdznuvtxxhijefcpmdznuvthhhijefcpmdznuvtiiiijefcpmdznuvtjjjjjefcpmdznuvteeeeeefcpmdznuvtfffffffcpmdznuvtccccccccpmdznuvtppppppppppppnuvtmmmmmmmmpmd.....ddddddddpddz....zzzzzzzzp.zznuvtnnnnnnnnn..nnnnnuuuuuuuuu..unuvtvvvvvvvvv..vnvvtttttttttt..tnttt",
+  "=": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.....bbbbbbbbbbbb....bbbbbbbbb.bbbbbbbbbbbbbbb..bbbbbbbbbbbbbb..bbbbbbbbbbbbbb..bbbbbbbbbbbbbb..bbbbb",
+  "<": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb.....bbbbbbbbbbbb....bbbbbbbbb.bbbbbbbbbbbbbbb..bbbbbbbbbbbbbb..bbbbbbbbbbbbbb..bbbbbbbbbbbbbb..bbbbb",
+  "mod": "iiiijef.pmdznuvtiiiijef.pmdznuvtiiiijef.pmdznuvtiiiijef.pmdznuvtjjjjjef.pmdznuvtffffffffffzzffffffffffffffzzffff......f.pmdznuvtnnnnnnfn........iiiiiifi........iiiiii.i........ffffffff........nnnnnnfn........uuuuuufu........vvvvvvfv........ttttttft........",
+  "div": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiijjjjjjjjjjjjjjjjffffffffffffffffffffffffffffffffiiiiiiiiiiiiiiiippppppppppppppppmmmmmmmmmmmmmmmmddddddddddddddddzzzzzzzzzzzzzzzznnnnnnnnnnnnnnnnuuuuuuuuuuuuuuuuvvvvvvvvvvvvvvvvtttttttttttttttt",
+  "xexp": "fffffff.........fffffff.........fffffff.........fffffff.........fffffff.........fffffff.........fffffff........................................................................................................................................................."
+};

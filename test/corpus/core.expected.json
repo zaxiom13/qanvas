@@ -1,0 +1,1702 @@
+[
+ {
+  "src": "2+3",
+  "out": "5\n"
+ },
+ {
+  "src": "2-3",
+  "out": "-1\n"
+ },
+ {
+  "src": "2*3",
+  "out": "6\n"
+ },
+ {
+  "src": "7%2",
+  "out": "3.5\n"
+ },
+ {
+  "src": "7 div 2",
+  "out": "3\n"
+ },
+ {
+  "src": "-7 div 2",
+  "out": "-4\n"
+ },
+ {
+  "src": "7 mod 3",
+  "out": "1\n"
+ },
+ {
+  "src": "-7 mod 3",
+  "out": "2\n"
+ },
+ {
+  "src": "2 xexp 10",
+  "out": "1024f\n"
+ },
+ {
+  "src": "2 xlog 8",
+  "out": "3f\n"
+ },
+ {
+  "src": "neg 5",
+  "out": "-5\n"
+ },
+ {
+  "src": "abs -3 4 -5",
+  "out": "3 4 5\n"
+ },
+ {
+  "src": "signum -2 0 3",
+  "out": "-1 0 1i\n"
+ },
+ {
+  "src": "sqrt 2",
+  "out": "1.414214\n"
+ },
+ {
+  "src": "exp 0",
+  "out": "1f\n"
+ },
+ {
+  "src": "log 10",
+  "out": "2.302585\n"
+ },
+ {
+  "src": "floor 3.7 -3.7",
+  "out": "3 -4\n"
+ },
+ {
+  "src": "ceiling 3.2 -3.2",
+  "out": "4 -3\n"
+ },
+ {
+  "src": "reciprocal 4",
+  "out": "0.25\n"
+ },
+ {
+  "src": "1 2 3*4 5 6",
+  "out": "4 10 18\n"
+ },
+ {
+  "src": "1 2 3+10",
+  "out": "11 12 13\n"
+ },
+ {
+  "src": "10-1 2 3",
+  "out": "9 8 7\n"
+ },
+ {
+  "src": "1+2*3",
+  "out": "7\n"
+ },
+ {
+  "src": "(1+2)*3",
+  "out": "9\n"
+ },
+ {
+  "src": "2*3+4",
+  "out": "14\n"
+ },
+ {
+  "src": "1.5+2",
+  "out": "3.5\n"
+ },
+ {
+  "src": "1+1i",
+  "out": "2\n"
+ },
+ {
+  "src": "1i+1h",
+  "out": "2i\n"
+ },
+ {
+  "src": "1h+1h",
+  "out": "2i\n"
+ },
+ {
+  "src": "1b+1b",
+  "out": "2i\n"
+ },
+ {
+  "src": "0x01+1",
+  "out": "2\n"
+ },
+ {
+  "src": "3 4 5&4",
+  "out": "3 4 4\n"
+ },
+ {
+  "src": "3 4 5|4",
+  "out": "4 4 5\n"
+ },
+ {
+  "src": "1 2 3=1 5 3",
+  "out": "101b\n"
+ },
+ {
+  "src": "1 2 3<2",
+  "out": "100b\n"
+ },
+ {
+  "src": "1 2 3>2",
+  "out": "001b\n"
+ },
+ {
+  "src": "1 2 3<>2",
+  "out": "101b\n"
+ },
+ {
+  "src": "1 2 3<=2",
+  "out": "110b\n"
+ },
+ {
+  "src": "1 2 3>=2",
+  "out": "011b\n"
+ },
+ {
+  "src": "not 1 0 1b",
+  "out": "1b\n"
+ },
+ {
+  "src": "0.1+0.2",
+  "out": "0.3\n"
+ },
+ {
+  "src": "0.3=0.1+0.2",
+  "out": "1b\n"
+ },
+ {
+  "src": "1%0",
+  "out": "0w\n"
+ },
+ {
+  "src": "-1%0",
+  "out": "-0w\n"
+ },
+ {
+  "src": "0%0",
+  "out": "0n\n"
+ },
+ {
+  "src": "0w+1",
+  "out": "0w\n"
+ },
+ {
+  "src": "0N=0N",
+  "out": "1b\n"
+ },
+ {
+  "src": "0N<1",
+  "out": "1b\n"
+ },
+ {
+  "src": "0n<0w",
+  "out": "1b\n"
+ },
+ {
+  "src": "null 1 0N 3",
+  "out": "010b\n"
+ },
+ {
+  "src": "1 0N 3^0",
+  "out": "'2026.09.27T00:38:22.372 nyi\n  [0]  1 0N 3^0\n             ^\n"
+ },
+ {
+  "src": "0^1 0N 3",
+  "out": "1 0 3\n"
+ },
+ {
+  "src": "5 0N 7^1 2 3",
+  "out": "1 2 3\n"
+ },
+ {
+  "src": "max 3 1 4",
+  "out": "4\n"
+ },
+ {
+  "src": "min 3 1 4",
+  "out": "1\n"
+ },
+ {
+  "src": "sum 1 2 3 4",
+  "out": "10\n"
+ },
+ {
+  "src": "sum 1.5 2.5",
+  "out": "4f\n"
+ },
+ {
+  "src": "avg 1 2 3 4",
+  "out": "2.5\n"
+ },
+ {
+  "src": "prd 1 2 3 4",
+  "out": "24\n"
+ },
+ {
+  "src": "med 3 1 4 1 5",
+  "out": "3f\n"
+ },
+ {
+  "src": "var 1 2 3 4",
+  "out": "1.25\n"
+ },
+ {
+  "src": "dev 1 2 3 4",
+  "out": "1.118034\n"
+ },
+ {
+  "src": "sums 1 2 3 4",
+  "out": "1 3 6 10\n"
+ },
+ {
+  "src": "prds 1 2 3 4",
+  "out": "1 2 6 24\n"
+ },
+ {
+  "src": "maxs 3 1 4 1 5",
+  "out": "3 3 4 4 5\n"
+ },
+ {
+  "src": "mins 3 1 4 1 5",
+  "out": "3 1 1 1 1\n"
+ },
+ {
+  "src": "avgs 1 2 3 4",
+  "out": "1 1.5 2 2.5\n"
+ },
+ {
+  "src": "deltas 1 4 9 16",
+  "out": "1 3 5 7\n"
+ },
+ {
+  "src": "ratios 1 2 4 8",
+  "out": "1 2 2 2f\n"
+ },
+ {
+  "src": "differ 1 1 2 2 3",
+  "out": "10101b\n"
+ },
+ {
+  "src": "count 1 2 3",
+  "out": "3\n"
+ },
+ {
+  "src": "count `a",
+  "out": "1\n"
+ },
+ {
+  "src": "count ()",
+  "out": "0\n"
+ },
+ {
+  "src": "til 5",
+  "out": "0 1 2 3 4\n"
+ },
+ {
+  "src": "til 0",
+  "out": "`long$()\n"
+ },
+ {
+  "src": "5#1",
+  "out": "1 1 1 1 1\n"
+ },
+ {
+  "src": "5#1 2",
+  "out": "1 2 1 2 1\n"
+ },
+ {
+  "src": "-3#til 10",
+  "out": "7 8 9\n"
+ },
+ {
+  "src": "3#\"abcdef\"",
+  "out": "\"abc\"\n"
+ },
+ {
+  "src": "2_til 5",
+  "out": "2 3 4\n"
+ },
+ {
+  "src": "-2_til 5",
+  "out": "0 1 2\n"
+ },
+ {
+  "src": "3 4#til 12",
+  "out": "0 1 2  3 \n4 5 6  7 \n8 9 10 11\n"
+ },
+ {
+  "src": "0N 3#til 6",
+  "out": "0 1 2\n3 4 5\n"
+ },
+ {
+  "src": "2 cut til 7",
+  "out": "0 1\n2 3\n4 5\n,6\n"
+ },
+ {
+  "src": "0 2 5_til 8",
+  "out": "0 1\n2 3 4\n5 6 7\n"
+ },
+ {
+  "src": "reverse 1 2 3",
+  "out": "3 2 1\n"
+ },
+ {
+  "src": "reverse \"abc\"",
+  "out": "\"cba\"\n"
+ },
+ {
+  "src": "first 1 2 3",
+  "out": "1\n"
+ },
+ {
+  "src": "last 1 2 3",
+  "out": "3\n"
+ },
+ {
+  "src": "first ()",
+  "out": ""
+ },
+ {
+  "src": "first `long$()",
+  "out": "0N\n"
+ },
+ {
+  "src": "1 2 3,4 5",
+  "out": "1 2 3 4 5\n"
+ },
+ {
+  "src": "1,2",
+  "out": "1 2\n"
+ },
+ {
+  "src": "\"ab\",\"cd\"",
+  "out": "\"abcd\"\n"
+ },
+ {
+  "src": "`a,`b",
+  "out": "`a`b\n"
+ },
+ {
+  "src": "1,`a",
+  "out": "1\n`a\n"
+ },
+ {
+  "src": "(1;2),(3;4)",
+  "out": "1 2 3 4\n"
+ },
+ {
+  "src": "enlist 5",
+  "out": ",5\n"
+ },
+ {
+  "src": "enlist 1 2",
+  "out": "1 2\n"
+ },
+ {
+  "src": "raze (1 2;3;4 5)",
+  "out": "1 2 3 4 5\n"
+ },
+ {
+  "src": "raze (\"ab\";\"cd\")",
+  "out": "\"abcd\"\n"
+ },
+ {
+  "src": "where 1 0 1 1b",
+  "out": "'2026.09.27T00:38:22.375 type\n  [0]  where 1 0 1 1b\n       ^\n"
+ },
+ {
+  "src": "where 2 0 1",
+  "out": "0 0 2\n"
+ },
+ {
+  "src": "distinct 1 1 2 3 3",
+  "out": "1 2 3\n"
+ },
+ {
+  "src": "distinct \"hello\"",
+  "out": "\"helo\"\n"
+ },
+ {
+  "src": "1 2 3?2",
+  "out": "1\n"
+ },
+ {
+  "src": "1 2 3?5",
+  "out": "3\n"
+ },
+ {
+  "src": "\"hello\"?\"l\"",
+  "out": "2\n"
+ },
+ {
+  "src": "`a`b`c?`c`a",
+  "out": "2 0\n"
+ },
+ {
+  "src": "3 1 4 1 5 in 1 5",
+  "out": "01011b\n"
+ },
+ {
+  "src": "\"abc\" in \"bcd\"",
+  "out": "011b\n"
+ },
+ {
+  "src": "within[5;1 10]",
+  "out": "1b\n"
+ },
+ {
+  "src": "3 7 12 within 5 10",
+  "out": "010b\n"
+ },
+ {
+  "src": "asc 3 1 4 1 5",
+  "out": "`s#1 1 3 4 5\n"
+ },
+ {
+  "src": "desc 3 1 4 1 5",
+  "out": "5 4 3 1 1\n"
+ },
+ {
+  "src": "iasc 3 1 4 1 5",
+  "out": "1 3 0 2 4\n"
+ },
+ {
+  "src": "idesc 3 1 4 1 5",
+  "out": "4 2 0 1 3\n"
+ },
+ {
+  "src": "rank 30 10 20",
+  "out": "2 0 1\n"
+ },
+ {
+  "src": "group 1 2 1 3 2",
+  "out": "1| 0 2\n2| 1 4\n3| ,3\n"
+ },
+ {
+  "src": "group \"mississippi\"",
+  "out": "m| ,0\ni| 1 4 7 10\ns| 2 3 5 6\np| 8 9\n"
+ },
+ {
+  "src": "1 2 3 except 2",
+  "out": "1 3\n"
+ },
+ {
+  "src": "1 2 3 inter 2 3 4",
+  "out": "2 3\n"
+ },
+ {
+  "src": "1 2 3 union 3 4 5",
+  "out": "1 2 3 4 5\n"
+ },
+ {
+  "src": "2 rotate 1 2 3 4 5",
+  "out": "3 4 5 1 2\n"
+ },
+ {
+  "src": "-1 rotate 1 2 3 4 5",
+  "out": "5 1 2 3 4\n"
+ },
+ {
+  "src": "sublist[2;til 10]",
+  "out": "0 1\n"
+ },
+ {
+  "src": "sublist[2 3;til 10]",
+  "out": "2 3 4\n"
+ },
+ {
+  "src": "1 2 cross 3 4",
+  "out": "1 3\n1 4\n2 3\n2 4\n"
+ },
+ {
+  "src": "(1 2;3 4) cross 5",
+  "out": "1 2 5\n3 4 5\n"
+ },
+ {
+  "src": "5 bin 1 3 5 7",
+  "out": "'2026.09.27T00:38:22.378 type\n  [0]  5 bin 1 3 5 7\n         ^\n"
+ },
+ {
+  "src": "1 3 5 7 bin 4",
+  "out": "1\n"
+ },
+ {
+  "src": "1 3 5 7 bin 0 4 8",
+  "out": "-1 1 3\n"
+ },
+ {
+  "src": "prev 1 2 3",
+  "out": "0N 1 2\n"
+ },
+ {
+  "src": "next 1 2 3",
+  "out": "2 3 0N\n"
+ },
+ {
+  "src": "2 xprev 1 2 3 4",
+  "out": "0N 0N 1 2\n"
+ },
+ {
+  "src": "fills 1 0N 0N 4 0N",
+  "out": "1 1 1 4 4\n"
+ },
+ {
+  "src": "3 mavg 1 2 3 4 5",
+  "out": "1 1.5 2 3 4\n"
+ },
+ {
+  "src": "3 msum 1 2 3 4 5",
+  "out": "1 3 6 9 12\n"
+ },
+ {
+  "src": "3 mmax 1 3 2 5 4",
+  "out": "1 3 3 5 5\n"
+ },
+ {
+  "src": "2 xbar 1 2 3 4 5",
+  "out": "0 2 2 4 4\n"
+ },
+ {
+  "src": "5 xbar 3 7 12",
+  "out": "0 5 10\n"
+ },
+ {
+  "src": "x:10 20 30 40",
+  "out": ""
+ },
+ {
+  "src": "x 1",
+  "out": "20\n"
+ },
+ {
+  "src": "x 1 3",
+  "out": "20 40\n"
+ },
+ {
+  "src": "x[1 3]",
+  "out": "20 40\n"
+ },
+ {
+  "src": "x 5",
+  "out": "0N\n"
+ },
+ {
+  "src": "x[2]:99",
+  "out": ""
+ },
+ {
+  "src": "x",
+  "out": "10 20 99 40\n"
+ },
+ {
+  "src": "x+:1",
+  "out": ""
+ },
+ {
+  "src": "x",
+  "out": "11 21 100 41\n"
+ },
+ {
+  "src": "x,:50",
+  "out": ""
+ },
+ {
+  "src": "x",
+  "out": "11 21 100 41 50\n"
+ },
+ {
+  "src": "x[0 1]:1 2",
+  "out": ""
+ },
+ {
+  "src": "x",
+  "out": "1 2 100 41 50\n"
+ },
+ {
+  "src": "@[x;0;neg]",
+  "out": "-1 2 100 41 50\n"
+ },
+ {
+  "src": "@[x;0 1;+;100]",
+  "out": "101 102 100 41 50\n"
+ },
+ {
+  "src": ".[(1 2;3 4);(1;0);:;9]",
+  "out": "1 2\n9 4\n"
+ },
+ {
+  "src": "m:(1 2 3;4 5 6)",
+  "out": ""
+ },
+ {
+  "src": "m[1]",
+  "out": "4 5 6\n"
+ },
+ {
+  "src": "m[1;2]",
+  "out": "6\n"
+ },
+ {
+  "src": "m[;1]",
+  "out": "2 5\n"
+ },
+ {
+  "src": "m[0 1;2]",
+  "out": "3 6\n"
+ },
+ {
+  "src": "flip m",
+  "out": "1 4\n2 5\n3 6\n"
+ },
+ {
+  "src": "m+1",
+  "out": "2 3 4\n5 6 7\n"
+ },
+ {
+  "src": "m*m",
+  "out": "1  4  9 \n16 25 36\n"
+ },
+ {
+  "src": "sum m",
+  "out": "5 7 9\n"
+ },
+ {
+  "src": "sum each m",
+  "out": "6 15\n"
+ },
+ {
+  "src": "d:`a`b`c!1 2 3",
+  "out": ""
+ },
+ {
+  "src": "d",
+  "out": "a| 1\nb| 2\nc| 3\n"
+ },
+ {
+  "src": "d`b",
+  "out": "2\n"
+ },
+ {
+  "src": "d[`a`c]",
+  "out": "1 3\n"
+ },
+ {
+  "src": "key d",
+  "out": "`a`b`c\n"
+ },
+ {
+  "src": "value d",
+  "out": "1 2 3\n"
+ },
+ {
+  "src": "d`z",
+  "out": "0N\n"
+ },
+ {
+  "src": "count d",
+  "out": "3\n"
+ },
+ {
+  "src": "d+10",
+  "out": "a| 11\nb| 12\nc| 13\n"
+ },
+ {
+  "src": "d,`d`e!4 5",
+  "out": "a| 1\nb| 2\nc| 3\nd| 4\ne| 5\n"
+ },
+ {
+  "src": "d[`b]:20",
+  "out": ""
+ },
+ {
+  "src": "d",
+  "out": "a| 1\nb| 20\nc| 3\n"
+ },
+ {
+  "src": "`a`c#d",
+  "out": "a| 1\nc| 3\n"
+ },
+ {
+  "src": "`a _ d",
+  "out": "b| 20\nc| 3\n"
+ },
+ {
+  "src": "d?2",
+  "out": "`\n"
+ },
+ {
+  "src": "`c`b`a!3 2 1",
+  "out": "c| 3\nb| 2\na| 1\n"
+ },
+ {
+  "src": "(`a`b!1 2)+`b`c!10 20",
+  "out": "a| 1\nb| 12\nc| 20\n"
+ },
+ {
+  "src": "reverse d",
+  "out": "c| 3\nb| 20\na| 1\n"
+ },
+ {
+  "src": "asc `c`a`b!3 1 2",
+  "out": "a| 1\nb| 2\nc| 3\n"
+ },
+ {
+  "src": "where `a`b`c!1 0 1b",
+  "out": "'2026.09.27T00:38:22.385 length\n  [0]  where `a`b`c!1 0 1b\n                   ^\n"
+ },
+ {
+  "src": "\"hello\"",
+  "out": "\"hello\"\n"
+ },
+ {
+  "src": "count \"hello\"",
+  "out": "5\n"
+ },
+ {
+  "src": "upper \"hello\"",
+  "out": "\"HELLO\"\n"
+ },
+ {
+  "src": "lower \"HELLO\"",
+  "out": "\"hello\"\n"
+ },
+ {
+  "src": "trim \"  hi  \"",
+  "out": "\"hi\"\n"
+ },
+ {
+  "src": "\"hello world\" like \"hello*\"",
+  "out": "1b\n"
+ },
+ {
+  "src": "\"hello\" like \"h?llo\"",
+  "out": "1b\n"
+ },
+ {
+  "src": "`abc like \"a*\"",
+  "out": "1b\n"
+ },
+ {
+  "src": "ss[\"banana\";\"an\"]",
+  "out": "1 3\n"
+ },
+ {
+  "src": "ssr[\"banana\";\"an\";\"AN\"]",
+  "out": "\"bANANa\"\n"
+ },
+ {
+  "src": "\",\" vs \"a,b,c\"",
+  "out": ",\"a\"\n,\"b\"\n,\"c\"\n"
+ },
+ {
+  "src": "\",\" sv (\"a\";\"b\";\"c\")",
+  "out": "'2026.09.27T00:38:22.385 type\n  [0]  \",\" sv (\"a\";\"b\";\"c\")\n           ^\n"
+ },
+ {
+  "src": "\" \" vs \"the quick brown fox\"",
+  "out": "\"the\"\n\"quick\"\n\"brown\"\n\"fox\"\n"
+ },
+ {
+  "src": "string 42",
+  "out": "\"42\"\n"
+ },
+ {
+  "src": "string `abc",
+  "out": "\"abc\"\n"
+ },
+ {
+  "src": "string 1 2 3",
+  "out": ",\"1\"\n,\"2\"\n,\"3\"\n"
+ },
+ {
+  "src": "string 3.14",
+  "out": "\"3.14\"\n"
+ },
+ {
+  "src": "\"i\"$\"A\"",
+  "out": "65i\n"
+ },
+ {
+  "src": "\"c\"$65",
+  "out": "\"A\"\n"
+ },
+ {
+  "src": "`$\"hello\"",
+  "out": "`hello\n"
+ },
+ {
+  "src": "`$(\"a\";\"bc\")",
+  "out": "`a`bc\n"
+ },
+ {
+  "src": "\"J\"$\"123\"",
+  "out": "123\n"
+ },
+ {
+  "src": "\"F\"$\"1.5\"",
+  "out": "1.5\n"
+ },
+ {
+  "src": "\"D\"$\"2020.01.02\"",
+  "out": "2020.01.02\n"
+ },
+ {
+  "src": "\"I\"$(\"1\";\"22\";\"x\")",
+  "out": "1 22 0Ni\n"
+ },
+ {
+  "src": "`int$3.7",
+  "out": "4i\n"
+ },
+ {
+  "src": "`long$2.5",
+  "out": "3\n"
+ },
+ {
+  "src": "`float$3",
+  "out": "3f\n"
+ },
+ {
+  "src": "`boolean$0 1 2",
+  "out": "011b\n"
+ },
+ {
+  "src": "`char$97",
+  "out": "\"a\"\n"
+ },
+ {
+  "src": "`date$2020.01.02D12:00:00",
+  "out": "2020.01.02\n"
+ },
+ {
+  "src": "`year$2020.05.06",
+  "out": "2020i\n"
+ },
+ {
+  "src": "`mm$2020.05.06",
+  "out": "5i\n"
+ },
+ {
+  "src": "`dd$2020.05.06",
+  "out": "6i\n"
+ },
+ {
+  "src": "`hh$12:34:56",
+  "out": "12i\n"
+ },
+ {
+  "src": "`minute$12:34:56",
+  "out": "12:34\n"
+ },
+ {
+  "src": "`second$12:34:56.789",
+  "out": "12:34:56\n"
+ },
+ {
+  "src": "`month$2020.05.06",
+  "out": "2020.05m\n"
+ },
+ {
+  "src": "\"d\"$2020.05m",
+  "out": "2020.05.01\n"
+ },
+ {
+  "src": "3$\"ab\"",
+  "out": "\"ab \"\n"
+ },
+ {
+  "src": "-5$\"ab\"",
+  "out": "\"   ab\"\n"
+ },
+ {
+  "src": "2020.01.01+1",
+  "out": "2020.01.02\n"
+ },
+ {
+  "src": "2020.03.01-2020.01.01",
+  "out": "60i\n"
+ },
+ {
+  "src": "2020.01.01 2020.06.15",
+  "out": "2020.01.01 2020.06.15\n"
+ },
+ {
+  "src": "2020.01.01D00:00:00+0D12:00:00",
+  "out": "2020.01.01D12:00:00.000000000\n"
+ },
+ {
+  "src": "12:00:00+60",
+  "out": "12:01:00\n"
+ },
+ {
+  "src": "12:00+30",
+  "out": "12:30\n"
+ },
+ {
+  "src": "12:00:00.000+1000",
+  "out": "12:00:01.000\n"
+ },
+ {
+  "src": "2020.01.01+til 3",
+  "out": "2020.01.01 2020.01.02 2020.01.03\n"
+ },
+ {
+  "src": "`date$2020.01.01T12:30:00.000",
+  "out": "2020.01.01\n"
+ },
+ {
+  "src": "2020.01.01<2020.01.02",
+  "out": "1b\n"
+ },
+ {
+  "src": "0D01:00:00*2",
+  "out": "0D02:00:00.000000000\n"
+ },
+ {
+  "src": "f:{x*x}",
+  "out": ""
+ },
+ {
+  "src": "f 5",
+  "out": "25\n"
+ },
+ {
+  "src": "f[5]",
+  "out": "25\n"
+ },
+ {
+  "src": "f each 1 2 3",
+  "out": "1 4 9\n"
+ },
+ {
+  "src": "{x+y}[1;2]",
+  "out": "3\n"
+ },
+ {
+  "src": "{x+y}[1] 2",
+  "out": "3\n"
+ },
+ {
+  "src": "{x+y+z}[1;;3] 2",
+  "out": "6\n"
+ },
+ {
+  "src": "g:{[a;b] a-b}",
+  "out": ""
+ },
+ {
+  "src": "g[10;3]",
+  "out": "7\n"
+ },
+ {
+  "src": "g[;3] 10",
+  "out": "7\n"
+ },
+ {
+  "src": "h:{a:x*2; a+1}",
+  "out": ""
+ },
+ {
+  "src": "h 5",
+  "out": "11\n"
+ },
+ {
+  "src": "{x}[]",
+  "out": ""
+ },
+ {
+  "src": "{1+1}[]",
+  "out": "2\n"
+ },
+ {
+  "src": "{:x*2; 99}[5]",
+  "out": "10\n"
+ },
+ {
+  "src": "{$[x>0;`pos;x<0;`neg;`zero]} each -1 0 1",
+  "out": "`neg`zero`pos\n"
+ },
+ {
+  "src": "{r:0; do[x; r+:1]; r}[5]",
+  "out": "5\n"
+ },
+ {
+  "src": "{i:0; while[i<x; i+:1]; i}[7]",
+  "out": "7\n"
+ },
+ {
+  "src": "{if[x>5; :`big]; `small} 3",
+  "out": "`small\n"
+ },
+ {
+  "src": "{if[x>5; :`big]; `small} 9",
+  "out": "`big\n"
+ },
+ {
+  "src": "fac:{$[x<2;1;x*fac x-1]}",
+  "out": ""
+ },
+ {
+  "src": "fac 10",
+  "out": "3628800\n"
+ },
+ {
+  "src": "fib:{$[x<2;x;fib[x-1]+fib x-2]}",
+  "out": ""
+ },
+ {
+  "src": "fib 15",
+  "out": "610\n"
+ },
+ {
+  "src": "{x+y}/[1 2 3]",
+  "out": "6\n"
+ },
+ {
+  "src": "{x,y}/[(1 2;3;4 5)]",
+  "out": "1 2 3 4 5\n"
+ },
+ {
+  "src": "{x*y}\\[1 2 3 4]",
+  "out": "1 2 6 24\n"
+ },
+ {
+  "src": "1 {x+y}/ 2 3",
+  "out": "6\n"
+ },
+ {
+  "src": "(+/) 1 2 3",
+  "out": "6\n"
+ },
+ {
+  "src": "+/[10;1 2 3]",
+  "out": "16\n"
+ },
+ {
+  "src": "+\\[10;1 2 3]",
+  "out": "11 13 16\n"
+ },
+ {
+  "src": "{x*2}/[3;1]",
+  "out": "8\n"
+ },
+ {
+  "src": "{x*2}\\[3;1]",
+  "out": "1 2 4 8\n"
+ },
+ {
+  "src": "{x<100}{x*2}/1",
+  "out": "128\n"
+ },
+ {
+  "src": "{x<100}{x*2}\\1",
+  "out": "1 2 4 8 16 32 64 128\n"
+ },
+ {
+  "src": "{1+x mod 5}\\[3]",
+  "out": "3 4 5 1 2\n"
+ },
+ {
+  "src": "(neg;abs) @\\: -3",
+  "out": "3 3\n"
+ },
+ {
+  "src": "1 2 3 +/: 10 20",
+  "out": "11 12 13\n21 22 23\n"
+ },
+ {
+  "src": "1 2 3 +\\: 10 20",
+  "out": "11 21\n12 22\n13 23\n"
+ },
+ {
+  "src": "1 2 3 ,' 4 5 6",
+  "out": "1 4\n2 5\n3 6\n"
+ },
+ {
+  "src": "{x,y}'[1 2;3 4]",
+  "out": "1 3\n2 4\n"
+ },
+ {
+  "src": "-':[1 4 9 16]",
+  "out": "1 3 5 7\n"
+ },
+ {
+  "src": "0 -':1 4 9",
+  "out": "1 3 5\n"
+ },
+ {
+  "src": "{x+y}':[1 2 3 4]",
+  "out": "0N 3 5 7\n"
+ },
+ {
+  "src": "count each (\"ab\";\"cde\";\"f\")",
+  "out": "2 3 1\n"
+ },
+ {
+  "src": "{x*x} each til 5",
+  "out": "0 1 4 9 16\n"
+ },
+ {
+  "src": "{[x;y] x+y} . 3 4",
+  "out": "7\n"
+ },
+ {
+  "src": "(+) . 3 4",
+  "out": "7\n"
+ },
+ {
+  "src": "g . 10 1",
+  "out": "9\n"
+ },
+ {
+  "src": "f @ 7",
+  "out": "49\n"
+ },
+ {
+  "src": "@[f;3]",
+  "out": "9\n"
+ },
+ {
+  "src": ".[g;10 4]",
+  "out": "6\n"
+ },
+ {
+  "src": "@[{x+1};`a;{`caught}]",
+  "out": "`caught\n"
+ },
+ {
+  "src": "@[{x+1};1;{`caught}]",
+  "out": "2\n"
+ },
+ {
+  "src": ".[{x+y};(1;`a);{\"err:\",x}]",
+  "out": "\"err:type\"\n"
+ },
+ {
+  "src": "'[neg;sum] 1 2 3",
+  "out": "-6\n"
+ },
+ {
+  "src": "k:{x+1}",
+  "out": ""
+ },
+ {
+  "src": "k k k 1",
+  "out": "4\n"
+ },
+ {
+  "src": "t:([]name:`alice`bob`carol`dan;age:30 45 28 45;score:88.5 72 95 60.5)",
+  "out": ""
+ },
+ {
+  "src": "t",
+  "out": "name  age score\n---------------\nalice 30  88.5 \nbob   45  72   \ncarol 28  95   \ndan   45  60.5 \n"
+ },
+ {
+  "src": "count t",
+  "out": "4\n"
+ },
+ {
+  "src": "cols t",
+  "out": "`name`age`score\n"
+ },
+ {
+  "src": "meta t",
+  "out": "c    | t f a\n-----| -----\nname | s    \nage  | j    \nscore| f    \n"
+ },
+ {
+  "src": "t 0",
+  "out": "name | `alice\nage  | 30\nscore| 88.5\n"
+ },
+ {
+  "src": "t`name",
+  "out": "`alice`bob`carol`dan\n"
+ },
+ {
+  "src": "t[1]`age",
+  "out": "45\n"
+ },
+ {
+  "src": "first t",
+  "out": "name | `alice\nage  | 30\nscore| 88.5\n"
+ },
+ {
+  "src": "last t",
+  "out": "name | `dan\nage  | 45\nscore| 60.5\n"
+ },
+ {
+  "src": "2#t",
+  "out": "name  age score\n---------------\nalice 30  88.5 \nbob   45  72   \n"
+ },
+ {
+  "src": "-1#t",
+  "out": "name age score\n--------------\ndan  45  60.5 \n"
+ },
+ {
+  "src": "select from t",
+  "out": "name  age score\n---------------\nalice 30  88.5 \nbob   45  72   \ncarol 28  95   \ndan   45  60.5 \n"
+ },
+ {
+  "src": "select name,age from t",
+  "out": "name  age\n---------\nalice 30 \nbob   45 \ncarol 28 \ndan   45 \n"
+ },
+ {
+  "src": "select from t where age>29",
+  "out": "name  age score\n---------------\nalice 30  88.5 \nbob   45  72   \ndan   45  60.5 \n"
+ },
+ {
+  "src": "select from t where age>29,score>70",
+  "out": "name  age score\n---------------\nalice 30  88.5 \nbob   45  72   \n"
+ },
+ {
+  "src": "select avg score by age from t",
+  "out": "age| score\n---| -----\n28 | 95   \n30 | 88.5 \n45 | 66.25\n"
+ },
+ {
+  "src": "select count i by age from t",
+  "out": "age| x\n---| -\n28 | 1\n30 | 1\n45 | 2\n"
+ },
+ {
+  "src": "select n:count i,s:sum score by age from t",
+  "out": "age| n s    \n---| -------\n28 | 1 95   \n30 | 1 88.5 \n45 | 2 132.5\n"
+ },
+ {
+  "src": "select max score from t",
+  "out": "score\n-----\n95   \n"
+ },
+ {
+  "src": "select name from t where score=max score",
+  "out": "name \n-----\ncarol\n"
+ },
+ {
+  "src": "exec name from t",
+  "out": "`alice`bob`carol`dan\n"
+ },
+ {
+  "src": "exec name,age from t",
+  "out": "name| alice bob carol dan\nage | 30    45  28    45 \n"
+ },
+ {
+  "src": "exec avg score by age from t",
+  "out": "28| 95\n30| 88.5\n45| 66.25\n"
+ },
+ {
+  "src": "update bonus:score*0.1 from t",
+  "out": "name  age score bonus\n---------------------\nalice 30  88.5  8.85 \nbob   45  72    7.2  \ncarol 28  95    9.5  \ndan   45  60.5  6.05 \n"
+ },
+ {
+  "src": "update score:0 from t where age=45",
+  "out": "'2026.09.27T00:38:22.389 type\n  [0]  update score:0 from t where age=45\n                                       ^\n"
+ },
+ {
+  "src": "update rk:rank score from t",
+  "out": "name  age score rk\n------------------\nalice 30  88.5  2 \nbob   45  72    1 \ncarol 28  95    3 \ndan   45  60.5  0 \n"
+ },
+ {
+  "src": "delete from t where age=45",
+  "out": "name  age score\n---------------\nalice 30  88.5 \ncarol 28  95   \n"
+ },
+ {
+  "src": "delete score from t",
+  "out": "name  age\n---------\nalice 30 \nbob   45 \ncarol 28 \ndan   45 \n"
+ },
+ {
+  "src": "`age xasc t",
+  "out": "name  age score\n---------------\ncarol 28  95   \nalice 30  88.5 \nbob   45  72   \ndan   45  60.5 \n"
+ },
+ {
+  "src": "`score xdesc t",
+  "out": "name  age score\n---------------\ncarol 28  95   \nalice 30  88.5 \nbob   45  72   \ndan   45  60.5 \n"
+ },
+ {
+  "src": "`age`score xasc t",
+  "out": "name  age score\n---------------\ncarol 28  95   \nalice 30  88.5 \ndan   45  60.5 \nbob   45  72   \n"
+ },
+ {
+  "src": "select distinct age from t",
+  "out": "age\n---\n30 \n45 \n28 \n"
+ },
+ {
+  "src": "flip t",
+  "out": "name | alice bob carol dan \nage  | 30    45  28    45  \nscore| 88.5  72  95    60.5\n"
+ },
+ {
+  "src": "t,([]name:enlist`eve;age:enlist 22;score:enlist 99.0)",
+  "out": "name  age score\n---------------\nalice 30  88.5 \nbob   45  72   \ncarol 28  95   \ndan   45  60.5 \neve   22  99   \n"
+ },
+ {
+  "src": "kt:([name:`alice`bob]dept:`eng`ops)",
+  "out": ""
+ },
+ {
+  "src": "kt",
+  "out": "name | dept\n-----| ----\nalice| eng \nbob  | ops \n"
+ },
+ {
+  "src": "kt`bob",
+  "out": "dept| ops\n"
+ },
+ {
+  "src": "key kt",
+  "out": "name \n-----\nalice\nbob  \n"
+ },
+ {
+  "src": "value kt",
+  "out": "dept\n----\neng \nops \n"
+ },
+ {
+  "src": "t lj kt",
+  "out": "name  age score dept\n--------------------\nalice 30  88.5  eng \nbob   45  72    ops \ncarol 28  95        \ndan   45  60.5      \n"
+ },
+ {
+  "src": "select name,dept from t lj kt",
+  "out": "name  dept\n----------\nalice eng \nbob   ops \ncarol     \ndan       \n"
+ },
+ {
+  "src": "t ij kt",
+  "out": "name  age score dept\n--------------------\nalice 30  88.5  eng \nbob   45  72    ops \n"
+ },
+ {
+  "src": "1!t",
+  "out": "name | age score\n-----| ---------\nalice| 30  88.5 \nbob  | 45  72   \ncarol| 28  95   \ndan  | 45  60.5 \n"
+ },
+ {
+  "src": "0!kt",
+  "out": "name  dept\n----------\nalice eng \nbob   ops \n"
+ },
+ {
+  "src": "`name xkey t",
+  "out": "name | age score\n-----| ---------\nalice| 30  88.5 \nbob  | 45  72   \ncarol| 28  95   \ndan  | 45  60.5 \n"
+ },
+ {
+  "src": "xcols[`score`name;t]",
+  "out": "score name  age\n---------------\n88.5  alice 30 \n72    bob   45 \n95    carol 28 \n60.5  dan   45 \n"
+ },
+ {
+  "src": "`n`a`s xcol t",
+  "out": "n     a  s   \n-------------\nalice 30 88.5\nbob   45 72  \ncarol 28 95  \ndan   45 60.5\n"
+ },
+ {
+  "src": "ungroup ([]a:1 2;b:(3 4;5 6 7))",
+  "out": "a b\n---\n1 3\n1 4\n2 5\n2 6\n2 7\n"
+ },
+ {
+  "src": "([]a:1 2 3) uj ([]b:`x`y)",
+  "out": "a b\n---\n1  \n2  \n3  \n  x\n  y\n"
+ },
+ {
+  "src": "tt:([]a:1 2 3;b:10 20 30)",
+  "out": ""
+ },
+ {
+  "src": "`tt insert (4;40)",
+  "out": ",3\n"
+ },
+ {
+  "src": "tt",
+  "out": "a b \n----\n1 10\n2 20\n3 30\n4 40\n"
+ },
+ {
+  "src": "`tt upsert (5;50)",
+  "out": "`tt\n"
+ },
+ {
+  "src": "tt",
+  "out": "a b \n----\n1 10\n2 20\n3 30\n4 40\n5 50\n"
+ },
+ {
+  "src": "aj[`t;([]t:1 5 9);([]t:0 4 8;v:`a`b`c)]",
+  "out": "t v\n---\n1 a\n5 b\n9 c\n"
+ },
+ {
+  "src": "t[`age]",
+  "out": "30 45 28 45\n"
+ },
+ {
+  "src": "select from t where name in `bob`dan",
+  "out": "name age score\n--------------\nbob  45  72   \ndan  45  60.5 \n"
+ },
+ {
+  "src": "select from t where name like \"c*\"",
+  "out": "name  age score\n---------------\ncarol 28  95   \n"
+ },
+ {
+  "src": "select name,age,old:age>40 from t",
+  "out": "name  age old\n-------------\nalice 30  0  \nbob   45  1  \ncarol 28  0  \ndan   45  1  \n"
+ },
+ {
+  "src": "exec count i from t",
+  "out": "4\n"
+ },
+ {
+  "src": "select sum score, n:count i by old:age>35 from t",
+  "out": "old| score n\n---| -------\n0  | 183.5 2\n1  | 132.5 2\n"
+ },
+ {
+  "src": "count select from t",
+  "out": "4\n"
+ },
+ {
+  "src": "type 1",
+  "out": "-7h\n"
+ },
+ {
+  "src": "type 1 2",
+  "out": "7h\n"
+ },
+ {
+  "src": "type `a",
+  "out": "-11h\n"
+ },
+ {
+  "src": "type \"a\"",
+  "out": "-10h\n"
+ },
+ {
+  "src": "type \"ab\"",
+  "out": "10h\n"
+ },
+ {
+  "src": "type 1.0",
+  "out": "-9h\n"
+ },
+ {
+  "src": "type ()",
+  "out": "0h\n"
+ },
+ {
+  "src": "type t",
+  "out": "98h\n"
+ },
+ {
+  "src": "type d",
+  "out": "99h\n"
+ },
+ {
+  "src": "type {x}",
+  "out": "100h\n"
+ },
+ {
+  "src": "type +",
+  "out": "+[@:]\n"
+ },
+ {
+  "src": "type 2020.01.01",
+  "out": "-14h\n"
+ },
+ {
+  "src": "key 5",
+  "out": "0 1 2 3 4\n"
+ },
+ {
+  "src": "value \"2+3\"",
+  "out": "5\n"
+ },
+ {
+  "src": "value `d",
+  "out": "a| 1\nb| 20\nc| 3\n"
+ },
+ {
+  "src": "parse \"1+2\"",
+  "out": "+\n1\n2\n"
+ },
+ {
+  "src": "eval parse \"2*3\"",
+  "out": "6\n"
+ },
+ {
+  "src": "`s#1 2 3",
+  "out": "`s#1 2 3\n"
+ },
+ {
+  "src": "attr asc 3 1 2",
+  "out": "`s\n"
+ },
+ {
+  "src": "x:5",
+  "out": ""
+ },
+ {
+  "src": "x",
+  "out": "5\n"
+ },
+ {
+  "src": ".z.K>=4",
+  "out": "1b\n"
+ },
+ {
+  "src": "{x+1}",
+  "out": "{x+1}\n"
+ },
+ {
+  "src": "{[a;b] a+b}",
+  "out": "{[a;b] a+b}\n"
+ },
+ {
+  "src": "(1;`a;\"b\";2.5)",
+  "out": "1\n`a\n\"b\"\n2.5\n"
+ },
+ {
+  "src": "(1 2;3 4)",
+  "out": "1 2\n3 4\n"
+ },
+ {
+  "src": "((1;2);3)",
+  "out": "1 2\n3\n"
+ },
+ {
+  "src": "()",
+  "out": ""
+ },
+ {
+  "src": "enlist ()",
+  "out": "\n"
+ },
+ {
+  "src": "0N",
+  "out": "0N\n"
+ },
+ {
+  "src": "0n",
+  "out": "0n\n"
+ },
+ {
+  "src": "0Ni",
+  "out": "0Ni\n"
+ },
+ {
+  "src": "0Nd",
+  "out": "0Nd\n"
+ },
+ {
+  "src": "-0W",
+  "out": "-0W\n"
+ },
+ {
+  "src": "0Wi",
+  "out": "0Wi\n"
+ },
+ {
+  "src": "0w",
+  "out": "0w\n"
+ },
+ {
+  "src": "1e100",
+  "out": "1e+100\n"
+ },
+ {
+  "src": "1.23456789",
+  "out": "1.234568\n"
+ },
+ {
+  "src": "12345678.9",
+  "out": "1.234568e+07\n"
+ },
+ {
+  "src": "0.000123",
+  "out": "0.000123\n"
+ },
+ {
+  "src": "1.0e-10",
+  "out": "1e-10\n"
+ },
+ {
+  "src": "100000000",
+  "out": "100000000\n"
+ },
+ {
+  "src": "-5",
+  "out": "-5\n"
+ },
+ {
+  "src": "1 -2 3",
+  "out": "1 -2 3\n"
+ },
+ {
+  "src": "x:1 -2 3",
+  "out": ""
+ },
+ {
+  "src": "2 -1",
+  "out": "2 -1\n"
+ },
+ {
+  "src": "a:3;b:4;a*b",
+  "out": "12\n"
+ },
+ {
+  "src": "{x-1} -1",
+  "out": "-2\n"
+ },
+ {
+  "src": "- 1 2 3",
+  "out": "'2026.09.27T00:38:22.391  \n  [0]  - 1 2 3\n        ^\n"
+ },
+ {
+  "src": "-1 2 3",
+  "out": "-1 2 3\n"
+ },
+ {
+  "src": "1 - 2",
+  "out": "-1\n"
+ },
+ {
+  "src": "1-2",
+  "out": "-1\n"
+ },
+ {
+  "src": "1 -2",
+  "out": "1 -2\n"
+ },
+ {
+  "src": "1+`a",
+  "out": "'2026.09.27T00:38:22.391 type\n  [0]  1+`a\n        ^\n"
+ },
+ {
+  "src": "(1 2)+1 2 3",
+  "out": "'2026.09.27T00:38:22.391 length\n  [0]  (1 2)+1 2 3\n            ^\n"
+ },
+ {
+  "src": "undefinedthing",
+  "out": "'2026.09.27T00:38:22.391 undefinedthing\n  [0]  undefinedthing\n       ^\n"
+ },
+ {
+  "src": "`a+1",
+  "out": "'2026.09.27T00:38:22.391 type\n  [0]  `a+1\n         ^\n"
+ },
+ {
+  "src": "{x+y}[1;2;3]",
+  "out": "'2026.09.27T00:38:22.391 rank\n  [0]  {x+y}[1;2;3]\n       ^\n"
+ },
+ {
+  "src": "\"a\"+1",
+  "out": "'2026.09.27T00:38:22.391 type\n  [0]  \"a\"+1\n          ^\n"
+ },
+ {
+  "src": "til `a",
+  "out": "`a\n"
+ },
+ {
+  "src": "1 2 3@`a",
+  "out": "'2026.09.27T00:38:22.391 type\n  [0]  1 2 3@`a\n            ^\n"
+ },
+ {
+  "src": "x:1 2 3; x[0]:`a",
+  "out": "'2026.09.27T00:38:22.391 type\n  [0]  x:1 2 3; x[0]:`a\n                    ^\n"
+ },
+ {
+  "src": "'`custom",
+  "out": "'2026.09.27T00:38:22.391 custom\n  [0]  '`custom\n        ^\n"
+ },
+ {
+  "src": "'\"message\"",
+  "out": "'2026.09.27T00:38:22.392 message\n  [0]  '\"message\"\n        ^\n"
+ },
+ {
+  "src": "{'`inner}[]",
+  "out": "'2026.09.27T00:38:22.392 inner\n  [0]  {'`inner}[]\n       ^\n"
+ }
+]
