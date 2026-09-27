@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { app } from "../lib/app.svelte";
   import { DEFAULT_SKETCH, EXAMPLE_BY_ID, type Example } from "../content/examples";
@@ -161,7 +161,9 @@
         open(s);
         persist();
         history.replaceState(null, "", `#/sketch/${s.id}`);
-        loadedKey = `${s.id}`;
+        // replaceState fires no hashchange, so update the route ourselves
+        loadedKey = s.id;
+        app.route = { tab: "sketch", parts: [s.id] };
         return;
       }
     }
@@ -174,7 +176,7 @@
 
   onMount(loadRoute);
   $effect(() => {
-    if (app.route.tab === "sketch") void loadRoute();
+    if (app.route.tab === "sketch" && app.route.parts) untrack(() => void loadRoute());
   });
 
   // pause when hidden
