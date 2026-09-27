@@ -1,3 +1,24 @@
 [build]
   command = "npm run build"
   publish = "dist"
+
+# Vite 8 needs Node ^20.19 || >=22.12; don't rely on the site's default image.
+[build.environment]
+  NODE_VERSION = "22"
+
+# Never let browsers/CDN hold on to the service worker or the HTML shell,
+# otherwise returning visitors keep seeing the previously cached build.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "no-cache, no-store, must-revalidate"
+
+[[headers]]
+  for = "/index.html"
+  [headers.values]
+    Cache-Control = "no-cache"
+
+[[headers]]
+  for = "/"
+  [headers.values]
+    Cache-Control = "no-cache"
