@@ -217,6 +217,7 @@ export class QanvasRuntime {
     if (this.frameNo % 15 === 0) this.ev.fps?.(this.fpsAvg);
     this.publishInputs(dt);
     const s = this.session;
+    this.api.drawn = {};
     s.deadline = performance.now() + this.opts.frameBudget;
     s.budgetHint = `One frame of draw took longer than ${this.opts.frameBudget}ms, so the sketch was paused. Try fewer shapes or iterations.`;
     try {

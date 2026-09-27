@@ -78,14 +78,27 @@
     scale = Math.max(0.05, Math.min(bw / w, bh / h, full ? 4 : 2));
   }
 
-  export async function run(src: string) {
-    if (!rt) return;
+  export async function run(src: string): Promise<Explained | null> {
+    if (!rt) return null;
     lastSrc = src;
     err = null;
     onError?.(null);
     if (connectConsole) consoleHub.use(target);
     await rt.run(src);
     fit();
+    return err;
+  }
+
+  export function evaluate(src: string) {
+    return target.evaluate(src);
+  }
+
+  export function trace(src: string) {
+    return target.trace(src);
+  }
+
+  export function hasSession() {
+    return !!rt?.session;
   }
 
   export function stop() {

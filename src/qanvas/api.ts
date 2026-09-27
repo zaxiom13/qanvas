@@ -54,11 +54,18 @@ const FONTS: Record<string, string> = {
 export class Api {
   style: Style = defaultStyle();
   stack: Style[] = [];
+  /** shapes drawn since the last reset, by kind (used by lesson checks) */
+  drawn: Record<string, number> = {};
   constructor(public s: Surface) {}
 
   reset() {
     this.style = defaultStyle();
     this.stack = [];
+    this.drawn = {};
+  }
+
+  tally(kind: string, n: number) {
+    this.drawn[kind] = (this.drawn[kind] ?? 0) + n;
   }
 
   // ---------- paint helpers ----------
@@ -125,6 +132,7 @@ export class Api {
     const n = Math.max(P.n, count(r));
     const xs = spread(P.single ? floats(P.xs) : floats(P.xs), n, "circle position"), ys = spread(floats(P.ys), n, "circle position");
     const rs = spread(r, n, "circle radius");
+    this.tally("circle", n);
     this.shapes(n, (c, i) => {
       const rr = Math.abs(rs[i]);
       c.moveTo(xs[i] + rr, ys[i]);
@@ -144,6 +152,7 @@ export class Api {
     const n = Math.max(P.n, rx.length);
     const xs = spread(floats(P.xs), n, "ellipse position"), ys = spread(floats(P.ys), n, "ellipse position");
     const RX = spread(floats(rx), n, "ellipse radii"), RY = spread(floats(ry), n, "ellipse radii");
+    this.tally("ellipse", n);
     this.shapes(n, (c, i) => {
       c.moveTo(xs[i] + Math.abs(RX[i]), ys[i]);
       c.ellipse(xs[i], ys[i], Math.abs(RX[i]), Math.abs(RY[i]), 0, 0, Math.PI * 2);
@@ -163,6 +172,7 @@ export class Api {
     const n = Math.max(P.n, W.length);
     const xs = spread(floats(P.xs), n, "rect corner"), ys = spread(floats(P.ys), n, "rect corner");
     const ws = spread(floats(W), n, "rect width"), hs = spread(floats(H), n, "rect height");
+    this.tally("rect", n);
     this.shapes(n, (c, i) => c.rect(xs[i], ys[i], ws[i], hs[i]));
   }
 
@@ -171,6 +181,7 @@ export class Api {
     const n = Math.max(A.n, B.n);
     const ax = spread(floats(A.xs), n, "line start"), ay = spread(floats(A.ys), n, "line start");
     const bx = spread(floats(B.xs), n, "line end"), by = spread(floats(B.ys), n, "line end");
+    this.tally("line", n);
     const saved = this.style.ink;
     this.style.ink = { kind: "none" };
     const pen = this.style.pen.kind === "none" ? ({ kind: "one", css: "#ffffff" } as Paint) : null;
@@ -188,6 +199,7 @@ export class Api {
 
   point(p: QValue) {
     const P = points(p, "point");
+    this.tally("point", P.n);
     const r = Math.max(0.5, this.weightAt(0) / 2);
     const c = this.s.ctx();
     const col = this.strokeAt(0) ?? this.fillAt(0);
@@ -215,6 +227,7 @@ export class Api {
   /** closed polygon(s) */
   poly(p: QValue, closed: boolean) {
     const polys = this.polyList(p);
+    this.tally(closed ? "poly" : "path", polys.length);
     const saved = this.style.ink;
     if (!closed) this.style.ink = { kind: "none" };
     const pen = !closed && this.style.pen.kind === "none" ? ({ kind: "one", css: "#ffffff" } as Paint) : null;
@@ -235,6 +248,7 @@ export class Api {
 
   curve(p: QValue, closed: boolean) {
     const polys = this.polyList(p);
+    this.tally(closed ? "blob" : "curve", polys.length);
     const saved = this.style.ink;
     if (!closed) this.style.ink = { kind: "none" };
     const pen = !closed && this.style.pen.kind === "none" ? ({ kind: "one", css: "#ffffff" } as Paint) : null;
@@ -278,6 +292,7 @@ export class Api {
     const n = Math.max(A.n, B.n, C.n);
     const X = [A, B, C].map((P) => spread(floats(P.xs), n, "triangle corner"));
     const Y = [A, B, C].map((P) => spread(floats(P.ys), n, "triangle corner"));
+    this.tally("tri", n);
     this.shapes(n, (c, i) => {
       c.moveTo(X[0][i], Y[0][i]);
       c.lineTo(X[1][i], Y[1][i]);
@@ -300,6 +315,7 @@ export class Api {
       a0 = new Float64Array(n).fill(a[0]);
       a1 = new Float64Array(n).fill(a[1]);
     }
+    this.tally("arc", n);
     this.shapes(n, (c, i) => {
       c.moveTo(xs[i], ys[i]);
       c.arc(xs[i], ys[i], Math.abs(rs[i]), a0[i], a1[i]);
@@ -312,6 +328,7 @@ export class Api {
     const strs = texts(s, fmt);
     const n = Math.max(P.n, strs.length);
     const xs = spread(floats(P.xs), n, "text position"), ys = spread(floats(P.ys), n, "text position");
+    this.tally("text", n);
     const c = this.s.ctx();
     c.font = `${this.style.fontSize}px ${this.style.fontFamily}`;
     c.textAlign = this.style.align;
@@ -373,6 +390,7 @@ export class Api {
     const H = chans[0].length;
     const W = chans[0][0]?.length ?? 0;
     if (!H || !W) return;
+    this.tally(cmap ? "heatmap" : "pixels", 1);
     for (const ch of chans) for (const r of ch) if (r.length !== W) throw lengthErr(`pixels: every row must have ${W} values.`);
     const img = new ImageData(W, H);
     const d = img.data;
@@ -435,6 +453,7 @@ export class Api {
     this.style.pen = paint(c);
   }
   background(c: QValue) {
+    this.tally("background", 1);
     const p = paint(c);
     const ctx = this.s.ctx();
     ctx.save();

@@ -15,6 +15,8 @@ export interface HeadlessOpts {
   /** pixels per sketch unit (thumbnail scale) */
   scale?: number;
   onOut?: (t: string) => void;
+  /** record the arguments of every drawing call (for lesson checks) */
+  record?: boolean;
 }
 
 export interface HeadlessResult {
@@ -22,13 +24,13 @@ export interface HeadlessResult {
   session: Session;
   api: Api;
   counts: Record<string, number>;
+  calls: Record<string, QValue[][]>;
 }
 
 export function runHeadless(code: string, o: HeadlessOpts): HeadlessResult {
   const ctx = o.ctx;
   const scale = o.scale ?? 1;
   let w = 600, h = 600;
-  const counts: Record<string, number> = {};
   const surface: Surface = {
     ctx: () => ctx,
     get width() { return w; },
@@ -50,15 +52,16 @@ export function runHeadless(code: string, o: HeadlessOpts): HeadlessResult {
   const s = new Session({ stdout: (t) => o.onOut?.(t), stderr: (t) => o.onOut?.(t) });
   s.imports = [".qv"];
   installApi(s, api);
-  // count shapes as they are drawn (for challenge checks)
   const ns = s.nsMap(".qv");
-  for (const name of ["circle", "rect", "square", "ellipse", "line", "point", "poly", "path", "curve", "blob", "tri", "arc", "text", "pixels", "heatmap"]) {
-    const f = ns.get(name) as any;
-    const wrap = (impl: any) => impl && ((...a: QValue[]) => ((counts[name] = (counts[name] ?? 0) + 1), impl(...a)));
-    if (f) {
-      if (f.m) f.m = wrap(f.m);
-      if (f.d) f.d = wrap(f.d);
-      if (f.n) f.n = wrap(f.n);
+  const calls: Record<string, QValue[][]> = {};
+  if (o.record) {
+    for (const [name, f] of ns) {
+      const b = f as any;
+      if (!b || typeof b !== "object" || !("rank" in b)) continue;
+      const rec = (impl: any) => impl && ((...a: any[]) => ((calls[name] ??= []).push(Array.isArray(a[0]) ? a[0] : a), impl(...a)));
+      if (b.m) b.m = rec(b.m);
+      if (b.d) b.d = rec(b.d);
+      if (b.n) b.n = rec(b.n);
     }
   }
   s.run(QANVAS_Q);
@@ -109,6 +112,7 @@ export function runHeadless(code: string, o: HeadlessOpts): HeadlessResult {
       const n = o.frames ?? 1;
       for (let i = 0; i < n; i++) {
         publish(i);
+        api.drawn = {};
         reset();
         deadline();
         s.call(draw, NIL);
@@ -119,5 +123,35 @@ export function runHeadless(code: string, o: HeadlessOpts): HeadlessResult {
   } finally {
     s.deadline = 0;
   }
-  return { error, session: s, api, counts };
+  return { error, session: s, api, counts: api.drawn, calls };
+}
+
+/** A looping, input-less sketch player on a plain 2D canvas (used for decorative previews). */
+export function createPlayer(code: string, ctx: CanvasRenderingContext2D, scale: number) {
+  const first = runHeadless(code, { ctx, frames: 0, scale, budgetMs: 2000 });
+  const s = first.session;
+  const draw = s.get("draw");
+  let frame = 0;
+  const ns = s.nsMap(".qv");
+  return {
+    error: first.error,
+    step(mouse: [number, number], ox = 0, oy = 0) {
+      if (!(draw instanceof Lambda) || first.error) return false;
+      ns.set("mouse", floats(mouse));
+      ns.set("pmouse", floats(mouse));
+      ns.set("frame", long(frame));
+      ns.set("time", float(frame / 60));
+      frame++;
+      ctx.setTransform(scale, 0, 0, scale, ox, oy);
+      s.deadline = performance.now() + 60;
+      try {
+        s.call(draw, NIL);
+      } catch {
+        return false;
+      } finally {
+        s.deadline = 0;
+      }
+      return true;
+    },
+  };
 }
