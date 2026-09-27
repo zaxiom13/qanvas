@@ -5,7 +5,7 @@ import { Session } from "../src/q/index";
 
 // Expressions whose real-q output is nondeterministic or a q quirk we intentionally don't copy.
 const SKIP = new Set([
-  "5?10", ".z.p", "\\t sum til 1000000", "atan2[1;1]", "-7h$3", ",`a", "neg", "til", "count", "type +",
+  "5?10", "3?1f", ".z.p", "\\t sum til 1000000", "atan2[1;1]", "-7h$3", ",`a", "neg", "til", "count", "type +",
   "1 0N 3^0", "where 1 0 1 1b", "where `a`b`c!1 0 1b", "- 1 2 3", "til `a", "100000#1",
   "{x,y}': 1 2 3", "-': 1 4 9", "%': 2 4 8", ",': 1 2 3",
 ]);

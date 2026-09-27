@@ -17,7 +17,7 @@ export interface CheckOutcome {
 
 /** Run code off-screen, then evaluate each check (a q boolean expression) in its session. */
 export function checkCode(code: string, checks: { expr: string; msg: string }[], ctx: CanvasRenderingContext2D): CheckOutcome {
-  const r = runHeadless(code, { ctx, frames: 3, budgetMs: 3000, record: true });
+  const r = runHeadless(code, { ctx, frames: 3, budgetMs: 3000, record: true, mouse: [380, 260] });
   if (r.error) return { ok: false, runError: explainError(r.error, code), results: [] };
   const s = r.session;
   const kinds = Object.keys(r.api.drawn);

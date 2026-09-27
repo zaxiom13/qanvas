@@ -283,6 +283,16 @@ export class Session {
     for (let f: Frame | null = fr; f; f = f.parent) {
       const loc = f.locals?.get(n.n);
       if (loc !== undefined) return loc;
+      if (f.lam && f.lam.node.locals.includes(n.n)) {
+        // declared local (assigned somewhere in this function) but not set yet
+        const err = new QError(
+          n.n,
+          `'${n.n}' is a local inside this function (because it's assigned with ${n.n}: here), but it has no value yet. ` +
+            `To change the global ${n.n}, use ${n.n}+: (or -:, *:…) or ${n.n}::value.`,
+        );
+        err.span = { s: n.s, e: n.e };
+        throw err;
+      }
       if (f.lam && !f.parent) break;
     }
     const v = this.lookupGlobal(n.n, fr.ns);

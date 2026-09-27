@@ -128,6 +128,17 @@ export class Parser {
   build(items: Item[], i: number): Node {
     const a = items[i];
     if (i === items.length - 1) return a.node;
+    if (a.verb && a.node.k === "adv") {
+      // q won't apply a derived function (like +/ or f') prefix by juxtaposition
+      const adv = a.node.a;
+      const src = this.src.slice(a.node.s, a.node.e);
+      const next = this.src[a.node.e] ?? "";
+      throw new QError(
+        /\s/.test(next) ? " " : adv,
+        `q can't apply ${src} to what follows just by putting it in front. Write (${src}) x or ${src}[x]` +
+          (adv === "/" && src === "+/" ? " — or simply sum x." : adv === "\\" && src === "+\\" ? " — or simply sums x." : "."),
+      ).at({ s: a.node.e - adv.length, e: a.node.e, src: this.src });
+    }
     if (a.verb) {
       const rest = this.build(items, i + 1);
       return { k: "mono", f: a.node, x: rest, s: a.node.s, e: rest.e };
