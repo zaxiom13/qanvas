@@ -27,8 +27,8 @@ const KEY_NAMES: Record<string, string> = {
 };
 const keyName = (k: string) => KEY_NAMES[k] ?? (k.length === 1 ? k.toLowerCase() : k.toLowerCase());
 
-export const DEFAULT_BG = "#15141d";
-export const DEFAULT_INK = "#f6f1e7";
+import { DEFAULT_BG, DEFAULT_INK } from "./defaults";
+export { DEFAULT_BG, DEFAULT_INK };
 
 export class QanvasRuntime {
   p!: p5;

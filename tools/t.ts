@@ -1,7 +1,10 @@
-import { Session, inline } from "../src/q/index";
-const s = new Session();
-for (const src of ["2*3+4", "sum til 10", "x:3; x*x", "{x*2} each 1 2 3"]) {
-  const { steps } = s.trace(src);
-  console.log(src);
-  for (const st of steps) console.log("   ", src.slice(st.s, st.e).padEnd(18), "→", inline(st.value, 7));
-}
+import "../test/dom-shims";
+import { readFileSync } from "node:fs";
+import { mockCtx } from "../test/helpers";
+import { runHeadless } from "../src/qanvas/headless";
+const code = readFileSync(process.argv[2], "utf8");
+const { ctx, calls } = mockCtx();
+const r = runHeadless(code, { ctx, frames: 2 });
+console.log("error:", r.error?.qname, r.error?.hint);
+console.log("counts:", r.counts);
+console.log(calls.slice(0, 30).join("\n"));

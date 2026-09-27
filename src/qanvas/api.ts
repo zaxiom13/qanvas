@@ -422,7 +422,7 @@ export class Api {
     oc.putImageData(img, 0, 0);
     const c = this.s.ctx();
     const smooth = c.imageSmoothingEnabled;
-    c.imageSmoothingEnabled = W * 2 > w; // keep low-res grids crisp
+    c.imageSmoothingEnabled = W * 3 >= w; // smooth photos, keep low-res grids crisp
     c.drawImage(this.off as CanvasImageSource, x0, y0, w, h);
     c.imageSmoothingEnabled = smooth;
   }

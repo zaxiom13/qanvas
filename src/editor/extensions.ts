@@ -250,6 +250,28 @@ export interface EditorOpts {
   onScrub?: () => void;
   readOnly?: boolean;
   compact?: boolean;
+  /** console mode: Enter runs, Up/Down walk history */
+  console?: boolean;
+  onHistory?: (dir: -1 | 1) => string | null;
+}
+
+function consoleKeys(o: EditorOpts): Extension {
+  const walk = (dir: -1 | 1) => (view: EditorView) => {
+    const { state } = view;
+    const line = state.doc.lineAt(state.selection.main.head);
+    if (dir < 0 && line.number !== 1) return false;
+    if (dir > 0 && line.number !== state.doc.lines) return false;
+    const next = o.onHistory?.(dir);
+    if (next == null) return false;
+    view.dispatch({ changes: { from: 0, to: state.doc.length, insert: next }, selection: { anchor: next.length } });
+    return true;
+  };
+  return keymap.of([
+    ...completionKeymap,
+    { key: "Enter", run: () => (o.onRun?.(), true) },
+    { key: "ArrowUp", run: walk(-1) },
+    { key: "ArrowDown", run: walk(1) },
+  ]);
 }
 
 export function qExtensions(o: EditorOpts): Extension[] {
@@ -266,6 +288,7 @@ export function qExtensions(o: EditorOpts): Extension[] {
     qHover,
     linter(null),
     EditorView.lineWrapping,
+    ...(o.console ? [consoleKeys(o)] : []),
     keymap.of([
       { key: "Mod-Enter", run: () => (o.onRun?.(), true), preventDefault: true },
       { key: "Shift-Enter", run: () => (o.onRun?.(), true), preventDefault: true },

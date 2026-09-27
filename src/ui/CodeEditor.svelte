@@ -16,6 +16,8 @@
     scrub?: boolean;
     view?: EditorView | null;
     label?: string;
+    consoleMode?: boolean;
+    onHistory?: (dir: -1 | 1) => string | null;
   }
 
   let {
@@ -30,6 +32,8 @@
     scrub = false,
     view = $bindable(null),
     label = "q code editor",
+    consoleMode = false,
+    onHistory,
   }: Props = $props();
 
   let host: HTMLDivElement;
@@ -45,6 +49,8 @@
           compact,
           readOnly,
           placeholder,
+          console: consoleMode,
+          onHistory: (d) => onHistory?.(d) ?? null,
           onRun: () => onRun?.(),
           onScrub: onScrub ? () => onScrub?.() : undefined,
           onChange: (v) => {

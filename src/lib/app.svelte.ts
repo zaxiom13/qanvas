@@ -114,8 +114,8 @@ export const scratchTarget: ConsoleTarget = {
 };
 
 class ConsoleHub {
-  target = $state<ConsoleTarget>(scratchTarget);
-  lines = $state<ConsoleLine[]>([]);
+  target = $state.raw<ConsoleTarget>(scratchTarget);
+  lines = $state.raw<ConsoleLine[]>([]);
   private id = 0;
   use(t: ConsoleTarget | null) {
     this.target = t ?? scratchTarget;
@@ -135,7 +135,7 @@ export interface ConsoleLine {
   text: string;
   value?: QValue;
   src?: string;
-  hint?: string;
+  err?: import("./explain").Explained;
   trace?: { s: number; e: number; value: QValue }[];
 }
 
