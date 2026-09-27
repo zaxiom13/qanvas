@@ -28,6 +28,7 @@ const KEY_NAMES: Record<string, string> = {
 const keyName = (k: string) => KEY_NAMES[k] ?? (k.length === 1 ? k.toLowerCase() : k.toLowerCase());
 
 import { DEFAULT_BG, DEFAULT_INK } from "./defaults";
+import { nils } from "./headless";
 export { DEFAULT_BG, DEFAULT_INK };
 
 export class QanvasRuntime {
@@ -180,7 +181,7 @@ export class QanvasRuntime {
       try {
         s.deadline = performance.now() + this.opts.runBudget;
         this.p.push();
-        s.call(setup, ...(setup.rank ? [NIL] : []));
+        s.call(setup, ...nils(setup));
         this.p.pop();
       } catch (e) {
         this.fail(e, src);
@@ -222,7 +223,7 @@ export class QanvasRuntime {
     s.budgetHint = `One frame of draw took longer than ${this.opts.frameBudget}ms, so the sketch was paused. Try fewer shapes or iterations.`;
     try {
       const f = this.drawFn;
-      s.call(f, ...((f as Lambda).rank ? [NIL] : []));
+      s.call(f, ...nils(f as Lambda));
     } catch (e) {
       s.deadline = 0;
       this.fail(e, this.src);

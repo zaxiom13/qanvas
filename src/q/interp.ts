@@ -1134,7 +1134,7 @@ export function rankOf(f: QValue): number {
 }
 
 function ambivalent(f: QFn): boolean {
-  if (f instanceof Builtin) return !!(f.m && f.d);
+  if (f instanceof Builtin) return !!(f.m && (f.d || f.n));
   if (f instanceof Derived) return f.adv !== "'" || f.baseRank === 1;
   return false;
 }

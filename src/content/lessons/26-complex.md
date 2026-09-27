@@ -52,15 +52,15 @@ Every pixel iterates together: `.cx.sq z` squares 57,600 complex numbers at once
 
 ## Julia sets
 
-Flip it around: fix `c`, and start `z` at each pixel. Every `c` gives a different shape — so let the mouse choose `c`:
+Flip it around: fix `c`, and start `z` at each pixel. (Inside `draw` we call it `zs` — remember, `x`, `y` and `z` are reserved for a function's own arguments.) Every `c` gives a different shape — so let the mouse choose `c`:
 
 ```q sketch
 w:150; h:150
 z0:(-1.6+3.2*(til[w*h] mod w)%w; -1.6+3.2*(til[w*h] div w)%h)
 draw:{
   c:(mouse%300)-1 1;
-  z:z0; k:0*z0 0;
-  do[24; z:.cx.add[.cx.sq z;c]; k+:4>.cx.abs2 z];
+  zs:z0; k:0*z0 0;
+  do[24; zs:.cx.add[.cx.sq zs;c]; k+:4>.cx.abs2 zs];
   heatmap[w cut k;`inferno]
  }
 ```

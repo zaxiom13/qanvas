@@ -6,7 +6,7 @@
   import { shapeLabel } from "../lib/shape";
   import CodeEditor from "./CodeEditor.svelte";
   import ErrorCard from "./ErrorCard.svelte";
-  import ValueView from "./ValueView.svelte";
+  import ValueView, { hasVisual, isTabular } from "./ValueView.svelte";
   import { Eye, Footprints, Play, RotateCcw, Sparkles, Terminal } from "./icons";
   import type { QValue } from "../q/index";
 
@@ -84,13 +84,13 @@
     <div class="out"><ErrorCard e={err} compact /></div>
   {:else if result && result.text}
     <div class="out">
-      <pre class="text">{result.text}</pre>
+      {#if !result.value || !isTabular(result.value)}<pre class="text">{result.text}</pre>{/if}
       {#if result.value}
+        {#if hasVisual(result.value)}<div class="visual"><ValueView value={result.value} /></div>{/if}
         <div class="tools">
-          <button class="tool" class:on={showVisual} onclick={() => (showVisual = !showVisual)}><Eye size={13} /> {shapeLabel(result.value)}</button>
+          <span class="shape">{shapeLabel(result.value)}</span>
           {#if explainable}<button class="tool" class:on={!!steps} onclick={explain}><Footprints size={13} /> explain</button>{/if}
         </div>
-        {#if showVisual}<div class="visual"><ValueView value={result.value} showLabel={false} /></div>{/if}
         {#if steps}
           <div class="trace">
             {#each steps as st, i (i)}
@@ -172,7 +172,13 @@
     border-color: color-mix(in srgb, var(--accent) 45%, transparent);
   }
   .visual {
-    margin-top: 10px;
+    margin-top: 8px;
+  }
+  .shape {
+    font-size: 11px;
+    color: var(--text-3);
+    font-weight: 600;
+    align-self: center;
   }
   .trace {
     margin-top: 10px;

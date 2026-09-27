@@ -7,7 +7,7 @@
   import { explainError } from "../lib/explain";
   import type { QValue } from "../q/index";
   import ErrorCard from "./ErrorCard.svelte";
-  import ValueView from "./ValueView.svelte";
+  import ValueView, { hasVisual, isTabular } from "./ValueView.svelte";
   import { ArrowLeft, BookOpen, Search, Terminal } from "./icons";
 
   let { mobile }: { mobile: boolean } = $props();
@@ -151,8 +151,8 @@
                 {:else if ex.image}
                   <img class="shot" src={ex.image} alt={`Result of ${ex.code}`} />
                 {:else if ex.text}
-                  <pre class="out">{ex.text}</pre>
-                  {#if ex.value}<div class="vis"><ValueView value={ex.value} /></div>{/if}
+                  {#if !ex.value || !isTabular(ex.value)}<pre class="out">{ex.text}</pre>{/if}
+                  {#if ex.value && hasVisual(ex.value)}<div class="vis"><ValueView value={ex.value} /></div>{/if}
                 {/if}
               </div>
             {/each}

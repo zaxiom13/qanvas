@@ -95,7 +95,7 @@
     </section>
     {#if visual}
       <aside class="stagewrap">
-        <Stage bind:this={stage} name={problem.title} compact />
+        <Stage bind:this={stage} name={problem?.title ?? "dojo"} compact />
       </aside>
     {/if}
   {:else if !mobile}

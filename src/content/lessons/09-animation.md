@@ -74,9 +74,9 @@ draw:{
   circle[center;30]
  }
 %% check 1<=drawn`circle | Keep drawing one circle each frame.
-%% check 100<abs (first arg[`circle;0])-300 | The circle should swing well away from the middle — try x = 300+250*cos 2*time.
+%% check 100<max {abs 300-first x 0} each drew`circle | The circle should swing well away from the middle — let x follow a sine wave, like 300+250*sin 2*time.
 %% hint The position is (x;y). Keep y at 300 and let x be 300 plus a sine wave.
-%% hint cos starts at 1, so 300+250*cos 2*time begins at the right edge and swings to the left.
+%% hint center+250*(sin 2*time;0) moves the centre left and right.
 %% solution
 draw:{
   background 20;

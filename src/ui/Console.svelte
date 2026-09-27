@@ -8,7 +8,7 @@
   import { inline } from "../q/format";
   import CodeEditor from "./CodeEditor.svelte";
   import ErrorCard from "./ErrorCard.svelte";
-  import ValueView from "./ValueView.svelte";
+  import ValueView, { hasVisual } from "./ValueView.svelte";
   import { Eye, Footprints, Trash } from "./icons";
 
   interface Props {
@@ -108,9 +108,11 @@
         <div class="line value">
           <pre class="out">{l.text}</pre>
           <div class="tools">
-            <button class="tool" class:on={expanded[l.id]} onclick={() => (expanded = { ...expanded, [l.id]: !expanded[l.id] })}>
-              <Eye size={13} /> {l.value ? shapeLabel(l.value) : "value"}
-            </button>
+            {#if l.value && hasVisual(l.value)}
+              <button class="tool" class:on={expanded[l.id]} onclick={() => (expanded = { ...expanded, [l.id]: !expanded[l.id] })}>
+                <Eye size={13} /> {shapeLabel(l.value)}
+              </button>
+            {/if}
             {#if l.src && /[+\-*%&|,#_$?@.!~^<>=]|\b(til|sum|count|each|where|flip|neg|max|min|avg|reverse|first|last)\b/.test(l.src)}
               <button class="tool" class:on={!!l.trace} onclick={() => explain(l)}><Footprints size={13} /> explain</button>
             {/if}

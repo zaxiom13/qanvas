@@ -35,7 +35,11 @@
 
   const target: ConsoleTarget = {
     get name() {
-      return name;
+      try {
+        return name;
+      } catch {
+        return "sketch";
+      }
     },
     evaluate: (src) => {
       const r = rt?.evalInSketch(src) ?? null;

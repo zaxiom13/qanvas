@@ -5,7 +5,7 @@ import { linter, lintGutter, setDiagnostics, type Diagnostic } from "@codemirror
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { EditorState, StateEffect, StateField, type Extension } from "@codemirror/state";
 import {
-  Decoration, EditorView, ViewPlugin, drawSelection, highlightActiveLine, highlightActiveLineGutter, hoverTooltip, keymap,
+  Decoration, EditorView, MatchDecorator, ViewPlugin, drawSelection, highlightActiveLine, highlightActiveLineGutter, hoverTooltip, keymap,
   lineNumbers, placeholder as cmPlaceholder, type DecorationSet, type ViewUpdate,
 } from "@codemirror/view";
 import { KIND_LABEL, REFERENCE, REF_BY_NAME } from "../content/reference";
@@ -239,7 +239,21 @@ export function scrubber(onScrub: () => void): Extension {
       },
     },
   );
-  return [scrubModeField, plugin];
+  const numMark = new MatchDecorator({ regexp: /(?<![\w`.])-?\d+\.?\d*(?![\w:])/g, decoration: Decoration.mark({ class: "cm-scrub" }) });
+  const marks = ViewPlugin.fromClass(
+    class {
+      decos: DecorationSet;
+      constructor(view: EditorView) {
+        this.decos = view.state.field(scrubModeField, false) ? numMark.createDeco(view) : Decoration.none;
+      }
+      update(u: ViewUpdate) {
+        const on = u.state.field(scrubModeField, false);
+        this.decos = on ? (u.docChanged || u.viewportChanged || !u.startState.field(scrubModeField, false) ? numMark.createDeco(u.view) : numMark.updateDeco(u, this.decos)) : Decoration.none;
+      }
+    },
+    { decorations: (v) => v.decos },
+  );
+  return [scrubModeField, plugin, marks];
 }
 
 export interface EditorOpts {

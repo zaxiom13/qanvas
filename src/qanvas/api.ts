@@ -562,19 +562,36 @@ export function installApi(session: Session, api: Api) {
     return unit;
   }));
 
-  set("circle", new Builtin("circle", 2, (t) => (api.circle(t, float(10)), unit), (p, r) => (api.circle(p, r), unit)));
-  set("ellipse", b2("ellipse", (p, r) => (api.ellipse(p, r), unit)));
-  set("rect", new Builtin("rect", 2, (t) => (api.rect(t, float(10)), unit), (p, wh) => (api.rect(p, wh), unit)));
-  set("square", b2("square", (p, s) => (api.rect(p, s), unit)));
+  // shapes take an optional last argument: the fill colour for just this call
+  const filled = (fill: QValue | undefined, draw: () => void) => {
+    if (fill === undefined) return draw();
+    const saved = api.style.ink;
+    api.style.ink = paint(fill);
+    try {
+      draw();
+    } finally {
+      api.style.ink = saved;
+    }
+  };
+  const shape = (name: string, rank: number, draw: (a: QValue[]) => void, mono?: (x: QValue) => void) =>
+    new Builtin(name, rank, mono ? (x) => (mono(x), unit) : undefined, undefined, (a) => {
+      if (a.length > rank + 1) throw typeErr(`${name} takes ${rank} arguments, plus an optional fill colour.`);
+      filled(a[rank], () => draw(a));
+      return unit;
+    });
+  set("circle", shape("circle", 2, ([p, r]) => api.circle(p, r), (t) => api.circle(t, float(10))));
+  set("ellipse", shape("ellipse", 2, ([p, r]) => api.ellipse(p, r)));
+  set("rect", shape("rect", 2, ([p, wh]) => api.rect(p, wh), (t) => api.rect(t, float(10))));
+  set("square", shape("square", 2, ([p, sz]) => api.rect(p, sz)));
   set("line", b2("line", (a, bb) => (api.line(a, bb), unit)));
   set("point", b1("point", (p) => (api.point(p), unit)));
-  set("poly", b1("poly", (p) => (api.poly(p, true), unit)));
+  set("poly", new Builtin("poly", 1, (p) => (api.poly(p, true), unit), (p, f) => (filled(f, () => api.poly(p, true)), unit)));
   set("path", b1("path", (p) => (api.poly(p, false), unit)));
   set("curve", b1("curve", (p) => (api.curve(p, false), unit)));
-  set("blob", b1("blob", (p) => (api.curve(p, true), unit)));
-  set("tri", bn("tri", 3, ([a, bb, c]) => (api.tri(a, bb, c), unit)));
-  set("arc", bn("arc", 3, ([p, r, a]) => (api.arc(p, r, a), unit)));
-  set("text", b2("text", (p, s) => (api.text(p, s, fmt), unit)));
+  set("blob", new Builtin("blob", 1, (p) => (api.curve(p, true), unit), (p, f) => (filled(f, () => api.curve(p, true)), unit)));
+  set("tri", shape("tri", 3, ([a, bb, c]) => api.tri(a, bb, c)));
+  set("arc", shape("arc", 3, ([p, r, a]) => api.arc(p, r, a)));
+  set("text", shape("text", 2, ([p, t]) => api.text(p, t, fmt)));
   set("pixels", b1("pixels", (m) => (api.pixels(m, null), unit)));
   set("heatmap", new Builtin("heatmap", 2, (m) => (api.pixels(m, "viridis"), unit), (m, c) => (api.pixels(m, text(c) ?? "viridis"), unit)));
 

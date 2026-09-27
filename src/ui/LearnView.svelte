@@ -8,6 +8,7 @@
   import ChallengeCell from "./ChallengeCell.svelte";
   import Stage from "./Stage.svelte";
   import HeroArt from "./HeroArt.svelte";
+  import { runHeadless } from "../qanvas/headless";
   import { ArrowLeft, ArrowRight, CircleCheck, Compass, Maximize, Minimize, Palette, Sparkles } from "./icons";
 
   let { mobile }: { mobile: boolean } = $props();
@@ -48,15 +49,16 @@
     return stage.run(code);
   }
 
-  function evaluate(src: string) {
-    const r = stage?.evaluate(src) ?? null;
-    if (r && !r.error && /\b(circle|rect|line|poly|path|text|background|pixels|heatmap|point|ellipse|tri|arc|curve|blob|square)\b/.test(src)) hasDrawn = true;
-    return r;
+  // Each q cell is stateless: a fresh session that silently replays the cells above it.
+  function sessionFor(i: number) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 60;
+    const s = runHeadless("", { ctx: canvas.getContext("2d")!, scale: 0.1 }).session;
+    for (const b of lesson!.blocks.slice(0, i)) if (b.kind === "cell" && !b.sketch) s.evaluate(b.code);
+    return s;
   }
-
-  function trace(src: string) {
-    return stage?.trace(src) ?? null;
-  }
+  const evaluateAt = (i: number) => (src: string) => sessionFor(i).evaluate(src);
+  const traceAt = (i: number) => (src: string) => sessionFor(i).trace(src);
 
   async function solved() {
     if (!lesson) return;
@@ -147,7 +149,7 @@
           {#if b.kind === "html"}
             <div class="prose">{@html b.html}</div>
           {:else if b.kind === "cell"}
-            <LessonCell code={b.code} sketch={b.sketch} {evaluate} {trace} {runSketch} />
+            <LessonCell code={b.code} sketch={b.sketch} evaluate={evaluateAt(i)} trace={traceAt(i)} {runSketch} />
           {:else}
             <ChallengeCell id={b.id} goal={b.goal} starter={b.starter} checks={b.checks} hints={b.hints} solution={b.solution} {runSketch} onSolved={solved} />
           {/if}
@@ -171,7 +173,7 @@
           {#if stageOpen}<Minimize size={15} />{:else}<Maximize size={15} />{/if}
         </button>
       {/if}
-      <Stage bind:this={stage} name={lesson.title} compact={!mobile || !stageOpen} hideToolbar={mobile && !stageOpen} />
+      <Stage bind:this={stage} name={lesson?.title ?? "lesson"} compact={!mobile || !stageOpen} hideToolbar={mobile && !stageOpen} />
     </aside>
   </div>
 {/if}

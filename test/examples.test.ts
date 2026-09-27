@@ -3,6 +3,7 @@ import { EXAMPLES } from "../src/content/examples";
 import { Lambda } from "../src/q/fns";
 import { NIL, float, long } from "../src/q/index";
 import { sketchSession } from "./helpers";
+import { nils } from "../src/qanvas/headless";
 import "./dom-shims";
 
 /** Run a sketch like the runtime does: top level, setup, then a few frames of draw. */
@@ -25,7 +26,7 @@ export function runSketch(code: string, frames = 3) {
       s.nsMap(".qv").set("frame", long(i));
       s.nsMap(".qv").set("time", float(i / 60));
       try {
-        s.call(f, NIL);
+        s.call(f, ...nils(f as Lambda));
       } catch (e) {
         return { error: fail(`${name} (frame ${i})`, e), calls, out };
       }

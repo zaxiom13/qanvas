@@ -32,16 +32,20 @@ draw:{
   background 20;
   v+:0 0.4;
   p+:v;
-  if[p[1]>560; v[1]*:-0.9; p[1]:560];
-  if[(p[0]<40)|p[0]>560; v[0]*:-1];
-  ink `coral;
-  circle[p;40]
+  out:(p<40 40)|p>560 560;
+  v*:?[out;-0.9;1];
+  p::40|560&p;
+  circle[p;40;`coral]
  }
 ```
 
 - `v+:0 0.4` is gravity: a little extra downward speed every frame.
 - `p+:v` moves x and y together — the pair `v` is added to the pair `p`.
-- `if[condition; …]` runs the statements after the condition only when it's true.
+- `(p<40 40)|p>560 560` checks **both** walls in **both** directions at once: a pair of booleans, one for x and one for y.
+- `?[out;-0.9;1]` flips (and slightly slows) whichever direction hit a wall.
+- `40|560&p` clamps x and y back inside the box.
+
+No `if`, no indexing — the whole bounce is pair arithmetic.
 
 ## A thousand balls
 

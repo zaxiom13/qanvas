@@ -105,7 +105,7 @@
   }
 
   function newSketch() {
-    const s: Sketch = { id: newId(), name: "Untitled sketch", code: "background 20\nink `coral\ncircle[center;100]\n", created: Date.now(), updated: Date.now() };
+    const s: Sketch = { id: newId(), name: "Untitled sketch", code: "background 20\ncircle[center;100;`coral]\n", created: Date.now(), updated: Date.now() };
     open(s);
     app.go(`sketch/${s.id}`);
     persist();

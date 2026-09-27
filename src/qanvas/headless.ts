@@ -105,7 +105,7 @@ export function runHeadless(code: string, o: HeadlessOpts): HeadlessResult {
     const setup = s.get("setup");
     if (setup instanceof Lambda) {
       reset();
-      s.call(setup, NIL);
+      s.call(setup, ...nils(setup));
     }
     const draw = s.get("draw");
     if (draw instanceof Lambda) {
@@ -115,7 +115,7 @@ export function runHeadless(code: string, o: HeadlessOpts): HeadlessResult {
         api.drawn = {};
         reset();
         deadline();
-        s.call(draw, NIL);
+        s.call(draw, ...nils(draw));
       }
     }
   } catch (e) {
@@ -145,7 +145,7 @@ export function createPlayer(code: string, ctx: CanvasRenderingContext2D, scale:
       ctx.setTransform(scale, 0, 0, scale, ox, oy);
       s.deadline = performance.now() + 60;
       try {
-        s.call(draw, NIL);
+        s.call(draw, ...nils(draw));
       } catch {
         return false;
       } finally {
@@ -155,3 +155,6 @@ export function createPlayer(code: string, ctx: CanvasRenderingContext2D, scale:
     },
   };
 }
+
+/** A sketch function may use x, y or z as variables, which gives it that many implicit arguments — fill them all. */
+export const nils = (f: Lambda) => new Array(Math.max(1, f.rank)).fill(NIL);

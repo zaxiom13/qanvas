@@ -5,7 +5,7 @@
   import { getProgress, markDone, saveAnswer } from "../lib/storage";
   import CodeEditor from "./CodeEditor.svelte";
   import ErrorCard from "./ErrorCard.svelte";
-  import ValueView from "./ValueView.svelte";
+  import ValueView, { hasVisual, isTabular } from "./ValueView.svelte";
   import type { QValue } from "../q/index";
   import { Check, CircleCheck, CircleX, Eye, Lightbulb, RotateCcw, Target } from "./icons";
 
@@ -119,7 +119,8 @@
   {#if shown}
     <div class="answer">
       <div class="label">{show}</div>
-      {#if shown.value}<ValueView value={shown.value} />{:else}<pre>{shown.text}</pre>{/if}
+      {#if !shown.value || !isTabular(shown.value)}<pre>{shown.text}</pre>{/if}
+      {#if shown.value && hasVisual(shown.value)}<ValueView value={shown.value} />{/if}
     </div>
   {/if}
 

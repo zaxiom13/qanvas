@@ -28,12 +28,11 @@ Before drawing the circle, let's paint the background and choose an ink:
 
 ```q sketch
 background 30
-ink `coral
-circle[300 300;100]
+circle[300 300;100;`coral]
 ```
 
 - `background 30` fills everything with a dark gray — 0 is black and 255 is white.
-- ``ink `coral`` sets the fill colour for whatever comes next. `` `coral `` is a **symbol**: q's way of writing a name. You'll meet lots of them.
+- The optional third argument is the circle's colour. `` `coral `` is a **symbol**: q's way of writing a name. You'll meet lots of them.
 
 Notice that `background 30` has no brackets. When a function takes one argument, you can simply put the argument after it with a space. `background[30]` works too.
 
@@ -52,8 +51,7 @@ When you run a plain expression, you see its **value** underneath. Click the lit
 ```q challenge
 %% goal Draw one big circle — radius 150 or more — right in the middle, on a black background.
 background 30
-ink `lemon
-circle[300 100;50]
+circle[300 100;50;`lemon]
 %% check 1=drawn`circle | Draw exactly one circle.
 %% check 0=arg[`background;0] | The background should be black: background 0.
 %% check all center=arg[`circle;0] | Put the circle in the middle — use center (or 300 300).
@@ -62,6 +60,5 @@ circle[300 100;50]
 %% hint The position is the first argument of circle; the radius is the second.
 %% solution
 background 0
-ink `lemon
-circle[center;150]
+circle[center;150;`lemon]
 ```
