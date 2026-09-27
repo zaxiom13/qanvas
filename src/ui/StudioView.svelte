@@ -47,7 +47,7 @@
   // mobile picture-in-picture: drag to move, tap to open the canvas, × to hide until the next run
   let pipClosed = $state(false);
   let pipPos = $state<[number, number]>([0, 0]);
-  const pip = $derived(mtab === "code" && runState === "running" && !pipClosed);
+  const pip = $derived(mtab === "code" && runState !== "idle" && runState !== "error" && !pipClosed);
   function pipDown(e: PointerEvent) {
     const start = [e.clientX, e.clientY], from = [...pipPos];
     let moved = false;
