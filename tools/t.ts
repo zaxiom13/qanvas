@@ -1,8 +1,7 @@
-import { Session, formatError } from "../src/q/index";
-import { QANVAS_Q } from "../src/qanvas/qlib";
+import { Session, inline } from "../src/q/index";
 const s = new Session();
-for (const line of QANVAS_Q.split("\n")) {
-  if (!line.trim() || line.startsWith("\\")) { if (line.startsWith("\d")) s.run(line); continue; }
-  const r = s.evaluate(line);
-  if (r.error) console.log(line, "\n  ", r.errorText, r.error.hint);
+for (const src of ["2*3+4", "sum til 10", "x:3; x*x", "{x*2} each 1 2 3"]) {
+  const { steps } = s.trace(src);
+  console.log(src);
+  for (const st of steps) console.log("   ", src.slice(st.s, st.e).padEnd(18), "→", inline(st.value, 7));
 }

@@ -37,6 +37,7 @@ export interface EvalResult {
 }
 
 const MAX_DEPTH = 2000;
+const TRACEABLE = new Set(["mono", "dyad", "app", "sql", "cond", "list", "table", "lsect", "assign"]);
 
 /** Mulberry32 PRNG — deterministic for \S seeds. */
 function prng(seed: number) {
@@ -311,7 +312,27 @@ export class Session {
     return `'${name}' is not defined.` + (best ? ` Did you mean '${best}'?` : "") + lam;
   }
 
+  /** optional hook receiving (node, value) for top-level evaluation steps */
+  tracer: ((n: Node, v: QValue) => void) | null = null;
+
   ev(n: Node, fr: Frame): QValue {
+    const v = this.ev0(n, fr);
+    if (this.tracer && this.depth === 0 && TRACEABLE.has(n.k)) this.tracer(n, v);
+    return v;
+  }
+
+  /** Evaluate src, recording each intermediate result (in q's right-to-left order). */
+  trace(src: string): { steps: { s: number; e: number; value: QValue }[]; result: EvalResult } {
+    const steps: { s: number; e: number; value: QValue }[] = [];
+    this.tracer = (n, v) => steps.push({ s: n.s, e: n.e, value: v });
+    try {
+      return { steps, result: this.evaluate(src) };
+    } finally {
+      this.tracer = null;
+    }
+  }
+
+  ev0(n: Node, fr: Frame): QValue {
     if (this.interrupt) throw new QError("stop", "Stopped.");
     switch (n.k) {
       case "lit":

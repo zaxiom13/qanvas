@@ -26,7 +26,7 @@ export interface Surface {
 export interface Style {
   ink: Paint;
   pen: Paint;
-  weight: number;
+  weight: number | Float64Array;
   fontSize: number;
   fontFamily: string;
   align: CanvasTextAlign;
@@ -75,13 +75,17 @@ export class Api {
     return k.css[i % k.css.length];
   }
   private uniform() {
-    return this.style.ink.kind !== "many" && this.style.pen.kind !== "many";
+    return this.style.ink.kind !== "many" && this.style.pen.kind !== "many" && typeof this.style.weight === "number";
+  }
+  weightAt(i: number): number {
+    const w = this.style.weight;
+    return typeof w === "number" ? w : w[i % w.length];
   }
 
   /** Draw n shapes, each traced by `trace(ctx, i)`. Batches into one path when style is uniform. */
   private shapes(n: number, trace: (c: CanvasRenderingContext2D, i: number) => void, closedFill = true) {
     const c = this.s.ctx();
-    c.lineWidth = this.style.weight;
+    c.lineWidth = this.weightAt(0);
     if (this.uniform()) {
       const f = this.fillAt(0), st = this.strokeAt(0);
       if (!f && !st) return;
@@ -100,6 +104,7 @@ export class Api {
     for (let i = 0; i < n; i++) {
       const f = this.fillAt(i), st = this.strokeAt(i);
       if (!f && !st) continue;
+      c.lineWidth = this.weightAt(i);
       c.beginPath();
       trace(c, i);
       if (f && closedFill) {
@@ -183,7 +188,7 @@ export class Api {
 
   point(p: QValue) {
     const P = points(p, "point");
-    const r = Math.max(0.5, this.style.weight / 2);
+    const r = Math.max(0.5, this.weightAt(0) / 2);
     const c = this.s.ctx();
     const col = this.strokeAt(0) ?? this.fillAt(0);
     if (this.style.pen.kind === "many" || (this.style.pen.kind === "none" && this.style.ink.kind === "many")) {
@@ -261,7 +266,8 @@ export class Api {
     // a single polygon is (xs;ys); several are a list of those
     if (p instanceof QVec && p.t === 0) {
       const its = p.d as QValue[];
-      const isSingle = (its.length === 2 || its.length === 3) && its.every((e) => e instanceof QVec && e.t !== 0);
+      const flat = (e: QValue) => e instanceof QAtom || (e instanceof QVec && (e.t !== 0 || (e.d as QValue[]).every((z) => z instanceof QAtom)));
+      const isSingle = (its.length === 2 || its.length === 3) && its.every(flat);
       if (!isSingle) return its.map((e, i) => points(e, `polygon ${i}`));
     }
     return [points(p, "polygon points")];
@@ -310,7 +316,7 @@ export class Api {
     c.font = `${this.style.fontSize}px ${this.style.fontFamily}`;
     c.textAlign = this.style.align;
     c.textBaseline = this.style.baseline;
-    c.lineWidth = this.style.weight;
+    c.lineWidth = this.weightAt(0);
     for (let i = 0; i < n; i++) {
       const t = strs[i % strs.length];
       const f = this.fillAt(i), st = this.strokeAt(i);
@@ -501,7 +507,11 @@ export function installApi(session: Session, api: Api) {
   set("clear", b1("clear", () => (api.background(sym("none")), unit)));
   set("ink", b1("ink", (x) => (api.setInk(x), unit)));
   set("pen", b1("pen", (x) => (api.setPen(x), unit)));
-  set("weight", b1("weight", (x) => ((api.style.weight = num(x, "weight")), unit)));
+  set("weight", b1("weight", (x) => {
+    const w = nums(x, "weight");
+    api.style.weight = w.length === 1 ? w[0] : Float64Array.from(w);
+    return unit;
+  }));
   set("alpha", b1("alpha", (x) => ((api.s.ctx().globalAlpha = Math.max(0, Math.min(1, num(x, "alpha") / 255))), unit)));
   set("blend", b1("blend", (x) => {
     const m: Record<string, GlobalCompositeOperation> = {

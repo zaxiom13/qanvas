@@ -305,7 +305,8 @@ export class Parser {
     const op = opTok.text === ":" || opTok.text === "::" ? null : opTok.text.slice(0, -1);
     const name = nt.text;
     if (op || idx) this.noteUse(name);
-    this.noteAssign(name, global);
+    // only a plain `name:value` introduces a local; `name+:v` and `name[i]:v` amend whatever `name` already is
+    if (!op && !idx) this.noteAssign(name, global);
     const v = this.expr(new Set());
     if (!v) throw this.err(`Nothing to assign to '${name}'.`, opTok);
     return { k: "assign", name, idx, op, global, v, s: nt.s, e: v.e };
