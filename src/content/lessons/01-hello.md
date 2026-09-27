@@ -20,7 +20,7 @@ A circle! Let's unpack that line:
 
 The canvas is 600 pixels wide and 600 tall. The top-left corner is `0 0`, and **y grows downward**, like reading a page.
 
-> **Try it:** change `300 300` to `100 150` and run again. Then try a bigger radius. Hold <kbd>Alt</kbd> and drag a number sideways to change it live.
+> **Try it:** change `300 300` to `100 150` and run again. Then try a bigger radius.
 
 ## Colour and background
 

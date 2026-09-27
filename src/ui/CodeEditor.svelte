@@ -2,18 +2,16 @@
   import { EditorState } from "@codemirror/state";
   import { EditorView } from "@codemirror/view";
   import { onDestroy, onMount } from "svelte";
-  import { qExtensions, setQError, toggleScrub } from "../editor/extensions";
+  import { qExtensions, setQError } from "../editor/extensions";
 
   interface Props {
     value: string;
     onChange?: (v: string) => void;
     onRun?: () => void;
-    onScrub?: () => void;
     error?: { from: number; to: number; message: string } | null;
     compact?: boolean;
     readOnly?: boolean;
     placeholder?: string;
-    scrub?: boolean;
     view?: EditorView | null;
     label?: string;
     consoleMode?: boolean;
@@ -24,12 +22,10 @@
     value,
     onChange,
     onRun,
-    onScrub,
     error = null,
     compact = false,
     readOnly = false,
     placeholder,
-    scrub = false,
     view = $bindable(null),
     label = "q code editor",
     consoleMode = false,
@@ -52,7 +48,6 @@
           console: consoleMode,
           onHistory: (d) => onHistory?.(d) ?? null,
           onRun: () => onRun?.(),
-          onScrub: onScrub ? () => onScrub?.() : undefined,
           onChange: (v) => {
             current = v;
             onChange?.(v);
@@ -82,10 +77,6 @@
     if (view) setQError(view, e);
   });
 
-  $effect(() => {
-    const s = scrub;
-    if (view) toggleScrub(view, s);
-  });
 </script>
 
 <div class="editor" class:compact bind:this={host}></div>

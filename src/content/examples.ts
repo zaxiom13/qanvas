@@ -41,7 +41,7 @@ export const EXAMPLES: Example[] = Object.keys(files)
 export const EXAMPLE_BY_ID = new Map(EXAMPLES.map((e) => [e.id, e]));
 
 export const DEFAULT_SKETCH = `/ Welcome to the studio. Press Run (or Ctrl+Enter).
-/ Hold Alt and drag any number to change it live.
+/ Change a number and it re-runs live.
 
 draw:{
   background 20;

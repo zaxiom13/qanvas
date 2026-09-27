@@ -52,8 +52,6 @@ export const editorTheme = EditorView.theme({
   },
   ".cm-panels": { background: "var(--surface)", color: "var(--text)" },
   ".cm-placeholder": { color: "var(--text-3)", fontStyle: "italic" },
-  ".cm-scrub": { cursor: "ew-resize", borderBottom: "1px dashed color-mix(in srgb, var(--syn-number) 60%, transparent)" },
-  ".cm-scrubbing": { background: "color-mix(in srgb, var(--syn-number) 18%, transparent)", borderRadius: "3px" },
 });
 
 // ---------- completion ----------
@@ -159,109 +157,11 @@ export const setQError = (view: EditorView, err: { from: number; to: number; mes
   view.dispatch(setDiagnostics(view.state, diags));
 };
 
-// ---------- number scrubbing (Alt/Option-drag a number, or drag in scrub mode) ----------
-const setScrubMode = StateEffect.define<boolean>();
-export const scrubModeField = StateField.define<boolean>({
-  create: () => false,
-  update(v, tr) {
-    for (const e of tr.effects) if (e.is(setScrubMode)) return e.value;
-    return v;
-  },
-});
-export const toggleScrub = (view: EditorView, on: boolean) => view.dispatch({ effects: setScrubMode.of(on) });
-
-const NUM_AT = /-?\d+\.?\d*(?:e[+-]?\d+)?/g;
-
-function numberAt(view: EditorView, pos: number): { from: number; to: number; text: string } | null {
-  const line = view.state.doc.lineAt(pos);
-  for (const m of line.text.matchAll(NUM_AT)) {
-    const from = line.from + m.index!, to = from + m[0].length;
-    if (pos >= from && pos <= to) {
-      const before = line.text[m.index! - 1] ?? " ";
-      if (/[a-zA-Z_`]/.test(before)) return null;
-      if (/[a-zA-Z_:]/.test(line.text[m.index! + m[0].length] ?? "") && line.text[m.index! + m[0].length] !== "f") return null;
-      return { from, to, text: m[0] };
-    }
-  }
-  return null;
-}
-
-export function scrubber(onScrub: () => void): Extension {
-  const plugin = ViewPlugin.fromClass(
-    class {
-      decos: DecorationSet = Decoration.none;
-      active: { from: number; to: number; start: number; x: number; decimals: number; base: number } | null = null;
-      constructor(readonly view: EditorView) {}
-      update(u: ViewUpdate) {
-        if (u.docChanged && this.active) {
-          // keep range in sync as text length changes
-        }
-      }
-    },
-    {
-      eventHandlers: {
-        pointerdown(e: PointerEvent, view: EditorView) {
-          const scrubMode = view.state.field(scrubModeField, false);
-          if (!e.altKey && !scrubMode) return false;
-          const pos = view.posAtCoords({ x: e.clientX, y: e.clientY });
-          if (pos == null) return false;
-          const n = numberAt(view, pos);
-          if (!n) return false;
-          e.preventDefault();
-          const dec = n.text.includes(".") ? n.text.split(".")[1].length : 0;
-          let cur = { from: n.from, to: n.to };
-          const base = parseFloat(n.text);
-          const x0 = e.clientX;
-          const el = e.target as HTMLElement;
-          el.setPointerCapture?.(e.pointerId);
-          let last = n.text;
-          const step = dec ? Math.pow(10, -dec) : Math.max(1, Math.abs(base) >= 100 ? 1 : 1);
-          const move = (ev: PointerEvent) => {
-            const dx = ev.clientX - x0;
-            const fine = ev.shiftKey ? 0.1 : 1;
-            let v = base + Math.round((dx / 4) * fine) * step;
-            let s = dec ? v.toFixed(dec) : String(Math.round(v));
-            if (s === "-0") s = "0";
-            if (s === last) return;
-            view.dispatch({ changes: { from: cur.from, to: cur.to, insert: s }, userEvent: "input.scrub" });
-            cur = { from: cur.from, to: cur.from + s.length };
-            last = s;
-            onScrub();
-          };
-          const up = () => {
-            window.removeEventListener("pointermove", move);
-            window.removeEventListener("pointerup", up);
-          };
-          window.addEventListener("pointermove", move);
-          window.addEventListener("pointerup", up);
-          return true;
-        },
-      },
-    },
-  );
-  const numMark = new MatchDecorator({ regexp: /(?<![\w`.])-?\d+\.?\d*(?![\w:])/g, decoration: Decoration.mark({ class: "cm-scrub" }) });
-  const marks = ViewPlugin.fromClass(
-    class {
-      decos: DecorationSet;
-      constructor(view: EditorView) {
-        this.decos = view.state.field(scrubModeField, false) ? numMark.createDeco(view) : Decoration.none;
-      }
-      update(u: ViewUpdate) {
-        const on = u.state.field(scrubModeField, false);
-        this.decos = on ? (u.docChanged || u.viewportChanged || !u.startState.field(scrubModeField, false) ? numMark.createDeco(u.view) : numMark.updateDeco(u, this.decos)) : Decoration.none;
-      }
-    },
-    { decorations: (v) => v.decos },
-  );
-  return [scrubModeField, plugin, marks];
-}
-
 export interface EditorOpts {
   lineNumbers?: boolean;
   placeholder?: string;
   onRun?: () => void;
   onChange?: (text: string) => void;
-  onScrub?: () => void;
   readOnly?: boolean;
   compact?: boolean;
   /** console mode: Enter runs, Up/Down walk history */
@@ -323,6 +223,5 @@ export function qExtensions(o: EditorOpts): Extension[] {
   if (!o.compact) ext.push(highlightActiveLine());
   if (o.placeholder) ext.push(cmPlaceholder(o.placeholder));
   if (o.readOnly) ext.push(EditorState.readOnly.of(true), EditorView.editable.of(false));
-  if (o.onScrub) ext.push(scrubber(o.onScrub));
   return ext;
 }

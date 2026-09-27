@@ -9,7 +9,7 @@
   import Stage from "./Stage.svelte";
   import HeroArt from "./HeroArt.svelte";
   import { runHeadless } from "../qanvas/headless";
-  import { ArrowLeft, ArrowRight, CircleCheck, Compass, Maximize, Minimize, Palette, Sparkles } from "./icons";
+  import { X, ArrowLeft, ArrowRight, CircleCheck, Compass, Maximize, Minimize, Palette, Sparkles } from "./icons";
 
   let { mobile }: { mobile: boolean } = $props();
 
@@ -42,9 +42,31 @@
     });
   });
 
+  let pipClosed = $state(false);
+  let pipPos = $state<[number, number]>([0, 0]);
+  function pipDown(e: PointerEvent) {
+    const start = [e.clientX, e.clientY], from = [...pipPos];
+    let moved = false;
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - start[0], dy = ev.clientY - start[1];
+      if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+      if (moved) pipPos = [from[0] + dx, from[1] + dy];
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      if (!moved) stageOpen = true;
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+  }
+
   async function runSketch(code: string): Promise<Explained | null> {
     if (!stage) return null;
     hasDrawn = true;
+    pipClosed = false;
     if (mobile) stageOpen = true;
     return stage.run(code);
   }
@@ -167,7 +189,12 @@
       </div>
     </article>
 
-    <aside class="stage" class:pip={mobile && !stageOpen} class:open={mobile && stageOpen} class:hide={mobile && !hasDrawn}>
+    <aside class="stage" class:pip={mobile && !stageOpen} class:open={mobile && stageOpen} class:hide={mobile && (!hasDrawn || pipClosed)} style:translate={mobile && !stageOpen ? `${pipPos[0]}px ${pipPos[1]}px` : null}>
+      {#if mobile && !stageOpen}
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <div class="drag" onpointerdown={pipDown}></div>
+        <button class="pipx" aria-label="Hide the mini canvas" onclick={() => (pipClosed = true)}><X size={14} /></button>
+      {/if}
       {#if mobile}
         <button class="grow btn sm icon" onclick={() => (stageOpen = !stageOpen)} aria-label={stageOpen ? "Shrink canvas" : "Expand canvas"}>
           {#if stageOpen}<Minimize size={15} />{:else}<Maximize size={15} />{/if}
@@ -568,7 +595,29 @@
     opacity: 0;
     pointer-events: none;
   }
+  .drag {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    touch-action: none;
+  }
+  .pipx {
+    position: absolute;
+    top: 4px;
+    left: 4px;
+    z-index: 4;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, #000 55%, transparent);
+    color: #fff;
+  }
   .grow {
+    z-index: 4 !important;
     position: absolute;
     top: 6px;
     right: 6px;

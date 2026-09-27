@@ -13,7 +13,7 @@
   import Gallery from "./Gallery.svelte";
   import SymbolBar from "./SymbolBar.svelte";
   import type { EditorView } from "@codemirror/view";
-  import { Check, Code, FolderOpen, MoveHorizontal, Play, Plus, Share, Sparkles, Terminal, Wand } from "./icons";
+  import { X, Check, Code, FolderOpen, Play, Plus, Share, Sparkles, Terminal, Wand } from "./icons";
 
   interface Props {
     active: boolean;
@@ -30,7 +30,6 @@
   let galleryOpen = $state(false);
   let galleryTab = $state<"examples" | "mine">("examples");
   let mtab = $state<"code" | "canvas" | "console">("code");
-  let scrub = $state(false);
   let runState = $state<RunState>("idle");
   let toast = $state("");
   let loadedKey: string | null = null;
@@ -45,7 +44,31 @@
     }
   });
 
+  // mobile picture-in-picture: drag to move, tap to open the canvas, × to hide until the next run
+  let pipClosed = $state(false);
+  let pipPos = $state<[number, number]>([0, 0]);
+  const pip = $derived(mtab === "code" && runState === "running" && !pipClosed);
+  function pipDown(e: PointerEvent) {
+    const start = [e.clientX, e.clientY], from = [...pipPos];
+    let moved = false;
+    const el = e.currentTarget as HTMLElement;
+    el.setPointerCapture(e.pointerId);
+    const move = (ev: PointerEvent) => {
+      const dx = ev.clientX - start[0], dy = ev.clientY - start[1];
+      if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
+      if (moved) pipPos = [from[0] + dx, from[1] + dy];
+    };
+    const up = () => {
+      el.removeEventListener("pointermove", move);
+      el.removeEventListener("pointerup", up);
+      if (!moved) mtab = "canvas";
+    };
+    el.addEventListener("pointermove", move);
+    el.addEventListener("pointerup", up);
+  }
+
   function run() {
+    pipClosed = false;
     if (!stage) {
       pendingRun = true;
       return;
@@ -76,10 +99,6 @@
     }
   }
 
-  function onScrub() {
-    clearTimeout(runTimer);
-    runTimer = setTimeout(run, 30);
-  }
 
   async function persist() {
     sketch = { ...sketch, code, updated: Date.now() };
@@ -198,10 +217,6 @@
       <input type="checkbox" checked={app.autoRun} onchange={(e) => app.setAutoRun((e.currentTarget as HTMLInputElement).checked)} />
       <Wand size={13} /> live
     </label>
-    <label class="toggle" title="Drag numbers to change them (Alt-drag works any time)">
-      <input type="checkbox" bind:checked={scrub} />
-      <MoveHorizontal size={13} /> scrub numbers
-    </label>
     <div class="spacer"></div>
     <button class="btn sm primary" onclick={run} title="Run (Ctrl+Enter)"><Play size={14} /> Run</button>
   </div>
@@ -209,7 +224,7 @@
 
 {#snippet editor()}
   <div class="edbody">
-    <CodeEditor value={code} onChange={codeChanged} onRun={run} {onScrub} error={edError} {scrub} bind:view label="Sketch code" />
+    <CodeEditor value={code} onChange={codeChanged} onRun={run} error={edError} bind:view label="Sketch code" />
   </div>
 {/snippet}
 
@@ -226,9 +241,10 @@
         {@render editor()}
         <SymbolBar onInsert={insert} />
       </div>
-      <div class="mstage" class:pip={mtab === "code" && runState === "running"} class:show={mtab === "canvas" || (mtab === "code" && runState === "running")}>
+      <div class="mstage" class:pip class:show={mtab === "canvas" || pip} style:translate={pip ? `${pipPos[0]}px ${pipPos[1]}px` : null}>
+        {#if pip}<button class="pipx" aria-label="Hide the mini canvas" onclick={() => (pipClosed = true)}><X size={14} /></button>{/if}
         <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <div class="pipclick" onclick={() => mtab === "code" && (mtab = "canvas")}></div>
+        <div class="pipclick" onpointerdown={pipDown}></div>
         <Stage bind:this={stage} name={sketch.name} {onError} onState={(s) => (runState = s)} onRunRequest={run} />
       </div>
       <div class="mpane" class:show={mtab === "console"}>
@@ -427,7 +443,23 @@
   .mstage.pip :global(.bar) {
     display: none;
   }
+  .pipx {
+    display: flex;
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    z-index: 3;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    border: none;
+    align-items: center;
+    justify-content: center;
+    background: color-mix(in srgb, #000 55%, transparent);
+    color: #fff;
+  }
   .pipclick {
+    touch-action: none;
     display: none;
   }
   .mstage.pip .pipclick {
