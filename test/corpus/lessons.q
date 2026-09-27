@@ -67,3 +67,13 @@ delete from t where n=2
 2026.03.14D09:30:00.000000000
 2026.03.14D09:30:00.000000000+0D00:05:00
 09:30:00+60*til 5
+p:(1 2 3f;10 20 60f);avg each p
+g:(1 0 0;0 1 0;0 0 1);1 rotate g
+1 rotate' g
+g:(0 0 0 0;0 1 1 0;0 1 0 0;0 0 0 0);v:(-1 0 1) rotate\: g;nb:sum raze {(-1 0 1) {x rotate' y}\: x} each v;nb
+sig:{1%1+exp neg x};sig -5 0 5
+X:(0 0f;0 1f;1 0f;1 1f);w:2 -1f;X mmu w
+sig:{1%1+exp neg x};tanh:{-1+2*sig 2*x};W1:(2 8)#0.5*til 16;W2:8#0.1;x:enlist 1 -1f;h:tanh x mmu W1;sig h mmu W2
+S:([] c:(0 0 3.5;-1.25 -0.35 4.4;1.3 -0.45 3.6;0 -101 4); r:1 0.65 0.55 100; col:(1 0.36 0.3;0.3 0.62 1;1 0.85 0.3;0.92 0.9 0.86));S
+hit:{[s] b:sum s[`c]*dir; q:(b*b)-(sum s[`c]*s`c)-s[`r]*s`r; t:b-sqrt q; ?[(q>0)&t>0.001;t;0w]}
+blocked:{[s] o:P-s`c; b:sum o*light; q:(b*b)-(sum o*o)-s[`r]*s`r; (q>0)&0.001<(neg b)+sqrt q}

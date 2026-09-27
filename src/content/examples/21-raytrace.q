@@ -15,7 +15,7 @@ light:unit -1 1.4 -0.8
 hit:{[s] b:sum s[`c]*dir; q:(b*b)-(sum s[`c]*s`c)-s[`r]*s`r; t:b-sqrt q; ?[(q>0)&t>0.001;t;0w]}
 T:hit each S                         / 4 rows of distances, one per sphere
 t:min T                              / nearest hit for every pixel
-k:sum (til 4)*T=\:t                  / ...and which sphere it was
+k:sum (til count S)*T=\:t           / ...and which sphere it was
 P:dir*\:t                            / the hit points
 N:unit P-flip S[`c] k                / surface normals
 
