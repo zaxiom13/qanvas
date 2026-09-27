@@ -5,6 +5,8 @@
   import { getProgress, markDone, saveAnswer } from "../lib/storage";
   import CodeEditor from "./CodeEditor.svelte";
   import ErrorCard from "./ErrorCard.svelte";
+  import ValueView from "./ValueView.svelte";
+  import type { QValue } from "../q/index";
   import { Check, CircleCheck, CircleX, Eye, Lightbulb, RotateCcw, Target } from "./icons";
 
   interface Props {
@@ -16,8 +18,12 @@
     solution: string;
     runSketch: (src: string) => Promise<Explained | null>;
     onSolved?: () => void;
+    /** q expression whose value is shown after each check (e.g. answer) */
+    show?: string;
+    badge?: string;
   }
-  let { id, goal, starter, checks, hints, solution, runSketch, onSolved }: Props = $props();
+  let { id, goal, starter, checks, hints, solution, runSketch, onSolved, show = "", badge = "Your turn" }: Props = $props();
+  let shown = $state<{ text: string; value?: QValue } | null>(null);
 
   let code = $state(starter);
   let outcome = $state<CheckOutcome | null>(null);
@@ -43,6 +49,11 @@
     checking = true;
     const visErr = await runSketch(code);
     outcome = visErr ? { ok: false, runError: visErr, results: [] } : checkCode(code, checks, offscreenCtx());
+    shown = null;
+    if (show && outcome.session) {
+      const r = outcome.session.evaluate(show);
+      shown = r.error ? { text: `'${r.error.qname}` } : { text: r.text, value: r.value };
+    }
     checking = false;
     if (outcome.ok) {
       const first = !solved;
@@ -61,7 +72,7 @@
 
 <section class="challenge" class:solved aria-label="Challenge">
   <header>
-    <span class="badge"><Target size={15} /> Your turn</span>
+    <span class="badge"><Target size={15} /> {badge}</span>
     {#if solved}<span class="done"><CircleCheck size={15} /> solved</span>{/if}
   </header>
   <p class="goal">{goal}</p>
@@ -102,6 +113,13 @@
           {/each}
         </ul>
       {/if}
+    </div>
+  {/if}
+
+  {#if shown}
+    <div class="answer">
+      <div class="label">{show}</div>
+      {#if shown.value}<ValueView value={shown.value} />{:else}<pre>{shown.text}</pre>{/if}
     </div>
   {/if}
 
@@ -269,6 +287,20 @@
     border: 1px solid var(--line);
     border-radius: 10px;
     overflow: hidden;
+  }
+  .answer {
+    margin-top: 12px;
+    padding: 12px;
+    border-radius: 12px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    overflow-x: auto;
+  }
+  .answer pre {
+    margin: 0;
   }
   .label {
     font-size: 12px;

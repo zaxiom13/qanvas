@@ -12,7 +12,7 @@ import { highlightToHtml } from "../editor/qlang";
 export type Block =
   | { kind: "html"; html: string }
   | { kind: "cell"; code: string; sketch: boolean; id: string }
-  | { kind: "challenge"; id: string; starter: string; goal: string; checks: { expr: string; msg: string }[]; hints: string[]; solution: string };
+  | { kind: "challenge"; id: string; starter: string; goal: string; checks: { expr: string; msg: string }[]; hints: string[]; solution: string; title: string; level: string; show: string };
 
 export interface Lesson {
   id: string;
@@ -55,7 +55,7 @@ function parseChallenge(body: string, id: string): Block {
   const checks: { expr: string; msg: string }[] = [];
   const hints: string[] = [];
   const solution: string[] = [];
-  let goal = "";
+  let goal = "", title = "", level = "", show = "";
   let inSolution = false;
   for (const line of lines) {
     if (inSolution) {
@@ -69,6 +69,9 @@ function parseChallenge(body: string, id: string): Block {
     }
     const [, k, rest] = m;
     if (k === "goal") goal = rest;
+    else if (k === "title") title = rest;
+    else if (k === "level") level = rest;
+    else if (k === "show") show = rest;
     else if (k === "hint") hints.push(rest);
     else if (k === "solution") inSolution = true;
     else if (k === "check") {
@@ -77,7 +80,7 @@ function parseChallenge(body: string, id: string): Block {
     }
   }
   const trim = (a: string[]) => a.join("\n").replace(/^\n+|\s+$/g, "") + "\n";
-  return { kind: "challenge", id, starter: trim(starter), goal, checks, hints, solution: trim(solution) };
+  return { kind: "challenge", id, starter: trim(starter), goal, checks, hints, solution: trim(solution), title, level, show };
 }
 
 export function parseLesson(file: string, src: string, n: number): Lesson {

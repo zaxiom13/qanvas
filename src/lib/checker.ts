@@ -11,6 +11,7 @@ export interface CheckResult {
 
 export interface CheckOutcome {
   ok: boolean;
+  session?: import("../q/index").Session;
   runError?: Explained;
   results: CheckResult[];
 }
@@ -26,6 +27,7 @@ export function checkCode(code: string, checks: { expr: string; msg: string }[],
   const called = Object.keys(r.calls);
   ns.set("drew", dict(syms(called), list(called.map((k) => list(r.calls[k].map((args) => list(args)))))));
   s.run(".qv.arg:{[k;i] (last drew k) i}");
+  s.run(".qv.same:{$[(type x) in 98 99h;x~y;(count x)<>count y;0b;all raze x=y]}");
   const results = checks.map((c): CheckResult => {
     const res = s.evaluate(c.expr);
     if (res.error) return { ...c, pass: false, error: `'${res.error.qname}${res.error.hint ? " — " + res.error.hint : ""}` };
@@ -33,7 +35,7 @@ export function checkCode(code: string, checks: { expr: string; msg: string }[],
     const pass = v instanceof QAtom && typeof v.v === "number" && v.v !== 0 && v.v === v.v;
     return { ...c, pass };
   });
-  return { ok: results.every((x) => x.pass), results };
+  return { ok: results.every((x) => x.pass), results, session: s };
 }
 
 export function offscreenCtx(): CanvasRenderingContext2D {
