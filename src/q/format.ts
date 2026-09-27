@@ -217,7 +217,15 @@ function colCells(c: QValue, n: number, p: number): string[] {
     const t = c.t;
     const d = c.d as any;
     const out = new Array<string>(n);
-    if (t === 0) for (let i = 0; i < n; i++) out[i] = inlineNested(d[i], p);
+    if (t === 0) {
+      // equal-length vectors in a column print as aligned sub-columns
+      const grid = gridCells((d as QValue[]).slice(0, n), p);
+      if (grid && grid[0] && grid[0].length > 1 && (d as QValue[]).every((e) => e instanceof QVec && e.t !== 0)) {
+        const w: number[] = [];
+        for (const r of grid) r.forEach((c, j) => (w[j] = Math.max(w[j] ?? 0, c.length)));
+        for (let i = 0; i < n; i++) out[i] = grid[i].map((c, j) => pad(c, w[j])).join(" ");
+      } else for (let i = 0; i < n; i++) out[i] = inlineNested(d[i], p);
+    }
     else if (t === 10) for (let i = 0; i < n; i++) out[i] = d[i];
     else if (t === 11 || t === 2) for (let i = 0; i < n; i++) out[i] = d[i];
     else if (t === 1) for (let i = 0; i < n; i++) out[i] = d[i] ? "1" : "0";
