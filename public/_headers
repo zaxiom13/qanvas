@@ -1,0 +1,8 @@
+# Cloudflare Pages headers. Never let browsers/CDN hold on to the service
+# worker or the HTML shell, otherwise returning visitors see an old build.
+/sw.js
+  Cache-Control: no-cache, no-store, must-revalidate
+/index.html
+  Cache-Control: no-cache
+/
+  Cache-Control: no-cache
