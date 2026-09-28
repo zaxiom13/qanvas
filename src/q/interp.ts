@@ -364,6 +364,12 @@ export class Session {
           return this.guard(() => this.apply(b, [x]), n.f);
         }
         const f = this.ev(n.f, fr);
+        if (f === NIL && n.f.k === "app") {
+          // `circle[p;r]` returns (::), and q happily applies that to whatever follows, so a missing `;`
+          // silently reorders the statements (the next line runs first). Almost never intended: say so.
+          const callee = n.f.f.k === "name" ? n.f.f.n : "that call";
+          throw new QError("type", `${callee}[...] gives back nothing, so it can't be applied to what follows. Missing a ; after it?`).at(n.f);
+        }
         return this.guard(() => this.applyJux(f, x), n.f);
       }
       case "dyad": {

@@ -5,11 +5,14 @@ import { QANVAS_Q } from "../src/qanvas/qlib";
 /** A CanvasRenderingContext2D stand-in that records calls. */
 export function mockCtx() {
   const calls: string[] = [];
+  /** fillStyle in force at each fill() call, so tests can check which colour a shape got. */
+  const fills: unknown[] = [];
   const target: Record<string, unknown> = { canvas: { width: 600, height: 600 } };
   const ctx = new Proxy(target, {
     get(t, k: string) {
       if (k in t) return t[k];
       return (...args: unknown[]) => {
+        if (k === "fill") fills.push(t.fillStyle);
         calls.push(k + "(" + args.map((a) => (typeof a === "number" ? Math.round(a * 100) / 100 : typeof a)).join(",") + ")");
       };
     },
@@ -18,11 +21,11 @@ export function mockCtx() {
       return true;
     },
   }) as unknown as CanvasRenderingContext2D;
-  return { ctx, calls };
+  return { ctx, calls, fills };
 }
 
 export function sketchSession() {
-  const { ctx, calls } = mockCtx();
+  const { ctx, calls, fills } = mockCtx();
   const out: string[] = [];
   const surface: Surface = {
     ctx: () => ctx,
@@ -62,5 +65,5 @@ export function sketchSession() {
   ns.set("level", float(0));
   ns.set("spectrum", floats(new Float64Array(64)));
   ns.set("cam", list([floats(new Float64Array(8))]));
-  return { s, api, calls, out };
+  return { s, api, calls, fills, out };
 }
