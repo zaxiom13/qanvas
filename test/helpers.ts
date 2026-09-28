@@ -1,6 +1,8 @@
 import { Session, floats, bool, long, float, syms, list } from "../src/q/index";
 import { Api, Surface, installApi } from "../src/qanvas/api";
 import { QANVAS_Q } from "../src/qanvas/qlib";
+import { Lambda } from "../src/q/fns";
+import { nils } from "../src/qanvas/headless";
 
 /** A CanvasRenderingContext2D stand-in that records calls. */
 export function mockCtx() {
@@ -66,4 +68,33 @@ export function sketchSession() {
   ns.set("spectrum", floats(new Float64Array(64)));
   ns.set("cam", list([floats(new Float64Array(8))]));
   return { s, api, calls, fills, out };
+}
+
+/** Run a sketch like the runtime does: top level, setup, then a few frames of draw. */
+export function runSketch(code: string, frames = 3) {
+  const { s, calls, out } = sketchSession();
+  const fail = (stage: string, e: unknown) => {
+    const err = e as { qname?: string; hint?: string; message?: string };
+    return `${stage}: '${err.qname ?? err.message} ${err.hint ?? ""}`;
+  };
+  try {
+    s.run(code);
+  } catch (e) {
+    return { error: fail("top level", e), calls, out };
+  }
+  for (const name of ["setup", "draw"]) {
+    const f = s.get(name);
+    if (!(f instanceof Lambda)) continue;
+    const times = name === "draw" ? frames : 1;
+    for (let i = 0; i < times; i++) {
+      s.nsMap(".qv").set("frame", long(i));
+      s.nsMap(".qv").set("time", float(i / 60));
+      try {
+        s.call(f, ...nils(f as Lambda));
+      } catch (e) {
+        return { error: fail(`${name} (frame ${i})`, e), calls, out };
+      }
+    }
+  }
+  return { error: null, calls, out };
 }

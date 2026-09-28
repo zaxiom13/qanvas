@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { runSketch } from "./examples.test";
 import { formatError } from "../src/q/errors";
-import { sketchSession } from "./helpers";
+import { runSketch, sketchSession } from "./helpers";
 import { Lambda } from "../src/q/fns";
 import { nils } from "../src/qanvas/headless";
 import "./dom-shims";
