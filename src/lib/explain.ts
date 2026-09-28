@@ -28,17 +28,6 @@ export function explainError(err: QError, src: string): Explained {
       const at = src.indexOf(err.span.src);
       if (at >= 0) out.where = { from: at + s, to: at + e };
     }
-    // a line break inside {...} is not a statement separator in q
-    const before = code.slice(0, s);
-    const nl = before.lastIndexOf("\n");
-    if (nl >= 0 && /^\s*$/.test(before.slice(nl + 1))) {
-      const prev = before.slice(0, nl).replace(/\s*\/[^\n]*$/, "").trimEnd();
-      const last = prev[prev.length - 1];
-      const insideLambda = (code.slice(0, s).match(/\{/g) ?? []).length > (code.slice(0, s).match(/\}/g) ?? []).length || !!err.span.src;
-      if (insideLambda && last && !";{[(".includes(last)) {
-        out.tip = "Inside { } a line break doesn't end a statement. Put a ; at the end of the previous line.";
-      }
-    }
   }
   if (!ERROR_HELP[err.qname] && /^[a-zA-Z_.][\w.]*$/.test(err.qname) && !out.hint) {
     out.help = `'${err.qname} usually means the name ${err.qname} has no value yet — define it before you use it.`;

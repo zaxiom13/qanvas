@@ -1,0 +1,297 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: Inter; src: url(../../node_modules/@fontsource-variable/inter/files/inter-latin-wght-normal.woff2) format("woff2"); font-weight: 100 900; }
+  @font-face { font-family: JBM; src: url(../../node_modules/@fontsource-variable/jetbrains-mono/files/jetbrains-mono-latin-wght-normal.woff2) format("woff2"); font-weight: 100 800; }
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #100e19; font-family: Inter, sans-serif; }
+  canvas.layer { position: absolute; inset: 0; }
+  .abs { position: absolute; }
+  .grad { background: linear-gradient(100deg, #ff7d6e 0%, #b86bff 55%, #6d7bff 100%); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+  /* phone */
+  .phone { position: absolute; left: 0; top: 0; width: 636px; height: 1376px; transform-origin: 50% 50%; }
+  .phone svg.body { position: absolute; inset: 0; overflow: visible; }
+  .phone .screen { position: absolute; left: 18px; top: 18px; width: 600px; height: 1340px; border-radius: 80px; overflow: hidden; background: #fbf8f1; }
+  .phone .status { position: absolute; left: 0; right: 0; top: 0; height: 42px; display: flex; align-items: center; justify-content: space-between; padding: 6px 54px 0 62px; box-sizing: border-box; font: 700 21px Inter; color: #1c1a24; }
+  .phone .shot { position: absolute; left: 0; top: 42px; width: 600px; height: 1298px; display: block; }
+  .phone .island { position: absolute; left: 50%; top: 13px; width: 150px; height: 40px; margin-left: -75px; border-radius: 22px; background: #050507; }
+  .phone .flash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+  .phone .glare { position: absolute; inset: 0; background: linear-gradient(115deg, rgba(255,255,255,.14) 0%, rgba(255,255,255,0) 32%, rgba(255,255,255,0) 70%, rgba(255,255,255,.06) 100%); pointer-events: none; }
+
+  /* captions */
+  #cap { position: absolute; left: 30px; right: 30px; top: 118px; text-align: center; }
+  #cap .kicker { font: 750 30px Inter; letter-spacing: 6px; color: #ff907f; margin-bottom: 22px; height: 36px; }
+  #cap .kicker span, #cap .head span { display: inline-block; }
+  #cap .head { font: 850 84px/1.05 Inter; letter-spacing: -2.5px; color: #fff; }
+  #cap .head .w { margin: 0 11px; }
+
+  #chip { position: absolute; left: 50%; top: 1712px; transform: translateX(-50%); padding: 16px 34px; border-radius: 40px; background: rgba(16,14,25,.86); color: #fff; font: 700 38px Inter; white-space: nowrap; box-shadow: 0 10px 40px rgba(0,0,0,.4); border: 2px solid rgba(255,255,255,.12); }
+
+  /* intro + outro */
+  .logo { position: absolute; width: 300px; height: 300px; left: 390px; }
+  .word { position: absolute; left: 0; right: 0; text-align: center; font: 850 170px Inter; letter-spacing: -5px; color: #fff; }
+  .word span { display: inline-block; }
+  .tag { position: absolute; left: 0; right: 0; text-align: center; font: 650 64px Inter; color: #ddd7ec; letter-spacing: -1px; }
+  .url { position: absolute; left: 50%; transform: translateX(-50%); padding: 22px 40px; border-radius: 26px; background: rgba(255,255,255,.08); border: 2px solid rgba(255,255,255,.18); font: 600 38px JBM; color: #fff; white-space: nowrap; }
+  .chips { position: absolute; left: 0; right: 0; display: flex; justify-content: center; gap: 18px; }
+  .chips span { padding: 14px 26px; border-radius: 30px; background: rgba(184,107,255,.16); color: #e6dcff; font: 650 30px Inter; border: 2px solid rgba(184,107,255,.35); }
+  .kick2 { position: absolute; left: 0; right: 0; text-align: center; font: 750 30px Inter; letter-spacing: 6px; color: #ff907f; }
+  #fade { position: absolute; inset: 0; background: #07060b; opacity: 0; }
+  #wflash { position: absolute; inset: 0; background: #fff; opacity: 0; }
+</style>
+</head>
+<body>
+<canvas id="bg" class="layer" width="1080" height="1920"></canvas>
+
+<div id="intro" class="abs" style="inset:0">
+  <svg id="dots" class="abs" width="1080" height="1920" style="inset:0"></svg>
+  <div class="logo" id="ilogo" style="top:560px"></div>
+  <div class="word" id="iword" style="top:900px"></div>
+  <div class="tag" id="itag" style="top:1120px">Learn <span class="grad" style="font-weight:850">q</span> by drawing.</div>
+</div>
+
+<div id="phones"></div>
+<div id="cap"><div class="kicker"></div><div class="head"></div></div>
+<div id="chip"></div>
+
+<div id="outro" class="abs" style="inset:0">
+  <div class="logo" id="ologo" style="top:470px"></div>
+  <div class="word" id="oword" style="top:800px"></div>
+  <div class="tag" id="otag" style="top:1015px">Learn <span class="grad" style="font-weight:850">q</span> by drawing.</div>
+  <div class="kick2" id="otry" style="top:1190px">TRY IT NOW</div>
+  <div class="url" id="ourl" style="top:1250px">qanvas.z-axiom-413.workers.dev</div>
+  <div class="chips" id="ochips" style="top:1420px"><span>No install</span><span>Works offline</span><span>30 lessons</span></div>
+</div>
+
+<canvas id="fx" class="layer" width="1080" height="1920"></canvas>
+<div id="wflash"></div>
+<div id="fade"></div>
+
+<script>
+const LOGO = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="100%" height="100%"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff7d6e"/><stop offset="0.55" stop-color="#b86bff"/><stop offset="1" stop-color="#5b6cff"/></linearGradient><radialGradient id="lglow" cx="0.5" cy="0.42" r="0.6"><stop offset="0" stop-color="#2a2740"/><stop offset="1" stop-color="#15141d"/></radialGradient></defs><rect width="512" height="512" rx="116" fill="url(#lglow)" stroke="rgba(255,255,255,.12)" stroke-width="4"/><circle cx="236" cy="230" r="112" fill="none" stroke="url(#lg)" stroke-width="56"/><path d="M332 262 C 340 330, 352 372, 398 414" fill="none" stroke="url(#lg)" stroke-width="56" stroke-linecap="round"/><circle cx="236" cy="230" r="22" fill="#f6f1e7" opacity="0.92"/></svg>`;
+const STATUS_ICONS = `<svg width="92" height="20" viewBox="0 0 92 20"><g fill="#1c1a24"><rect x="0" y="12" width="4" height="7" rx="1"/><rect x="6" y="9" width="4" height="10" rx="1"/><rect x="12" y="5" width="4" height="14" rx="1"/><rect x="18" y="1" width="4" height="18" rx="1"/><path d="M36 7a14 14 0 0 1 18 0l-2 2.4a10.5 10.5 0 0 0-14 0z M39.5 11a8.5 8.5 0 0 1 11 0l-2 2.3a5.3 5.3 0 0 0-7 0z M43 15a3 3 0 0 1 4 0l-2 2.4z"/><rect x="62" y="3" width="26" height="14" rx="4" fill="none" stroke="#1c1a24" stroke-width="2" opacity=".5"/><rect x="64.5" y="5.5" width="19" height="9" rx="2"/><rect x="89.5" y="8" width="2" height="5" rx="1" opacity=".5"/></g></svg>`;
+const PHONE_BODY = `<svg class="body" viewBox="0 0 636 1376" width="636" height="1376"><defs><linearGradient id="rim" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#5b5670"/><stop offset=".5" stop-color="#26232f"/><stop offset="1" stop-color="#4a4560"/></linearGradient></defs>
+  <rect x="-4" y="300" width="6" height="90" rx="3" fill="#3a3648"/><rect x="-4" y="420" width="6" height="130" rx="3" fill="#3a3648"/><rect x="634" y="380" width="6" height="170" rx="3" fill="#3a3648"/>
+  <rect x="0" y="0" width="636" height="1376" rx="98" fill="url(#rim)"/><rect x="6" y="6" width="624" height="1364" rx="92" fill="#0b0a10"/></svg>`;
+
+let C, phones = [], caps = [], bursts = [], imgCache = new Map();
+const $ = (s) => document.querySelector(s);
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const easeOut = (t) => 1 - (1 - clamp(t)) ** 3;
+const easeIn = (t) => clamp(t) ** 3;
+const easeInOut = (t) => { t = clamp(t); return t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2; };
+const spring = (t, dur = 18) => { if (t <= 0) return 0; const x = t / dur; return 1 - Math.exp(-6 * x) * Math.cos(10 * x); };
+const pad = (n) => String(n).padStart(4, "0");
+function rng(seed) { return () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296); }
+
+function makePhone() {
+  const el = document.createElement("div");
+  el.className = "phone";
+  el.innerHTML = PHONE_BODY + `<div class="screen"><div class="status"><span>9:41</span>${STATUS_ICONS}</div><img class="shot"><div class="island"></div><div class="flash"></div><div class="glare"></div></div>`;
+  $("#phones").appendChild(el);
+  return { el, img: el.querySelector(".shot"), flash: el.querySelector(".flash"), src: "" };
+}
+function words(el, text) {
+  // "*x*" = gradient highlight, "|" = line break
+  el.innerHTML = text.split("|").map((line) => line.split(" ").map((w) => {
+    const hi = /^\*.*\*[.,…]?$/.test(w) || w.startsWith("*") || w.endsWith("*") || w.endsWith("*.");
+    return `<span class="w${hi ? " grad" : ""}">${w.replace(/\*/g, "")}</span>`;
+  }).join("")).join("<br>");
+}
+
+window.setup = (cfg) => {
+  C = cfg;
+  phones = [makePhone(), makePhone()];
+  for (const id of ["ilogo", "ologo"]) $("#" + id).innerHTML = LOGO.replace(/\b(lglow|lg)\b/g, (m) => m + id);
+  for (const id of ["iword", "oword"]) $("#" + id).innerHTML = [..."qanvas"].map((c, i) => `<span class="${i ? "" : "grad"}">${c}</span>`).join("");
+  const S = Object.fromEntries(C.scenes.map((s) => [s.id, s]));
+  C.S = S;
+  // keep a multi-word highlight together: mark every word in *...* runs
+  const hl = (t) => t.replace(/\*([^*]+)\*/g, (_, g) => g.split(" ").map((w) => `*${w}*`).join(" "));
+  const live = S.type.start + Math.round(C.liveF / S.type.speed);
+  caps = [
+    [S.home.start + 6, S.home.end - 2, "LEARN q", "The language of kdb+,|*right on your phone.*"],
+    [S.type.start + 4, live - 2, "THE STUDIO", "Type a few lines…"],
+    [live, S.type.end - 2, "THE STUDIO", "…and it *draws. Live.*"],
+    [S.touch.start + 3, S.touch.end - 2, "INTERACTIVE", "*Poke it.*|It reacts to touch."],
+    [S.gallery.start + 3, S.montage.end - 2, "21 EXAMPLES", "Tap one.|*Remix it.*"],
+    [S.lesson.start + 3, S.lesson.end - 2, "30 LESSONS", "From *til 10*|to a *ray tracer.*"],
+    [S.dojo.start + 3, S.dojo.end - 2, "THE DOJO", "33 problems.|*Checked instantly.*"],
+    [S.duo.start + 3, S.duo.end - 2, "REFERENCE + CONSOLE", "Every primitive,|*alive* with examples."],
+  ].map(([s, e, k, t]) => ({ s, e, k, t: hl(t) }));
+  const outro = S.outro.start;
+  bursts = [
+    { f: 62, x: 540, y: 710, n: 70, seed: 3, sp: 26 },
+    { f: C.successF, x: 540, y: 1330, n: 60, seed: 7, sp: 20 },
+    { f: outro, x: 540, y: 620, n: 90, seed: 11, sp: 30 },
+    { f: outro + 120, x: 540, y: 620, n: 110, seed: 13, sp: 34 },
+  ];
+  for (const b of bursts) {
+    const r = rng(b.seed), cols = ["#ff7d6e", "#b86bff", "#6d7bff", "#ffd36e", "#6ee7c8", "#f6f1e7"];
+    b.p = Array.from({ length: b.n }, () => { const a = r() * Math.PI * 2, v = b.sp * (0.35 + r() * 0.8); return { vx: Math.cos(a) * v, vy: Math.sin(a) * v - 6, r: 6 + r() * 14, c: cols[Math.floor(r() * cols.length)], life: 26 + r() * 22 }; });
+  }
+};
+
+async function setImg(ph, src) {
+  if (ph.src === src) return;
+  ph.src = src;
+  ph.img.src = src;
+  try { await ph.img.decode(); } catch {}
+}
+
+function sceneAt(f) { return C.scenes.find((s) => f >= s.start && f < s.end) ?? C.scenes[C.scenes.length - 1]; }
+function clipSrc(clip, i) { const n = C.frames[clip]; return `clips/${clip}/${pad(Math.max(0, Math.min(n - 1, Math.floor(i))))}.jpg`; }
+function screenFor(f, s) {
+  if (s.clip) return clipSrc(s.clip, s.from + (f - s.start) * s.speed);
+  if (s.id === "montage") { const m = C.montage.find((m) => f >= m.start && f < m.start + m.len) ?? C.montage.at(-1); return clipSrc(m.clip, f - m.start); }
+  if (s.id === "duo" || s.id === "outro") { const d = C.S.duo; return clipSrc("ref", Math.min(f, d.end - 1) - d.start) ; }
+  return clipSrc("home", 0);
+}
+
+function drawBg(f) {
+  const g = $("#bg").getContext("2d");
+  g.fillStyle = "#100e19"; g.fillRect(0, 0, 1080, 1920);
+  const t = f / 30;
+  const blobs = [[300 + 180 * Math.sin(t * 0.5), 500 + 200 * Math.cos(t * 0.37), "255,125,110"], [820 + 160 * Math.cos(t * 0.43), 900 + 260 * Math.sin(t * 0.3), "184,107,255"], [420 + 200 * Math.sin(t * 0.27 + 2), 1500 + 180 * Math.cos(t * 0.5), "91,108,255"]];
+  const beat = f >= 120 && f < C.S.outro.start ? Math.exp(-(f % 15) / 4) : 0;
+  for (const [x, y, c] of blobs) {
+    const rg = g.createRadialGradient(x, y, 0, x, y, 720);
+    rg.addColorStop(0, `rgba(${c},${0.3 + 0.08 * beat})`); rg.addColorStop(1, `rgba(${c},0)`);
+    g.fillStyle = rg; g.fillRect(0, 0, 1080, 1920);
+  }
+  // the Ripples sketch, as wallpaper: a dot grid sized by distance to a wandering point
+  const px = 540 + 380 * Math.sin(t * 0.7), py = 960 + 700 * Math.sin(t * 0.45);
+  for (let y = 30; y < 1920; y += 60) for (let x = 30; x < 1080; x += 60) {
+    const d = Math.hypot(x - px, y - py);
+    const r = 1.5 + 4.5 * (0.5 + 0.5 * Math.sin(d / 38 - t * 4));
+    g.fillStyle = `hsla(${(250 + d / 6) % 360},80%,75%,${0.1 + 0.06 * beat})`;
+    g.beginPath(); g.arc(x, y, r, 0, 7); g.fill();
+  }
+}
+
+function drawFx(f) {
+  const g = $("#fx").getContext("2d");
+  g.clearRect(0, 0, 1080, 1920);
+  for (const b of bursts) {
+    const a = f - b.f;
+    if (a < 0 || a > 60) continue;
+    for (const p of b.p) {
+      if (a > p.life) continue;
+      const k = a / p.life, drag = (1 - Math.exp(-a / 10)) * 10;
+      const x = b.x + p.vx * drag, y = b.y + p.vy * drag + 0.35 * a * a;
+      g.globalAlpha = 1 - k * k; g.fillStyle = p.c;
+      g.beginPath(); g.arc(x, y, p.r * (1 - 0.6 * k), 0, 7); g.fill();
+    }
+  }
+  g.globalAlpha = 1;
+}
+
+function place(el, x, y, s = 1, rot = 0, op = 1) {
+  el.style.transform = `translate(${x - 318}px, ${y - 688}px) rotate(${rot}deg) scale(${s})`;
+  el.style.opacity = op;
+}
+
+function renderCaption(f) {
+  const c = caps.find((c) => f >= c.s - 1 && f <= c.e);
+  const cap = $("#cap");
+  if (!c) { cap.style.opacity = 0; return; }
+  cap.style.opacity = 1;
+  if (cap.dataset.k !== c.t) { cap.dataset.k = c.t; words(cap.querySelector(".head"), c.t); cap.querySelector(".kicker").innerHTML = `<span>${c.k}</span>`; }
+  const out = clamp((f - (c.e - 6)) / 6);
+  const k = cap.querySelector(".kicker span"), a0 = f - c.s;
+  k.style.opacity = clamp(a0 / 5) * (1 - out); k.style.transform = `translateY(${(1 - spring(a0, 14)) * 20 - out * 20}px)`;
+  cap.querySelectorAll(".head .w").forEach((w, i) => {
+    const a = f - c.s - 2 - i * 2;
+    w.style.opacity = clamp(a / 4) * (1 - out);
+    w.style.transform = `translateY(${(1 - spring(a, 16)) * 60 - out * 30}px) scale(${0.85 + 0.15 * spring(a, 16)})`;
+  });
+}
+
+window.render = async (f) => {
+  const S = C.S, s = sceneAt(f);
+  drawBg(f);
+  // ---------- intro ----------
+  const intro = $("#intro");
+  if (f < S.home.start + 10) {
+    intro.style.display = "block";
+    const push = easeIn((f - 104) / 16);
+    intro.style.transform = `scale(${1 + push * 0.5})`; intro.style.opacity = 1 - push;
+    const cols = ["#ff7d6e", "#b86bff", "#6d7bff", "#f6f1e7"], off = [[-190, -190], [190, -190], [-190, 190], [190, 190]];
+    let svg = "";
+    for (let i = 0; i < 4; i++) {
+      const a = f - i * 15, merge = easeInOut((f - 52) / 12);
+      if (a < 0 || merge >= 1) continue;
+      const pulse = 1 + 0.08 * Math.exp(-((f % 15)) / 3) * (f > i * 15 ? 1 : 0);
+      const r = 110 * spring(a, 14) * pulse * (1 - 0.7 * merge);
+      const x = 540 + off[i][0] * (1 - merge), y = 710 + off[i][1] * (1 - merge);
+      svg += `<circle cx="${x}" cy="${y}" r="${Math.max(0, r)}" fill="${cols[i]}" opacity="${1 - merge * 0.5}"/>`;
+    }
+    $("#dots").innerHTML = svg;
+    const L = $("#ilogo"), la = f - 62;
+    L.style.transform = `scale(${spring(la, 20)}) rotate(${(1 - spring(la, 24)) * -25}deg)`; L.style.opacity = la > 0 ? 1 : 0;
+    $("#iword").querySelectorAll("span").forEach((sp, i) => { const a = f - 70 - i * 3; sp.style.opacity = clamp(a / 3); sp.style.transform = `translateY(${(1 - spring(a, 14)) * -90}px)`; });
+    const ta = f - 90; $("#itag").style.opacity = clamp(ta / 8); $("#itag").style.transform = `translateY(${(1 - easeOut(ta / 14)) * 40}px)`;
+  } else intro.style.display = "none";
+
+  // ---------- phones ----------
+  const [P, Q] = phones;
+  const pulse = f >= S.home.start && f < S.outro.start ? 0.012 * Math.exp(-(f % 15) / 3) : 0;
+  const cutAge = f - s.start;
+  const swing = (["home", "touch", "montage", "dojo"].includes(s.id) ? 1 : -1) * 2.2;
+  let x = 540, y = 1190, sc = 1, rot = swing * (1 - spring(cutAge, 22)) , op = 1;
+  if (f < S.home.start) op = 0;
+  if (s.id === "home") { const e = spring(cutAge, 26); y = 2500 - (2500 - 1190) * e; rot = (1 - e) * 10; }
+  if (s.id === "touch") { const z = easeInOut(cutAge / 14); sc = 1 + 0.12 * z; y = 1190 + 70 * z; }
+  if (s.id === "gallery") { const z = easeInOut(1 - cutAge / 10); sc = 1 + 0.12 * z; y = 1190 + 70 * z; }
+  if (s.id === "duo" || s.id === "outro") {
+    const e = s.id === "duo" ? spring(cutAge, 22) : 1;
+    const away = s.id === "outro" ? easeIn(cutAge / 14) : 0;
+    const qx = 780 * e + 540 * (1 - e);
+    place(Q.el, qx + away * 300, 1250 + away * 1400, (1 - 0.34 * e), 5 * e + away * 20, s.id === "duo" ? clamp(cutAge / 3) : 1 - away);
+    x = 540 - 240 * e - away * 300; y = 1250 * e + 1190 * (1 - e) + away * 1400; sc = 1 - 0.34 * e; rot = -5 * e - away * 20; op = 1 - away;
+    const d = S.duo, cons = C.frames.console, sp = Math.max(1, cons / d.len);
+    await setImg(Q, clipSrc("console", (Math.min(f, d.end - 1) - d.start) * sp));
+    const refSp = Math.max(1, C.frames.ref / d.len);
+    await setImg(P, clipSrc("ref", (Math.min(f, d.end - 1) - d.start) * refSp));
+  } else {
+    Q.el.style.opacity = 0;
+    await setImg(P, screenFor(f, s));
+  }
+  if (s.id === "outro" && cutAge > 16) op = 0;
+  place(P.el, x, y, sc * (1 + pulse), rot, op);
+  // white blink on every cut inside the phone, and on each montage beat
+  let blink = s.id !== "home" ? clamp(1 - cutAge / 6) * 0.7 : 0;
+  if (s.id === "montage") { const m = C.montage.find((m) => f >= m.start && f < m.start + m.len); if (m) blink = clamp(1 - (f - m.start) / 5) * 0.6; }
+  P.flash.style.opacity = blink;
+
+  // montage chip
+  const chip = $("#chip");
+  const m = s.id === "montage" ? C.montage.find((m) => f >= m.start && f < m.start + m.len) : null;
+  if (m) { chip.style.opacity = 1; chip.textContent = m.title; const a = f - m.start; chip.style.transform = `translateX(-50%) scale(${0.6 + 0.4 * spring(a, 12)})`; }
+  else chip.style.opacity = 0;
+
+  renderCaption(f);
+
+  // ---------- outro ----------
+  const o = f - S.outro.start, outro = $("#outro");
+  outro.style.display = o >= 0 ? "block" : "none";
+  if (o >= 0) {
+    const hit = o >= 120 ? Math.exp(-(o - 120) / 6) : 0;
+    const L = $("#ologo");
+    L.style.transform = `scale(${spring(o - 4, 22) * (1 + 0.12 * hit)}) rotate(${(1 - spring(o - 4, 26)) * 30}deg)`;
+    $("#oword").querySelectorAll("span").forEach((sp, i) => { const a = o - 12 - i * 3; sp.style.opacity = clamp(a / 3); sp.style.transform = `translateY(${(1 - spring(a, 14)) * -90}px)`; });
+    const ta = o - 30; $("#otag").style.opacity = clamp(ta / 8); $("#otag").style.transform = `translateY(${(1 - easeOut(ta / 14)) * 40}px)`;
+    const ua = o - 44; $("#otry").style.opacity = clamp(ua / 8); $("#ourl").style.opacity = clamp(ua / 8); $("#ourl").style.transform = `translateX(-50%) scale(${0.8 + 0.2 * spring(ua, 16) + 0.05 * hit})`;
+    $("#ochips").querySelectorAll("span").forEach((sp, i) => { const a = o - 60 - i * 5; sp.style.opacity = clamp(a / 4); sp.style.transform = `translateY(${(1 - spring(a, 14)) * 40}px)`; });
+  }
+  // flashes + fade
+  const wf = [[120, 10, 0.55], [S.outro.start, 8, 0.35]].reduce((acc, [s0, d, a]) => Math.max(acc, f >= s0 ? a * clamp(1 - (f - s0) / d) : 0), 0);
+  $("#wflash").style.opacity = wf;
+  $("#fade").style.opacity = clamp((f - (C.total - 14)) / 14);
+  drawFx(f);
+};
+</script>
+</body>
+</html>

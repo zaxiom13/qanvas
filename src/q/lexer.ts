@@ -186,15 +186,12 @@ export function lex(src: string): Tok[] {
 
     if (c === "\n") {
       const top = stack[stack.length - 1];
-      // find next line's first char
-      let j = i + 1;
-      while (j < n && (src[j] === "\r")) j++;
-      const nextIndented = j < n && (isSpace(src[j]) || src[j] === "\n");
-      if (top) {
-        // inside any bracket a newline is just whitespace (q requires ';' between statements)
-      } else if (!nextIndented) {
+      // A newline ends a statement at top level and directly inside { }, indented or not, so
+      // nobody has to remember a trailing ';'. Inside ( ) and [ ] it is just whitespace, which
+      // keeps multi-line lists, tables and if[...] / $[...] bodies working.
+      if (!top || top === "{") {
         const p = toks[toks.length - 1];
-        if (p && p.k !== "nl") push("nl", i, i + 1);
+        if (p && p.k !== "nl" && p.k !== ";" && p.k !== "{") push("nl", i, i + 1);
       }
       i++;
       ws = true;

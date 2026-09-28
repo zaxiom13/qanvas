@@ -8,6 +8,10 @@ A creative-coding studio for the **q** language (the language of kdb+), running 
 - **Sketch:** studio with live re-run, number scrubbing, examples gallery, local saving and share links.
 - **Dojo:** 33 practice problems with instant checks. **Reference:** every primitive and function with live examples.
 
+**New here?** Read the illustrated [user guide](docs/guide/README.md), or watch the [47-second promo](docs/promo/qanvas-promo.mp4).
+
+<a href="docs/promo/qanvas-promo.mp4"><img src="docs/promo/poster.jpg" width="220" alt="Qanvas promo video"></a>
+
 ```bash
 npm install
 npm run dev        # http://127.0.0.1:5173

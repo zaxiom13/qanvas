@@ -57,7 +57,7 @@ flower[400 350;70]
 flower[250 480;25]
 ```
 
-> **Heads up:** inside `{ }`, a new line does **not** end a statement — put a `;` between them. If you forget, Qanvas will point at the spot.
+> **Heads up:** each line is its own statement, inside `{ }` too, so a `;` at the end of a line is optional. To put two statements on one line, separate them with `;`, like ``ink `rose; circle[c;r]``.
 
 `a` is a **local** name: it exists only while `flower` runs, then it's gone.
 
@@ -73,7 +73,7 @@ ring[center;100]
 %% check 100=type ring | Define ring as a function.
 %% check 36<=drawn`circle | Draw at least 3 rings of 12 circles — that's 36 circles or more.
 %% hint Inside ring, make 12 angles: a:6.28*til[12]%12 — then draw circle[c+(r*cos a;r*sin a);8].
-%% hint Don't forget the ; at the end of the line that sets a.
+%% hint Put the line that sets a above the circle call, so a exists when circle uses it.
 %% solution
 ring:{[c;r]
   a:6.28*til[12]%12;
