@@ -321,6 +321,13 @@ pre {
   }
 }
 
+/* phone landscape: every vertical pixel counts */
+@media (orientation: landscape) and (max-height: 500px) {
+  :root {
+    --topbar-h: 44px;
+  }
+}
+
 @media (max-width: 760px) {
   html,
   body {
