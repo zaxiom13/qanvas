@@ -3,7 +3,7 @@
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { app } from "../lib/app.svelte";
   import { DEFAULT_SKETCH, EXAMPLE_BY_ID, type Example } from "../content/examples";
-  import { decodeShare, encodeShare, getSketch, newId, saveSketch, type Sketch } from "../lib/storage";
+  import { clearPending, decodeShare, encodeShare, getSketch, newId, recoverPending, saveSketch, stashPending, type Sketch } from "../lib/storage";
   import type { Explained } from "../lib/explain";
   import { parse } from "../q/parser";
   import type { RunState } from "../qanvas/runtime";
@@ -101,14 +101,50 @@
   }
 
 
+  let saveFailed = false;
   async function persist() {
+    clearTimeout(saveTimer);
     sketch = { ...sketch, code, updated: Date.now() };
-    await saveSketch($state.snapshot(sketch) as Sketch);
-    saved = true;
-    localStorage.setItem("qanvas:lastSketch", sketch.id);
+    const snap = $state.snapshot(sketch) as Sketch;
+    try {
+      await saveSketch(snap);
+    } catch {
+      saved = false;
+      if (!saveFailed) flash("Couldn't save on this device (storage full or blocked). Use Share to keep a copy.");
+      saveFailed = true;
+      return;
+    }
+    saveFailed = false;
+    clearPending(snap.id);
+    if (sketch.id === snap.id && code === snap.code) saved = true;
+    try {
+      localStorage.setItem("qanvas:lastSketch", snap.id);
+    } catch {
+      /* storage unavailable */
+    }
   }
 
+  // write a pending (debounced) edit now, before the sketch is swapped out or the page goes away
+  function flush() {
+    if (saved) return;
+    stashPending({ ...($state.snapshot(sketch) as Sketch), code, updated: Date.now() });
+    persist();
+  }
+
+  onMount(() => {
+    const onHide = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("pagehide", flush);
+    };
+  });
+
   function open(s: Sketch, runNow = true) {
+    flush();
     sketch = s;
     code = s.code;
     saved = true;
@@ -179,7 +215,11 @@
     if (parts[0] === "new") return newSketch();
     const id = routeId || localStorage.getItem("qanvas:lastSketch") || "";
     const s = id ? await getSketch(id) : undefined;
-    if (s) open(s, active);
+    const recovered = id ? recoverPending(id, s) : null;
+    if (recovered) {
+      open(recovered, active);
+      persist();
+    } else if (s) open(s, active);
     else open(sketch, active);
   }
 
@@ -190,7 +230,10 @@
 
   // pause when hidden
   $effect(() => {
-    if (!active) stage?.stop?.();
+    if (!active) {
+      stage?.stop?.();
+      untrack(flush);
+    }
   });
 
   $effect(() => {
