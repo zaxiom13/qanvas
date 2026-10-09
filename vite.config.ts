@@ -9,6 +9,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icon.svg"],
+      includeManifestIcons: false,
       manifest: {
         name: "Qanvas — learn q by drawing",
         short_name: "Qanvas",
@@ -21,11 +22,13 @@ export default defineConfig({
           { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
           { src: "icon-192.png", sizes: "192x192", type: "image/png" },
           { src: "icon-512.png", sizes: "512x512", type: "image/png" },
-          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+          { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2,json}"],
+        // the OS fetches the 512px install icons once; no need to precache them for every visitor
+        globIgnores: ["**/icon-512.png", "**/icon-maskable-512.png"],
         maximumFileSizeToCacheInBytes: 8 * 1024 * 1024,
       },
     }),
