@@ -4,6 +4,7 @@
   import { app } from "../lib/app.svelte";
   import { DEFAULT_SKETCH, EXAMPLE_BY_ID, type Example } from "../content/examples";
   import { decodeShare, encodeShare, getSketch, newId, saveSketch, type Sketch } from "../lib/storage";
+  import { findSharedCopy, listSketches, shareKey } from "../lib/storage";
   import type { Explained } from "../lib/explain";
   import { parse } from "../q/parser";
   import type { RunState } from "../qanvas/runtime";
@@ -154,21 +155,29 @@
       const ex = EXAMPLE_BY_ID.get(parts[1]);
       if (ex) return openExample(ex);
     }
-    if (parts[0] === "shared" && parts[1]) {
-      const d = decodeShare(parts[1]);
+    let routeId = parts[0];
+    if (parts[0] === "shared") {
+      const d = parts[1] ? decodeShare(parts[1]) : null;
       if (d) {
-        const s: Sketch = { id: newId(), name: d.name, code: d.code, created: Date.now(), updated: Date.now() };
+        const key = shareKey(d.name, d.code);
+        const copy = findSharedCopy(await listSketches().catch(() => []), key, d.code);
+        const s: Sketch = copy ?? { id: newId(), name: d.name, code: d.code, created: Date.now(), updated: Date.now(), share: key };
         open(s);
-        persist();
+        if (!copy) persist();
         history.replaceState(null, "", `#/sketch/${s.id}`);
         // replaceState fires no hashchange, so update the route ourselves
         loadedKey = s.id;
         app.route = { tab: "sketch", parts: [s.id] };
         return;
       }
+      flash("This share link is damaged or incomplete, so it couldn't be opened.");
+      history.replaceState(null, "", "#/sketch");
+      loadedKey = "";
+      app.route = { tab: "sketch", parts: [] };
+      routeId = "";
     }
     if (parts[0] === "new") return newSketch();
-    const id = parts[0] || localStorage.getItem("qanvas:lastSketch") || "";
+    const id = routeId || localStorage.getItem("qanvas:lastSketch") || "";
     const s = id ? await getSketch(id) : undefined;
     if (s) open(s, active);
     else open(sketch, active);

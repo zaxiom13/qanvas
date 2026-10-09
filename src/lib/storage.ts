@@ -13,6 +13,7 @@ export interface Sketch {
   updated: number;
   thumb?: string;
   from?: string; // example id it was forked from
+  share?: string; // shareKey of the link it was opened from
 }
 
 export const newId = () => Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4);
@@ -65,3 +66,14 @@ export function decodeShare(data: string): { name: string; code: string } | null
     return null;
   }
 }
+
+/** Short stable key for a shared sketch, so reopening the same link finds the copy it made. */
+export function shareKey(name: string, code: string): string {
+  let h = 0x811c9dc5;
+  const s = name + "\u0000" + code;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193);
+  return (h >>> 0).toString(36) + s.length.toString(36);
+}
+
+/** The copy an earlier open of this link made, if the learner hasn't edited it since. */
+export const findSharedCopy = (list: Sketch[], key: string, code: string) => list.find((s) => s.share === key && s.code === code);
