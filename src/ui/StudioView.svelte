@@ -4,7 +4,6 @@
   import { app } from "../lib/app.svelte";
   import { DEFAULT_SKETCH, EXAMPLE_BY_ID, type Example } from "../content/examples";
   import { decodeShare, encodeShare, getSketch, newId, saveSketch, type Sketch } from "../lib/storage";
-  import { findSharedCopy, listSketches, shareKey } from "../lib/storage";
   import type { Explained } from "../lib/explain";
   import { parse } from "../q/parser";
   import type { RunState } from "../qanvas/runtime";
@@ -12,6 +11,7 @@
   import Console from "./Console.svelte";
   import Stage from "./Stage.svelte";
   import Gallery from "./Gallery.svelte";
+  import { findSharedCopy, listSketches, shareKey } from "../lib/storage";
   import SymbolBar from "./SymbolBar.svelte";
   import type { EditorView } from "@codemirror/view";
   import { X, Check, Code, FolderOpen, Play, Plus, Share, Sparkles, Terminal, Wand } from "./icons";
