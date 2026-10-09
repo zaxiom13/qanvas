@@ -28,6 +28,44 @@ export const getSketch = (id: string) => (sketchDB ? get<Sketch>(id, sketchDB) :
 export const saveSketch = (s: Sketch) => (sketchDB ? set(s.id, s, sketchDB) : Promise.resolve());
 export const deleteSketch = (id: string) => (sketchDB ? del(id, sketchDB) : Promise.resolve());
 
+// An IndexedDB write started in pagehide can be dropped when the page is torn down, so an
+// unsaved edit is also stashed synchronously in localStorage and recovered on the next load.
+const PENDING = "qanvas:pendingSketch";
+
+export function stashPending(s: Sketch) {
+  try {
+    localStorage.setItem(PENDING, JSON.stringify({ id: s.id, name: s.name, code: s.code, updated: s.updated }));
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export function clearPending(id: string) {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING) ?? "null");
+    if (p?.id === id) localStorage.removeItem(PENDING);
+  } catch {
+    /* storage unavailable */
+  }
+}
+
+export function readPending(): Pick<Sketch, "id" | "name" | "code" | "updated"> | null {
+  try {
+    const p = JSON.parse(localStorage.getItem(PENDING) ?? "null");
+    return p && typeof p.id === "string" && typeof p.code === "string" && typeof p.updated === "number" ? p : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The stored sketch with a newer stashed edit applied, or null if there's nothing to recover for `id`. */
+export function recoverPending(id: string, stored: Sketch | undefined, pending = readPending()): Sketch | null {
+  if (!pending || pending.id !== id) return null;
+  if (stored && stored.updated >= pending.updated) return null;
+  const base = stored ?? { id, name: pending.name, code: "", created: pending.updated, updated: pending.updated };
+  return { ...base, name: String(pending.name || base.name), code: pending.code, updated: pending.updated };
+}
+
 // ---------- learning progress ----------
 export interface Progress {
   done: Record<string, number>; // lesson/dojo id -> timestamp
