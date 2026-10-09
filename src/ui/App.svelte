@@ -98,11 +98,16 @@
 </div>
 
 <style>
+  /* viewport-fit=cover: keep content out of the notch and home indicator (landscape phones especially) */
   .shell {
     height: 100dvh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  .shell.mobile {
+    padding-bottom: 0;
   }
   .top {
     height: var(--topbar-h);
@@ -231,6 +236,9 @@
     border-radius: 16px 16px 0 0;
     overflow: hidden;
     animation: up 240ms var(--ease);
+  }
+  .drawer {
+    padding: 0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   }
   .mobile .drawer {
     height: 62dvh;
