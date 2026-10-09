@@ -261,8 +261,8 @@
     />
     <span class="saved" title={saved ? "Saved on this device" : "Saving…"}>{#if saved}<Check size={13} /> saved{:else}saving…{/if}</span>
     <div class="spacer"></div>
-    <button class="btn sm ghost" onclick={() => { galleryTab = "examples"; galleryOpen = true; }} title="Examples"><Sparkles size={15} />{#if !mobile}Examples{/if}</button>
-    <button class="btn sm ghost" onclick={() => { galleryTab = "mine"; galleryOpen = true; }} title="My sketches"><FolderOpen size={15} />{#if !mobile}Mine{/if}</button>
+    <button class="btn sm ghost" onclick={() => { galleryTab = "examples"; galleryOpen = true; }} title="Examples"><Sparkles size={15} />{#if !mobile}<span class="lbl">Examples</span>{/if}</button>
+    <button class="btn sm ghost" onclick={() => { galleryTab = "mine"; galleryOpen = true; }} title="My sketches"><FolderOpen size={15} />{#if !mobile}<span class="lbl">Mine</span>{/if}</button>
     <button class="btn sm ghost icon" onclick={newSketch} title="New sketch" aria-label="New sketch"><Plus size={16} /></button>
     <button class="btn sm ghost icon" onclick={share} title="Copy a share link" aria-label="Share"><Share size={15} /></button>
   </div>
@@ -349,6 +349,13 @@
     height: 100%;
     min-height: 0;
     background: var(--code-bg);
+    container-type: inline-size;
+  }
+  /* a narrow editor pane (phone landscape, dragged resizer): icons only, so the name stays readable */
+  @container (max-width: 420px) {
+    .lbl {
+      display: none;
+    }
   }
   .edhead {
     display: flex;
