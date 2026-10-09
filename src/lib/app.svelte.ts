@@ -2,23 +2,9 @@
 import type { EvalResult } from "../q/interp";
 import { Session } from "../q/index";
 import type { QValue } from "../q/index";
+import { parseHash as parse, type Route, type Tab } from "./route";
 
-export type Tab = "learn" | "sketch" | "dojo" | "ref";
-
-export interface Route {
-  tab: Tab;
-  parts: string[];
-}
-
-function parse(hash: string): Route {
-  const path = hash.replace(/^#\/?/, "");
-  const [head, ...parts] = path.split("/").map(decodeURIComponent);
-  if (head === "sketch" || head === "s") return { tab: "sketch", parts: head === "s" ? ["shared", ...parts] : parts };
-  if (head === "dojo") return { tab: "dojo", parts };
-  if (head === "ref") return { tab: "ref", parts };
-  if (head === "learn") return { tab: "learn", parts };
-  return { tab: "learn", parts: [] };
-}
+export type { Route, Tab } from "./route";
 
 const load = <T>(k: string, d: T): T => {
   try {
