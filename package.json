@@ -11,7 +11,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "oracle": "node tools/oracle.mjs",
-    "deploy": "vite build && wrangler deploy"
+    "deploy": "wrangler deploy"
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
