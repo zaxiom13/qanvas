@@ -109,6 +109,14 @@
     rt?.stop();
   }
 
+  export function pause() {
+    if (runState === "running") rt?.pause();
+  }
+
+  export function resume() {
+    if (runState === "paused") rt?.resume();
+  }
+
   export function focusConsole() {
     consoleHub.use(target);
   }
