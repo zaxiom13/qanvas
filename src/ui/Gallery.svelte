@@ -1,9 +1,10 @@
 <script lang="ts">
   import { Dialog } from "bits-ui";
   import { EXAMPLES, LEVELS, type Example } from "../content/examples";
-  import { deleteSketch, listSketches, type Sketch } from "../lib/storage";
+  import { sketchesFromBundle, sketchesToBundle } from "../lib/backup";
+  import { deleteSketch, listSketches, saveSketch, type Sketch } from "../lib/storage";
   import { thumbnail } from "../lib/thumbs";
-  import { Trash, X } from "./icons";
+  import { Download, Trash, Upload, X } from "./icons";
 
   interface Props {
     open: boolean;
@@ -15,6 +16,9 @@
   let current = $state<"examples" | "mine">("examples");
   let mine = $state<Sketch[]>([]);
   let thumbs = $state<Record<string, string>>({});
+  let note = $state("");
+  let noteBad = $state(false);
+  let fileInput = $state<HTMLInputElement>();
 
   $effect(() => {
     if (!open) return;
@@ -27,6 +31,38 @@
     if (!open || current !== "mine") return;
     for (const s of mine.slice(0, 40)) thumbnail("sk:" + s.id + ":" + s.updated, s.code).then((u) => (thumbs = { ...thumbs, ["sk:" + s.id]: u }));
   });
+
+  function download() {
+    const blob = new Blob([sketchesToBundle(mine)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "qanvas-sketches.json";
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  async function onFile(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    const parsed = sketchesFromBundle(await file.text(), mine.map((s) => s.id));
+    if ("error" in parsed) {
+      noteBad = true;
+      note = parsed.error;
+      return;
+    }
+    for (const s of parsed.add) await saveSketch(s);
+    mine = await listSketches();
+    const n = parsed.add.length;
+    noteBad = false;
+    note = n
+      ? `Imported ${n} sketch${n === 1 ? "" : "es"}${parsed.skipped ? `. Skipped ${parsed.skipped}.` : "."}`
+      : parsed.skipped
+        ? `Nothing new. Skipped ${parsed.skipped}.`
+        : "Nothing new in that file.";
+  }
 
   async function remove(s: Sketch) {
     if (!confirm(`Delete “${s.name}”? This can't be undone.`)) return;
@@ -76,11 +112,18 @@
               </div>
             {/if}
           {/each}
-        {:else if !mine.length}
-          <div class="empty">
-            <p>Nothing saved yet. Everything you make in the studio is saved on this device automatically.</p>
-          </div>
         {:else}
+          <div class="tools">
+            <button class="btn sm" onclick={download} disabled={!mine.length}><Download size={14} /> Export</button>
+            <button class="btn sm" onclick={() => fileInput?.click()}><Upload size={14} /> Import</button>
+            <input bind:this={fileInput} class="file" type="file" accept="application/json,.json" onchange={onFile} aria-label="Import a sketch backup" />
+          </div>
+          {#if note}<p class="note" class:bad={noteBad} role="status">{note}</p>{/if}
+          {#if !mine.length}
+          <div class="empty">
+            <p>Nothing saved yet. Everything you make in the studio is saved on this device automatically. Import brings a backup back onto this device without removing what is already here.</p>
+          </div>
+          {:else}
           <div class="grid">
             {#each mine as s (s.id)}
               <div class="card mine">
@@ -97,6 +140,7 @@
               </div>
             {/each}
           </div>
+          {/if}
         {/if}
       </div>
     </Dialog.Content>
@@ -264,5 +308,34 @@
   .empty {
     color: var(--text-2);
     padding: 30px 0;
+  }
+  .tools {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin: 14px 0 4px;
+  }
+  .file {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+  .note {
+    margin: 10px 0 0;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: var(--good-soft);
+    color: var(--text);
+    font-size: 13px;
+  }
+  .note.bad {
+    background: var(--bad-soft);
   }
 </style>
