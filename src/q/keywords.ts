@@ -361,9 +361,11 @@ function ss(x: QValue, y: QValue): QValue {
     for (let i = 0; i < s.length; i++) for (let j = i + 1; j <= s.length; j++) if (likeMatch(s.slice(i, j), p)) { out.push(i); break; }
   } else {
     let i = s.indexOf(p);
+    // q reports overlapping matches: "aaa" ss "aa" is 0 1, not just 0.
+    // Assumption from the public q reference for ss (code.kx.com/q/ref/ss/), not a fresh KDB-X run.
     while (i >= 0 && p.length) {
       out.push(i);
-      i = s.indexOf(p, i + p.length);
+      i = s.indexOf(p, i + 1);
     }
   }
   return longs(out);
