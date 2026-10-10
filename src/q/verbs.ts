@@ -13,6 +13,24 @@ import {
 
 const TOL = 1.1368683772161603e-13; // 2^-43, q comparison tolerance
 
+/** Biggest vector a single primitive may allocate. 8e6 floats is 64MB — past that a phone tab is liable to be killed. */
+export const MAX_VECTOR_ITEMS = 8_000_000;
+
+function guardVector(n: number) {
+  if (n > MAX_VECTOR_ITEMS) {
+    throw new QError(
+      "limit",
+      `This would create ${Math.floor(n).toLocaleString("en-US")} items. That's too large to run in the browser, so it was stopped.`,
+    );
+  }
+  RT.checkpoint?.();
+}
+
+/** Deadline check every 65536 steps inside a primitive that would otherwise never return to the interpreter. */
+function tickItems(i: number) {
+  if ((i & 0xffff) === 0) RT.checkpoint?.();
+}
+
 export const tolEq = (a: number, b: number) =>
   a === b || (a !== a && b !== b) || (Number.isFinite(a) && Number.isFinite(b) && Math.abs(a - b) <= TOL * Math.max(Math.abs(a), Math.abs(b)));
 
@@ -166,6 +184,8 @@ export function gradeDown(x: QValue): number[] {
 // ================= structural helpers =================
 
 export function take(n: number, x: QValue): QValue {
+  const m0 = Math.abs(n);
+  if (m0 > MAX_VECTOR_ITEMS) guardVector(m0);
   if (x instanceof QTable) return table(x.cols, x.data.map((c) => take(n, c)));
   if (x instanceof QDict) {
     if (isKeyed(x)) return dict(take(n, x.k), take(n, x.v));
@@ -189,8 +209,8 @@ export function take(n: number, x: QValue): QValue {
     const nul = x.t === 0 ? NIL : nullOf(x.t);
     return x.t === 0 ? list(new Array(m).fill(nul)) : take(m, nul);
   }
-  if (n >= 0) for (let i = 0; i < m; i++) idx[i] = i % len;
-  else for (let i = 0; i < m; i++) idx[i] = (((len - m + i) % len) + len) % len;
+  if (n >= 0) for (let i = 0; i < m; i++) { tickItems(i); idx[i] = i % len; }
+  else for (let i = 0; i < m; i++) { tickItems(i); idx[i] = (((len - m + i) % len) + len) % len; }
   return pick(x, idx);
 }
 
@@ -356,6 +376,7 @@ export function where(x: QValue): QValue {
   }
   if (x instanceof QAtom) {
     if (typeof x.v !== "number" || x.t === -9) throw typeErr("where needs booleans or counts.");
+    guardVector(x.v);
     return longs(new Array(x.v).fill(0));
   }
   if (!(x instanceof QVec) || x.t === 0 || x.t === 10 || x.t === 11 || x.t === 8 || x.t === 9) {
@@ -367,9 +388,10 @@ export function where(x: QValue): QValue {
     if (d[i] < 0) throw domainErr("where can't repeat an index a negative number of times.");
     total += d[i] | 0;
   }
+  guardVector(total);
   const out = new Float64Array(total);
   let k = 0;
-  for (let i = 0; i < d.length; i++) for (let j = 0; j < d[i]; j++) out[k++] = i;
+  for (let i = 0; i < d.length; i++) for (let j = 0; j < d[i]; j++) { tickItems(k); out[k++] = i; }
   return vec(7, out);
 }
 
@@ -479,8 +501,9 @@ export function til(x: QValue): QValue {
   if (!(x instanceof QAtom) || typeof x.v !== "number" || x.t === -9 || x.t === -8) throw typeErr("til needs a whole number, like til 10.");
   const n = x.v;
   if (n < 0) throw domainErr("til needs a non-negative number.");
+  guardVector(n);
   const d = new Float64Array(n);
-  for (let i = 0; i < n; i++) d[i] = i;
+  for (let i = 0; i < n; i++) { tickItems(i); d[i] = i; }
   return vec(7, d);
 }
 
@@ -847,12 +870,14 @@ export function roll(n: number, y: QValue): QValue {
     const t = -y.t;
     const k = shuffle ? m : Math.abs(n);
     if (t === 9 || t === 8) {
+      guardVector(k);
       const out = new Float64Array(k);
-      for (let i = 0; i < k; i++) out[i] = r() * m;
+      for (let i = 0; i < k; i++) { tickItems(i); out[i] = r() * m; }
       return vec(t, out);
     }
     if (deal || shuffle) {
       if (k > m) throw lengthErr(`Can't deal ${k} distinct numbers from ${m}.`);
+      guardVector(m);
       const pool = Array.from({ length: m }, (_, i) => i);
       for (let i = 0; i < k; i++) {
         const j = i + Math.floor(r() * (m - i));
@@ -860,8 +885,9 @@ export function roll(n: number, y: QValue): QValue {
       }
       return vec(t === 1 ? 7 : t, Float64Array.from(pool.slice(0, k)));
     }
+    guardVector(k);
     const out = new Float64Array(k);
-    for (let i = 0; i < k; i++) out[i] = Math.floor(r() * m);
+    for (let i = 0; i < k; i++) { tickItems(i); out[i] = Math.floor(r() * m); }
     return vec(t === 1 ? 1 : t, out);
   }
   if (y instanceof QVec || y instanceof QDict) {
@@ -870,6 +896,9 @@ export function roll(n: number, y: QValue): QValue {
     const k = shuffle ? m : Math.abs(n);
     if (deal || shuffle) {
       if (k > m) throw lengthErr(`Can't deal ${k} distinct items from ${m}.`);
+      guardVector(Math.max(k, m));
+    } else guardVector(k);
+    if (deal || shuffle) {
       const pool = Array.from({ length: m }, (_, i) => i);
       for (let i = 0; i < k; i++) {
         const j = i + Math.floor(r() * (m - i));
@@ -883,7 +912,9 @@ export function roll(n: number, y: QValue): QValue {
   if (y instanceof QAtom && y.t === -11 && y.v === "") {
     // random symbols of 8 chars? (n?`) - produce 4-char names
     const letters = "abcdefghijklmnop";
-    return syms(Array.from({ length: Math.abs(n) }, () => Array.from({ length: 4 }, () => letters[Math.floor(r() * 16)]).join("")));
+    const k = Math.abs(n);
+    guardVector(k);
+    return syms(Array.from({ length: k }, () => Array.from({ length: 4 }, () => letters[Math.floor(r() * 16)]).join("")));
   }
   throw typeErr("n?y needs a number or a list on the right.");
 }

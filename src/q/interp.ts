@@ -103,6 +103,13 @@ export class Session {
     RT.inline = (x) => inline(x, this.fmt.precision);
     RT.now = () => Date.now();
     RT.tzOffsetMin = () => -new Date().getTimezoneOffset();
+    RT.checkpoint = () => {
+      if (this.interrupt) throw new QError("stop", "Stopped.");
+      if (this.deadline && performance.now() > this.deadline) {
+        this.deadline = 0;
+        throw new QError("stop", this.budgetHint || "This took too long, so it was stopped.");
+      }
+    };
     RT.tables = (ns) => [...(this.ns.get(ns === "." ? "" : ns) ?? new Map()).entries()].filter(([, v]) => v instanceof QTable || isKeyed(v)).map(([k]) => k).sort();
     RT.names = (ns, kind) => {
       const m = this.ns.get(ns === "." ? "" : ns) ?? new Map();

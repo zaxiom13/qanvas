@@ -20,6 +20,8 @@ export interface Runtime {
   tzOffsetMin(): number;
   tables(ns: string): string[];
   names(ns: string, kind: "v" | "f" | "a"): string[];
+  /** Throw 'stop when the session deadline has passed. Callers throttle this. */
+  checkpoint(): void;
 }
 
 export const RT: Runtime = {} as Runtime;
