@@ -12,6 +12,7 @@
   import Stage from "./Stage.svelte";
   import Gallery from "./Gallery.svelte";
   import { findSharedCopy, listSketches, shareKey } from "../lib/storage";
+  import { sketchHold } from "../lib/visibility";
   import SymbolBar from "./SymbolBar.svelte";
   import type { EditorView } from "@codemirror/view";
   import { X, Check, Code, FolderOpen, Play, Plus, Share, Sparkles, Terminal, Wand } from "./icons";
@@ -132,8 +133,14 @@
   }
 
   onMount(() => {
+    let held = false;
     const onHide = () => {
-      if (document.visibilityState === "hidden") flush();
+      const hidden = document.visibilityState === "hidden";
+      if (hidden) flush();
+      const next = sketchHold(runState, hidden, held);
+      held = next.held;
+      if (next.action === "pause") stage?.pause();
+      else if (next.action === "resume") stage?.resume();
     };
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", flush);
