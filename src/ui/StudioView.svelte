@@ -1,9 +1,9 @@
 <script lang="ts">
-  import { onMount, untrack } from "svelte";
+  import { onMount, tick, untrack } from "svelte";
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { app } from "../lib/app.svelte";
   import { DEFAULT_SKETCH, EXAMPLE_BY_ID, type Example } from "../content/examples";
-  import { clearPending, decodeShare, encodeShare, getSketch, newId, recoverPending, saveSketch, stashPending, type Sketch } from "../lib/storage";
+  import { clearPending, decodeShare, getSketch, newId, recoverPending, saveSketch, shareUrl, shareWarning, stashPending, type Sketch } from "../lib/storage";
   import type { Explained } from "../lib/explain";
   import { parse } from "../q/parser";
   import type { RunState } from "../qanvas/runtime";
@@ -167,14 +167,32 @@
     persist();
   }
 
-  async function share() {
-    const url = `${location.origin}${location.pathname}#/s/${encodeShare(sketch.name, code)}`;
+  let shareWarn = $state("");
+  let pendingShare = "";
+  let cancelShare = $state<HTMLButtonElement>();
+
+  async function copyShare(url: string) {
+    shareWarn = "";
+    pendingShare = "";
     try {
       await navigator.clipboard.writeText(url);
       flash("Link copied — the whole sketch is inside it.");
     } catch {
       prompt("Copy this link:", url);
     }
+  }
+
+  async function share() {
+    const url = shareUrl(location.origin, location.pathname, sketch.name, code);
+    const warning = shareWarning(url);
+    if (warning) {
+      pendingShare = url;
+      shareWarn = warning;
+      await tick();
+      cancelShare?.focus();
+      return;
+    }
+    void copyShare(url);
   }
 
   function flash(t: string) {
@@ -330,6 +348,16 @@
 </div>
 
 <Gallery bind:open={galleryOpen} tab={galleryTab} onPick={openExample} onOpenSketch={(s) => { galleryOpen = false; open(s); app.go(`sketch/${s.id}`); }} />
+
+{#if shareWarn}
+  <div class="share-warn" role="alertdialog" aria-label="Long share link">
+    <p>{shareWarn}</p>
+    <div class="warn-actions">
+      <button class="btn sm" bind:this={cancelShare} onclick={() => (shareWarn = "")}>Cancel</button>
+      <button class="btn sm primary" onclick={() => copyShare(pendingShare)}>Copy anyway</button>
+    </div>
+  </div>
+{/if}
 
 {#if toast}<div class="toast" role="status">{toast}</div>{/if}
 
@@ -528,6 +556,30 @@
     position: absolute;
     inset: 0;
     z-index: 2;
+  }
+  .share-warn {
+    position: fixed;
+    z-index: 80;
+    left: 50%;
+    bottom: calc(var(--bottomnav-h) + 16px);
+    transform: translateX(-50%);
+    width: min(440px, calc(100vw - 24px));
+    background: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--line-strong);
+    border-radius: 14px;
+    box-shadow: var(--shadow-lg);
+    padding: 14px 14px 12px;
+  }
+  .share-warn p {
+    margin: 0 0 12px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .warn-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
   }
   .toast {
     position: fixed;
