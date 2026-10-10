@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { decodeShare, encodeShare, findSharedCopy, shareKey, type Sketch } from "../src/lib/storage";
+import { EXAMPLES } from "../src/content/examples";
+import { decodeShare, encodeShare, findSharedCopy, shareKey, SHARE_LINK_WARN, shareUrl, shareWarning, type Sketch } from "../src/lib/storage";
 
 const sk = (id: string, code: string, share?: string): Sketch => ({ id, name: "s", code, created: 1, updated: 1, share });
 
@@ -33,5 +34,31 @@ describe("share links", () => {
 
   test("sketches saved before share keys existed never match", () => {
     expect(findSharedCopy([sk("old", "til 3")], shareKey("s", "til 3"), "til 3")).toBeUndefined();
+  });
+
+  test("a short sketch does not warn", () => {
+    expect(shareWarning(shareUrl("https://qanvas.example", "/", "hi", "til 10\n"))).toBeNull();
+  });
+
+  test("built-in examples stay under the truncation warning", () => {
+    let longest = 0;
+    let which = "";
+    for (const ex of EXAMPLES) {
+      const n = shareUrl("https://qanvas.example", "/", ex.title, ex.code).length;
+      if (n > longest) {
+        longest = n;
+        which = ex.id;
+      }
+    }
+    expect(longest, `${which} is ${longest} characters`).toBeLessThanOrEqual(SHARE_LINK_WARN);
+  });
+
+  test("a sketch whose link would be truncated warns before anyone copies it", () => {
+    const code = Array.from({ length: 800 }, (_, i) => `n${i}:${i}*${i + 3}+${(i * 17) % 97}; / ${"qwertyuiopasdf".slice(i % 11)}`).join("\n");
+    const url = shareUrl("https://qanvas.example", "/", "Packed", code);
+    const warning = shareWarning(url);
+    expect(url.length).toBeGreaterThan(SHARE_LINK_WARN);
+    expect(warning).toContain(url.length.toLocaleString("en-US"));
+    expect(warning).toMatch(/may not open/);
   });
 });

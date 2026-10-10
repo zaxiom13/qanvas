@@ -96,6 +96,20 @@ export async function saveAnswer(id: string, code: string) {
 
 // ---------- sharing (all in the URL, works offline) ----------
 export const encodeShare = (name: string, code: string) => compressToEncodedURIComponent(JSON.stringify({ n: name, c: code }));
+
+/** Share URLs longer than this are likely to be cut off by a chat app or an in-app browser.
+ *  Assumption: Chrome allows roughly 2 million characters, and Discord messages stop at 2,000,
+ *  which would warn on ordinary sketches. 8,000 sits between those. */
+export const SHARE_LINK_WARN = 8000;
+
+export const shareUrl = (origin: string, pathname: string, name: string, code: string) =>
+  `${origin}${pathname}#/s/${encodeShare(name, code)}`;
+
+export function shareWarning(url: string): string | null {
+  if (url.length <= SHARE_LINK_WARN) return null;
+  const n = url.length.toLocaleString("en-US");
+  return `This link is ${n} characters. Some chat apps and mobile browsers cut off links this long, so the sketch may not open.`;
+}
 export function decodeShare(data: string): { name: string; code: string } | null {
   try {
     const j = JSON.parse(decompressFromEncodedURIComponent(data) ?? "");
