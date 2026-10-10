@@ -25,6 +25,7 @@ export { default as Check } from "@lucide/svelte/icons/check";
 export { default as Lightbulb } from "@lucide/svelte/icons/lightbulb";
 export { default as Search } from "@lucide/svelte/icons/search";
 export { default as Download } from "@lucide/svelte/icons/download";
+export { default as Upload } from "@lucide/svelte/icons/upload";
 export { default as Trash } from "@lucide/svelte/icons/trash-2";
 export { default as Copy } from "@lucide/svelte/icons/copy";
 export { default as Wand } from "@lucide/svelte/icons/wand-sparkles";
