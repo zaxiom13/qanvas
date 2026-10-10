@@ -1,11 +1,13 @@
 import { defineConfig } from "vite";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { VitePWA } from "vite-plugin-pwa";
+import { versionJsonPlugin } from "./tools/version-json.mjs";
 
 export default defineConfig({
   base: "./",
   plugins: [
     svelte(),
+    versionJsonPlugin(),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["icon.svg"],
