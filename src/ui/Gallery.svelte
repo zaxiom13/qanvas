@@ -3,6 +3,7 @@
   import { EXAMPLES, LEVELS, type Example } from "../content/examples";
   import { sketchesFromBundle, sketchesToBundle } from "../lib/backup";
   import { deleteSketch, listSketches, saveSketch, type Sketch } from "../lib/storage";
+  import { forgetSketchPointer } from "../lib/studioOpen";
   import { thumbnail } from "../lib/thumbs";
   import { Download, Trash, Upload, X } from "./icons";
 
@@ -11,8 +12,9 @@
     tab: "examples" | "mine";
     onPick: (e: Example) => void;
     onOpenSketch: (s: Sketch) => void;
+    onDeleted?: (id: string) => void;
   }
-  let { open = $bindable(), tab, onPick, onOpenSketch }: Props = $props();
+  let { open = $bindable(), tab, onPick, onOpenSketch, onDeleted }: Props = $props();
   let current = $state<"examples" | "mine">("examples");
   let mine = $state<Sketch[]>([]);
   let thumbs = $state<Record<string, string>>({});
@@ -67,7 +69,9 @@
   async function remove(s: Sketch) {
     if (!confirm(`Delete “${s.name}”? This can't be undone.`)) return;
     await deleteSketch(s.id);
+    forgetSketchPointer(s.id);
     mine = mine.filter((m) => m.id !== s.id);
+    onDeleted?.(s.id);
   }
 
   const ago = (t: number) => {
