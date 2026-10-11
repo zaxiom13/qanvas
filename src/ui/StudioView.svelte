@@ -3,7 +3,8 @@
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { app } from "../lib/app.svelte";
   import { DEFAULT_SKETCH, EXAMPLE_BY_ID, type Example } from "../content/examples";
-  import { clearPending, decodeShare, getSketch, newId, recoverPending, saveSketch, shareUrl, shareWarning, stashPending, type Sketch } from "../lib/storage";
+  import { clearPending, decodeShare, getSketch, listSketches, newId, readPending, recoverPending, saveSketch, shareUrl, shareWarning, stashPending, type Sketch } from "../lib/storage";
+  import { chooseStudioSketch, forgetSketchPointer, rememberSketch, replaceDeletedSketch } from "../lib/studioOpen";
   import type { Explained } from "../lib/explain";
   import { parse } from "../q/parser";
   import type { RunState } from "../qanvas/runtime";
@@ -11,7 +12,7 @@
   import Console from "./Console.svelte";
   import Stage from "./Stage.svelte";
   import Gallery from "./Gallery.svelte";
-  import { findSharedCopy, listSketches, shareKey } from "../lib/storage";
+  import { findSharedCopy, shareKey } from "../lib/storage";
   import { sketchHold } from "../lib/visibility";
   import SymbolBar from "./SymbolBar.svelte";
   import type { EditorView } from "@codemirror/view";
@@ -162,6 +163,7 @@
   function openExample(ex: Example) {
     galleryOpen = false;
     const s: Sketch = { id: newId(), name: ex.title, code: ex.code, created: Date.now(), updated: Date.now(), from: ex.id };
+    loadedKey = s.id;
     open(s);
     app.go(`sketch/${s.id}`);
     persist();
@@ -169,6 +171,7 @@
 
   function newSketch() {
     const s: Sketch = { id: newId(), name: "Untitled sketch", code: "background 20\ncircle[center;100;`coral]\n", created: Date.now(), updated: Date.now() };
+    loadedKey = s.id;
     open(s);
     app.go(`sketch/${s.id}`);
     persist();
@@ -238,14 +241,47 @@
       routeId = "";
     }
     if (parts[0] === "new") return newSketch();
-    const id = routeId || localStorage.getItem("qanvas:lastSketch") || "";
-    const s = id ? await getSketch(id) : undefined;
-    const recovered = id ? recoverPending(id, s) : null;
-    if (recovered) {
-      open(recovered, active);
-      persist();
-    } else if (s) open(s, active);
-    else open(sketch, active);
+    const idInRoute = routeId ?? "";
+    let lastId: string | null = null;
+    try {
+      lastId = localStorage.getItem("qanvas:lastSketch");
+    } catch {
+      /* storage unavailable */
+    }
+    const requested = idInRoute || lastId || "";
+    const stored = requested ? await getSketch(requested) : undefined;
+    const pending = readPending();
+    const recovered = requested ? recoverPending(requested, stored, pending) : null;
+    const newest = recovered || stored ? undefined : (await listSketches())[0];
+    if (!recovered && !stored && requested) forgetSketchPointer(requested);
+    const choice = chooseStudioSketch({ routeId: idInRoute, lastId, stored, pending, newest, fresh: sketch });
+    if (choice.rememberId) rememberSketch(choice.rememberId);
+    open(choice.sketch, active);
+    if (choice.persist) persist();
+    if (choice.replaceWithId) {
+      history.replaceState(null, "", `#/sketch/${choice.replaceWithId}`);
+      loadedKey = choice.replaceWithId;
+      app.route = { tab: "sketch", parts: [choice.replaceWithId] };
+    } else if (choice.clearRoute) {
+      history.replaceState(null, "", "#/sketch");
+      loadedKey = "";
+      app.route = { tab: "sketch", parts: [] };
+    }
+  }
+
+  async function sketchDeleted(id: string) {
+    if (sketch.id !== id) return;
+    clearTimeout(saveTimer);
+    saved = true;
+    const remaining = (await listSketches()).filter((s) => s.id !== id);
+    const fresh: Sketch = { id: newId(), name: "Untitled sketch", code: "background 20\ncircle[center;100;`coral]\n", created: Date.now(), updated: Date.now() };
+    const next = replaceDeletedSketch(id, id, remaining, fresh);
+    if (!next) return;
+    loadedKey = next.id;
+    open(next, active);
+    rememberSketch(next.id);
+    app.go(`sketch/${next.id}`);
+    if (next === fresh) persist();
   }
 
   onMount(loadRoute);
@@ -354,7 +390,7 @@
   {/if}
 </div>
 
-<Gallery bind:open={galleryOpen} tab={galleryTab} onPick={openExample} onOpenSketch={(s) => { galleryOpen = false; open(s); app.go(`sketch/${s.id}`); }} />
+  <Gallery bind:open={galleryOpen} tab={galleryTab} onPick={openExample} onOpenSketch={(s) => { galleryOpen = false; loadedKey = s.id; open(s); app.go(`sketch/${s.id}`); }} onDeleted={sketchDeleted} />
 
 {#if shareWarn}
   <div class="share-warn" role="alertdialog" aria-label="Long share link">
