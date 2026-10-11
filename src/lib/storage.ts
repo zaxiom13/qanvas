@@ -1,5 +1,5 @@
 // Local persistence (IndexedDB). Everything stays on this device.
-import { createStore, del, get, keys, set } from "idb-keyval";
+import { createStore, del, get, keys, set, update } from "idb-keyval";
 import { compressToEncodedURIComponent, decompressFromEncodedURIComponent } from "lz-string";
 
 const sketchDB = typeof indexedDB !== "undefined" ? createStore("qanvas", "sketches") : null;
@@ -82,16 +82,48 @@ export async function getProgress(): Promise<Progress> {
   return progressCache;
 }
 
-export async function markDone(id: string) {
-  const p = await getProgress();
-  p.done[id] = Date.now();
-  if (progressDB) await set("progress", p, progressDB);
+/** Drop the in-memory copy so the next read comes from the database. */
+export function forgetProgressCache() {
+  progressCache = null;
+}
+
+function copyProgress(old: Progress | undefined): Progress {
+  return { ...old, done: { ...(old?.done ?? {}) }, code: { ...(old?.code ?? {}) } };
+}
+
+function withDone(old: Progress | undefined, id: string, at: number): Progress {
+  const base = copyProgress(old);
+  base.done[id] = at;
+  return base;
+}
+
+function withAnswer(old: Progress | undefined, id: string, code: string): Progress {
+  const base = copyProgress(old);
+  base.code[id] = code;
+  return base;
+}
+
+// Read and write inside one IndexedDB transaction. Two tabs (or a stale cache in this tab)
+// must not replace the whole record and drop each other's done bits or saved answers.
+async function commitProgress(next: (old: Progress | undefined) => Progress): Promise<void> {
+  if (!progressDB) {
+    progressCache = next(progressCache ?? undefined);
+    return;
+  }
+  let written!: Progress;
+  await update<Progress>("progress", (old) => {
+    written = next(old);
+    return written;
+  }, progressDB);
+  progressCache = written;
+}
+
+export async function markDone(id: string, at = Date.now()) {
+  await commitProgress((old) => withDone(old, id, at));
 }
 
 export async function saveAnswer(id: string, code: string) {
-  const p = await getProgress();
-  p.code[id] = code;
-  if (progressDB) await set("progress", p, progressDB);
+  await commitProgress((old) => withAnswer(old, id, code));
 }
 
 // ---------- sharing (all in the URL, works offline) ----------
