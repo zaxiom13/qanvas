@@ -382,10 +382,33 @@ function ssr(x: QValue, y: QValue, z: QValue): QValue {
   return str(s.split(p).join(r));
 }
 
+// Short (16) and int (32) match the examples on code.kx.com/q/ref/vs/.
+// Long (64) and byte (8) are the widths of those q types. Not re-recorded from KDB-X.
+const BIT_WIDTH: Record<number, number> = { 4: 8, 5: 16, 6: 32, 7: 64 };
+
+function bitsOf(v: number, width: number): Float64Array {
+  const mask = (1n << BigInt(width)) - 1n;
+  let n = BigInt(Math.trunc(v)) & mask;
+  const out = new Float64Array(width);
+  for (let i = width - 1; i >= 0; i--) {
+    out[i] = Number(n & 1n);
+    n >>= 1n;
+  }
+  return out;
+}
+
 function vs(x: QValue, y: QValue): QValue {
   if (x instanceof QAtom && typeof x.v === "number" && x.t !== -9) {
-    // encode in base x
+    // 0b vs n is the bit pattern, not base 0. A base below 2 never finishes
+    // (n % 1 stays 0 and n / 1 does not shrink), which used to freeze the tab.
+    if (x.t === -1 && x.v === 0) {
+      if (!(y instanceof QAtom) || typeof y.v !== "number") throw typeErr("0b vs needs an integer on the right.");
+      const width = BIT_WIDTH[-y.t];
+      if (!width) throw typeErr("0b vs needs a byte, short, int or long.");
+      return vec(1, bitsOf(y.v, width));
+    }
     const base = x.v;
+    if (!Number.isInteger(base) || base < 2) throw domainErr("vs needs a base of 2 or more. 0b vs n is the bits of an integer.");
     const enc = (v: number) => {
       const digits: number[] = [];
       if (v === 0) return [0];
@@ -407,9 +430,22 @@ function vs(x: QValue, y: QValue): QValue {
     return flip(list(items(y).map((e) => longs(enc((e as QAtom).v)))));
   }
   if (x instanceof QAtom && x.t === -11 && x.v === "") {
+    // Empty symbol. Cited from code.kx.com/q/ref/vs/, not a fresh KDB-X run:
+    // a string splits on newlines (a trailing break is dropped); a symbol
+    // splits on "."; a file handle splits into directory and file.
+    if (y instanceof QAtom && y.t === -11) {
+      const s = String(y.v);
+      if (s.startsWith(":")) {
+        const i = s.lastIndexOf("/");
+        return i >= 0 ? syms([s.slice(0, i), s.slice(i + 1)]) : syms([s]);
+      }
+      return syms(s.length ? s.split(".") : [""]);
+    }
     const s = asText(y);
-    if (s === null) throw typeErr();
-    return syms(s.split("."));
+    if (s === null) throw typeErr("` vs needs a string or a symbol on the right.");
+    const parts = s.split(/\r\n|\n/);
+    if (parts.length > 1 && parts[parts.length - 1] === "") parts.pop();
+    return list(parts.map((p) => str(p)));
   }
   const sep = asText(x), s = asText(y);
   if (sep === null) throw typeErr("vs needs a separator on the left, like \",\" vs \"a,b\".");

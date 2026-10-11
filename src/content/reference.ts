@@ -166,7 +166,7 @@ export const REFERENCE: RefEntry[] = [
   e("like", "keyword", "Strings", "s like pattern", "Match against a pattern with * (anything) and ? (one char).", ["\"hello\" like \"h*o\"", "`apple`banana like \"*an*\""]),
   e("ss", "keyword", "Strings", "s ss pattern", "Positions where a pattern occurs, including overlaps.", ["\"banana\" ss \"an\"", "\"aaa\" ss \"aa\""]),
   e("ssr", "keyword", "Strings", "ssr[s;find;replace]", "Search and replace.", ["ssr[\"banana\";\"an\";\"AN\"]"]),
-  e("vs", "keyword", "Strings", "sep vs s", "Split a string on a separator (vs = 'vector from scalar').", ["\",\" vs \"a,b,c\""]),
+  e("vs", "keyword", "Strings", "sep vs s", "Split a string on a separator. An empty symbol on the left splits text into lines.", ["\",\" vs \"a,b,c\"", "` vs \"a\\nb\""]),
   e("sv", "keyword", "Strings", "sep sv strings", "Join strings with a separator ('scalar from vector').", ["\"-\" sv (\"ab\";\"cd\";\"ef\")"]),
 
   // ---------------- types & misc ----------------
