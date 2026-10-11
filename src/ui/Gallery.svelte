@@ -47,7 +47,7 @@
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
-    const parsed = sketchesFromBundle(await file.text(), mine.map((s) => s.id));
+    const parsed = sketchesFromBundle(await file.text(), mine);
     if ("error" in parsed) {
       noteBad = true;
       note = parsed.error;
@@ -57,11 +57,14 @@
     mine = await listSketches();
     const n = parsed.add.length;
     noteBad = false;
-    note = n
-      ? `Imported ${n} sketch${n === 1 ? "" : "es"}${parsed.skipped ? `. Skipped ${parsed.skipped}.` : "."}`
-      : parsed.skipped
-        ? `Nothing new. Skipped ${parsed.skipped}.`
-        : "Nothing new in that file.";
+    if (!n && parsed.already && !parsed.skipped) note = "Already on this device.";
+    else if (!n && parsed.already) note = `Already on this device. Skipped ${parsed.skipped}.`;
+    else if (n) {
+      let msg = `Imported ${n} sketch${n === 1 ? "" : "es"}`;
+      if (parsed.already) msg += `. ${parsed.already} already here`;
+      if (parsed.skipped) msg += `. Skipped ${parsed.skipped}`;
+      note = msg + ".";
+    } else note = parsed.skipped ? `Nothing new. Skipped ${parsed.skipped}.` : "Nothing new in that file.";
   }
 
   async function remove(s: Sketch) {
