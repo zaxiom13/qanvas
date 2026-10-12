@@ -40,6 +40,23 @@ test("an already-expired run budget stops til", () => {
   expect(err("count til 1000", performance.now() - 1)?.qname).toBe("stop");
 });
 
+test("a cross product too big to allocate is refused", () => {
+  // 4000×4000 is 16,000,000 pairs. 1500×1500 (2,250,000 pairs) used about 650MB and 1.1s here.
+  const e = err("count (til 4000) cross til 4000");
+  expect(e?.qname).toBe("limit");
+  expect(e?.hint).toMatch(/too large to run in the browser/);
+});
+
+test("a small cross product is unchanged", () => {
+  const s = new Session();
+  expect(s.evaluate("count 1 2 cross 10 20").text).toBe("4");
+  expect(s.evaluate("1 2 cross 10 20").text).toBe("1 10\n1 20\n2 10\n2 20");
+});
+
+test("an already-expired run budget stops cross", () => {
+  expect(err("count 1 2 cross 10 20", performance.now() - 1)?.qname).toBe("stop");
+});
+
 test("til notices a deadline that passes while the list is being filled", () => {
   let ticks = 0;
   performance.now = () => {

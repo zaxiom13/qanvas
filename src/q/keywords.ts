@@ -5,7 +5,7 @@ import { RT } from "./rt";
 import { stringOf } from "./cast";
 import {
   BUILTINS, GLYPHS, OPS, add, cmpValues, countOf, cut, distinct, drop, enlist, eq, fill, find, first, flip, gradeDown,
-  gradeUp, group, iasc, idesc, inList, join, keyOf, keyOfValue, last, matchValues, mkDict, mul, neg, not, nullMask, pick,
+  gradeUp, group, guardVector, iasc, idesc, inList, join, keyOf, keyOfValue, last, matchValues, mkDict, mul, neg, not, nullMask, pick,
   reciprocal, reverse, roll, sub, take, til, trap, typeVerb, unkey, upsertKeyed, valueOf, vmax, vmin, where, floorV, fdiv,
   identityFor,
 } from "./verbs";
@@ -506,13 +506,27 @@ function union(x: QValue, y: QValue): QValue {
 function cross(x: QValue, y: QValue): QValue {
   if (x instanceof QTable && y instanceof QTable) {
     const nx = x.n, ny = y.n;
+    const n = nx * ny;
+    // Refuse before the index arrays exist. 1500 cross 1500 (2.25e6 pairs) used about 650MB here.
+    guardVector(n);
     const ix: number[] = [], iy: number[] = [];
-    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { ix.push(i); iy.push(j); }
+    let k = 0;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      if ((k++ & 0xffff) === 0) RT.checkpoint?.();
+      ix.push(i);
+      iy.push(j);
+    }
     return table([...x.cols, ...y.cols], [...x.data.map((c) => pick(c, ix)), ...y.data.map((c) => pick(c, iy))]);
   }
   const a = x instanceof QAtom ? [x] : items(x), b = y instanceof QAtom ? [y] : items(y);
+  const n = a.length * b.length;
+  guardVector(n);
   const out: QValue[] = [];
-  for (const e of a) for (const f of b) out.push(join(e, f));
+  let k = 0;
+  for (const e of a) for (const f of b) {
+    if ((k++ & 0xffff) === 0) RT.checkpoint?.();
+    out.push(join(e, f));
+  }
   return fromItems(out);
 }
 
