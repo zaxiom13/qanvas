@@ -420,7 +420,28 @@ function vs(x: QValue, y: QValue): QValue {
   return list(s.split(sep).map((p) => str(p)));
 }
 
+function svBits(y: QValue): QValue {
+  // code.kx.com/q/ref/sv/ "Bits to integer", read 2026-10-12. Not a KDB-X recording.
+  if (!(y instanceof QVec) || y.t !== 1) throw typeErr("0b sv needs a boolean vector of 8, 16, 32 or 64 bits.");
+  const bits = y.d as Float64Array;
+  const n = bits.length;
+  if (n !== 8 && n !== 16 && n !== 32 && n !== 64) throw lengthErr("0b sv needs 8, 16, 32 or 64 bits.");
+  if (n === 8) {
+    let v = 0;
+    for (let i = 0; i < 8; i++) v = (v << 1) | (bits[i] ? 1 : 0);
+    return atom(-4, v);
+  }
+  let v = 0n;
+  for (let i = 0; i < n; i++) v = (v << 1n) | (bits[i] ? 1n : 0n);
+  const sign = 1n << BigInt(n - 1);
+  if (v >= sign) v -= sign << 1n;
+  // Longs past 2^53 are already approximate in this engine. The documented 64-bit case (all ones) is -1, which is exact.
+  return atom(n === 16 ? -5 : n === 32 ? -6 : -7, Number(v));
+}
+
 function sv(x: QValue, y: QValue): QValue {
+  // 0b is a number, so it used to take the base path with base 0 and keep only the last bit.
+  if (x instanceof QAtom && x.t === -1 && x.v === 0) return svBits(y);
   if (x instanceof QAtom && typeof x.v === "number" && x.t !== -9) {
     const base = x.v;
     const d = y instanceof QVec ? Array.from((y.d as Float64Array)) : [];
@@ -433,11 +454,17 @@ function sv(x: QValue, y: QValue): QValue {
     for (let i = 0; i < radix.length; i++) v = v * radix[i] + d[i];
     return long(v);
   }
-  if (x instanceof QAtom && x.t === -11) {
-    if (x.v === "" && y instanceof QVec && y.t === 11) {
+  if (x instanceof QAtom && x.t === -11 && x.v === "") {
+    if (y instanceof QVec && y.t === 11) {
       const parts = y.d as string[];
       if (parts[0]?.startsWith(":")) return sym(parts.join("/"));
       return sym(parts.join("."));
+    }
+    if (y instanceof QVec && y.t === 0 && (y.d as QValue[]).every((e) => e instanceof QVec && e.t === 10)) {
+      // code.kx.com/q/ref/sv/: ` sv ("one";"two";"three") is "one\ntwo\nthree\n".
+      // Assumption: the separator is "\n", that Unix example. The browser has no q host OS, so this is not "\r\n".
+      const parts = (y.d as QVec[]).map((e) => e.d as string);
+      return str(parts.length ? parts.join("\n") + "\n" : "");
     }
   }
   const sep = asText(x);
