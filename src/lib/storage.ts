@@ -105,6 +105,12 @@ export const SHARE_LINK_WARN = 8000;
 export const shareUrl = (origin: string, pathname: string, name: string, code: string) =>
   `${origin}${pathname}#/s/${encodeShare(name, code)}`;
 
+/** One line shown when a `#/s/` link has just been opened. The picture is drawn locally. */
+export function shareOpenedNote(name: string): string {
+  const n = name.trim() || "this sketch";
+  return `Opened shared sketch “${n}”.`;
+}
+
 export function shareWarning(url: string): string | null {
   if (url.length <= SHARE_LINK_WARN) return null;
   const n = url.length.toLocaleString("en-US");
