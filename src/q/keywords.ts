@@ -358,7 +358,15 @@ function ss(x: QValue, y: QValue): QValue {
   if (s === null || p === null) throw typeErr("ss needs two strings.");
   const out: number[] = [];
   if (p.includes("*") || p.includes("?") || p.includes("[")) {
-    for (let i = 0; i < s.length; i++) for (let j = i + 1; j <= s.length; j++) if (likeMatch(s.slice(i, j), p)) { out.push(i); break; }
+    // A wildcard scan tries every start and end. That never returns to the interpreter,
+    // so a long miss (for example 8000#"a" ss "b*") used to ignore the run budget.
+    let steps = 0;
+    for (let i = 0; i < s.length; i++) {
+      for (let j = i + 1; j <= s.length; j++) {
+        if ((steps++ & 4095) === 0) RT.checkpoint?.();
+        if (likeMatch(s.slice(i, j), p)) { out.push(i); break; }
+      }
+    }
   } else {
     let i = s.indexOf(p);
     // q reports overlapping matches: "aaa" ss "aa" is 0 1, not just 0.
