@@ -16,7 +16,7 @@ const TOL = 1.1368683772161603e-13; // 2^-43, q comparison tolerance
 /** Biggest vector a single primitive may allocate. 8e6 floats is 64MB — past that a phone tab is liable to be killed. */
 export const MAX_VECTOR_ITEMS = 8_000_000;
 
-function guardVector(n: number) {
+export function guardVector(n: number) {
   if (n > MAX_VECTOR_ITEMS) {
     throw new QError(
       "limit",
