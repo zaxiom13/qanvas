@@ -2,9 +2,10 @@
   import { Dialog } from "bits-ui";
   import { EXAMPLES, LEVELS, type Example } from "../content/examples";
   import { sketchesFromBundle, sketchesToBundle } from "../lib/backup";
+  import { copySketch } from "../lib/sketchCopy";
   import { deleteSketch, listSketches, saveSketch, type Sketch } from "../lib/storage";
   import { thumbnail } from "../lib/thumbs";
-  import { Download, Trash, Upload, X } from "./icons";
+  import { Copy, Download, Trash, Upload, X } from "./icons";
 
   interface Props {
     open: boolean;
@@ -62,6 +63,13 @@
       : parsed.skipped
         ? `Nothing new. Skipped ${parsed.skipped}.`
         : "Nothing new in that file.";
+  }
+
+  async function duplicate(s: Sketch) {
+    await saveSketch(copySketch(s));
+    mine = await listSketches();
+    noteBad = false;
+    note = `Duplicated “${s.name}”.`;
   }
 
   async function remove(s: Sketch) {
@@ -136,6 +144,7 @@
                     <span>{ago(s.updated)}</span>
                   </div>
                 </button>
+                <button class="dup btn sm ghost icon" aria-label={`Duplicate ${s.name}`} title="Duplicate" onclick={() => duplicate(s)}><Copy size={14} /></button>
                 <button class="del btn sm ghost icon" aria-label={`Delete ${s.name}`} onclick={() => remove(s)}><Trash size={14} /></button>
               </div>
             {/each}
@@ -299,12 +308,13 @@
     color: var(--text-2);
     line-height: 1.4;
   }
-  .del {
+  .del, .dup {
     position: absolute;
     top: 8px;
-    right: 8px;
     background: color-mix(in srgb, var(--surface) 85%, transparent);
   }
+  .del { right: 8px; }
+  .dup { right: 40px; }
   .empty {
     color: var(--text-2);
     padding: 30px 0;
