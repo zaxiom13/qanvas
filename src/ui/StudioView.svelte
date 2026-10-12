@@ -13,6 +13,7 @@
   import Gallery from "./Gallery.svelte";
   import { findSharedCopy, listSketches, shareKey } from "../lib/storage";
   import { sketchHold } from "../lib/visibility";
+  import { nudgeInto } from "../lib/pip";
   import SymbolBar from "./SymbolBar.svelte";
   import type { EditorView } from "@codemirror/view";
   import { X, Check, Code, FolderOpen, Play, Plus, Share, Sparkles, Terminal, Wand } from "./icons";
@@ -54,11 +55,20 @@
     const start = [e.clientX, e.clientY], from = [...pipPos];
     let moved = false;
     const el = e.currentTarget as HTMLElement;
+    const card = el.closest(".mstage") as HTMLElement;
+    const host = card.parentElement!;
+    const startRect = card.getBoundingClientRect();
     el.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - start[0], dy = ev.clientY - start[1];
       if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-      if (moved) pipPos = [from[0] + dx, from[1] + dy];
+      if (!moved) return;
+      const b = host.getBoundingClientRect();
+      const [nx, ny] = nudgeInto(
+        { left: startRect.left + dx, top: startRect.top + dy, width: startRect.width, height: startRect.height },
+        { left: b.left, top: b.top, right: b.right, bottom: b.bottom },
+      );
+      pipPos = [from[0] + dx + nx, from[1] + dy + ny];
     };
     const up = () => {
       el.removeEventListener("pointermove", move);
@@ -142,11 +152,21 @@
       if (next.action === "pause") stage?.pause();
       else if (next.action === "resume") stage?.resume();
     };
+    const reclamp = () => {
+      const card = document.querySelector(".studio .mstage.pip");
+      if (!(card instanceof HTMLElement) || !card.parentElement) return;
+      const r = card.getBoundingClientRect();
+      const b = card.parentElement.getBoundingClientRect();
+      const [dx, dy] = nudgeInto(r, { left: b.left, top: b.top, right: b.right, bottom: b.bottom });
+      if (dx || dy) pipPos = [pipPos[0] + dx, pipPos[1] + dy];
+    };
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", flush);
+    window.addEventListener("resize", reclamp);
     return () => {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", flush);
+      window.removeEventListener("resize", reclamp);
     };
   });
 
