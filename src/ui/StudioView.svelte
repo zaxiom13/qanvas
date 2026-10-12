@@ -3,7 +3,8 @@
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { app } from "../lib/app.svelte";
   import { DEFAULT_SKETCH, EXAMPLE_BY_ID, type Example } from "../content/examples";
-  import { clearPending, decodeShare, getSketch, newId, recoverPending, saveSketch, shareUrl, shareWarning, stashPending, type Sketch } from "../lib/storage";
+  import { clearPending, decodeShare, getSketch, newId, recoverPending, saveSketch, shareOpenedNote, shareUrl, shareWarning, stashPending, type Sketch } from "../lib/storage";
+  import { thumbnail } from "../lib/thumbs";
   import type { Explained } from "../lib/explain";
   import { parse } from "../q/parser";
   import type { RunState } from "../qanvas/runtime";
@@ -172,6 +173,8 @@
 
   function open(s: Sketch, runNow = true) {
     flush();
+    sharedNote = "";
+    sharedThumb = "";
     sketch = s;
     code = s.code;
     saved = true;
@@ -192,6 +195,18 @@
     open(s);
     app.go(`sketch/${s.id}`);
     persist();
+  }
+
+  let sharedNote = $state("");
+  let sharedThumb = $state("");
+
+  function showShared(name: string, code: string, key: string) {
+    const note = shareOpenedNote(name);
+    sharedNote = note;
+    sharedThumb = "";
+    thumbnail("share:" + key, code).then((u) => {
+      if (sharedNote === note) sharedThumb = u;
+    });
   }
 
   let shareWarn = $state("");
@@ -244,6 +259,7 @@
         const copy = findSharedCopy(await listSketches().catch(() => []), key, d.code);
         const s: Sketch = copy ?? { id: newId(), name: d.name, code: d.code, created: Date.now(), updated: Date.now(), share: key };
         open(s);
+        showShared(s.name, s.code, key);
         if (!copy) persist();
         history.replaceState(null, "", `#/sketch/${s.id}`);
         // replaceState fires no hashchange, so update the route ourselves
@@ -251,6 +267,7 @@
         app.route = { tab: "sketch", parts: [s.id] };
         return;
       }
+      sharedNote = "";
       flash("This share link is damaged or incomplete, so it couldn't be opened.");
       history.replaceState(null, "", "#/sketch");
       loadedKey = "";
@@ -328,6 +345,13 @@
 {/snippet}
 
 <div class="studio" class:hidden={!active}>
+  {#if sharedNote}
+    <div class="arrival" role="status">
+      {#if sharedThumb}<img src={sharedThumb} alt="" />{:else}<span class="arrival-ph" aria-hidden="true"></span>{/if}
+      <p>{sharedNote}</p>
+      <button class="btn sm ghost" onclick={() => (sharedNote = "")}>Dismiss</button>
+    </div>
+  {/if}
   {#if mobile}
     <div class="mtabs" role="tablist">
       <button role="tab" aria-selected={mtab === "code"} class:on={mtab === "code"} onclick={() => (mtab = "code")}><Code size={15} /> Code</button>
@@ -397,6 +421,31 @@
   }
   .studio.hidden {
     display: none;
+  }
+  .arrival {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .arrival img,
+  .arrival-ph {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #15141d;
+    flex: none;
+  }
+  .arrival p {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
   }
   .col {
     display: flex;
