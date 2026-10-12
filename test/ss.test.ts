@@ -22,3 +22,18 @@ test("ss still finds the non-overlapping banana matches from the corpus", () => 
 test("an empty pattern does not loop", () => {
   expect(show('"abc" ss ""')).toBe("`long$()");
 });
+
+test("wildcard searches still report the start of each match", () => {
+  expect(show('"abc" ss "b*"')).toBe(",1");
+  expect(show('"ab" ss "a*"')).toBe(",0");
+});
+
+test("a wildcard search stops when the run budget is already spent", () => {
+  // 4000#"a" ss "b*" took about 2s on this machine and returned 0, with the deadline ignored.
+  const s = new Session();
+  s.deadline = performance.now() - 1;
+  s.budgetHint = "budget";
+  const r = s.evaluate('count (4000#"a") ss "b*"');
+  expect(r.error?.qname).toBe("stop");
+  expect(r.error?.hint).toBe("budget");
+});
