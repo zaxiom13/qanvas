@@ -1,13 +1,15 @@
 <script lang="ts">
   // q is glyph-heavy; phone keyboards hide most glyphs. This bar puts them one tap away.
-  interface Props {
-    onInsert: (t: string) => void;
-  }
-  let { onInsert }: Props = $props();
+interface Props {
+  onInsert: (t: string) => void;
+  /** The shell already pads the safe area, so the bar should not add it again. */
+  flush?: boolean;
+}
+let { onInsert, flush = false }: Props = $props();
   const KEYS = [":", ";", "[", "]", "{", "}", "(", ")", "`", "\"", "+", "-", "*", "%", "#", "_", ",", "!", "?", "@", "$", "&", "|", "^", "~", "'", "/", "\\", "<", ">", "=", "."];
 </script>
 
-<div class="bar" role="toolbar" aria-label="q symbols">
+<div class="bar" class:flush role="toolbar" aria-label="q symbols">
   {#each KEYS as k (k)}
     <button type="button" onpointerdown={(e) => e.preventDefault()} onclick={() => onInsert(k)} aria-label={`insert ${k}`}>{k}</button>
   {/each}
@@ -25,6 +27,9 @@
   }
   .bar::-webkit-scrollbar {
     display: none;
+  }
+  .bar.flush {
+    padding-bottom: 6px;
   }
   button {
     flex: none;

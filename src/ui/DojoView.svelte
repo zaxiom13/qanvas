@@ -8,7 +8,7 @@
   import Stage from "./Stage.svelte";
   import { ArrowLeft, ArrowRight, CircleCheck, Target } from "./icons";
 
-  let { mobile }: { mobile: boolean } = $props();
+  let { mobile, phoneLand = false }: { mobile: boolean; phoneLand?: boolean } = $props();
 
   let done = $state<Record<string, number>>({});
   let stage = $state<Stage>();
@@ -45,8 +45,8 @@
   const levelLabel = (l: string) => (l === "warmup" ? "warm-up" : l || "core");
 </script>
 
-<div class="dojo" class:mobile class:has-problem={!!problem}>
-  {#if !mobile || !problem}
+<div class="dojo" class:mobile class:land={phoneLand} class:has-problem={!!problem}>
+  {#if (!mobile && !phoneLand) || !problem}
     <nav class="list scroll" aria-label="Problems">
       <header>
         <h1><Target size={22} /> Dojo</h1>
@@ -70,7 +70,7 @@
   {#if problem}
     <section class="work scroll" bind:this={pane}>
       <div class="inner">
-        {#if mobile}<button class="back btn ghost sm" onclick={() => app.go("dojo")}><ArrowLeft size={15} /> All problems</button>{/if}
+        {#if mobile || phoneLand}<button class="back btn ghost sm" onclick={() => app.go("dojo")}><ArrowLeft size={15} /> All problems</button>{/if}
         <p class="crumb">{DOJO.find((s) => s.id === problem.set)?.title} · {levelLabel(problem.level)}</p>
         <h1>{problem.title}</h1>
         {#key problem.id}
@@ -98,7 +98,7 @@
         <Stage bind:this={stage} name={problem?.title ?? "dojo"} compact />
       </aside>
     {/if}
-  {:else if !mobile}
+  {:else if !mobile && !phoneLand}
     <section class="empty">
       <div>
         <Target size={40} />
@@ -128,6 +128,14 @@
   .dojo.mobile:has(.stagewrap) {
     grid-template-columns: 1fr;
     grid-template-rows: minmax(0, 1fr) 42vh;
+  }
+  /* phone landscape: the list hides once a problem is open, so the work is not a 124px sliver */
+  .dojo.land {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .dojo.land:has(.stagewrap) {
+    grid-template-columns: minmax(0, 1.1fr) minmax(220px, 0.9fr);
+    grid-template-rows: minmax(0, 1fr);
   }
   .list {
     border-right: 1px solid var(--line);
@@ -242,8 +250,12 @@
     margin: 0 auto;
     padding: 28px 26px 60px;
   }
-  .mobile .inner {
+  .mobile .inner,
+  .land .inner {
     padding: 14px 14px 40px;
+  }
+  .land .inner h1 {
+    font-size: 24px;
   }
   .back {
     margin-bottom: 8px;
