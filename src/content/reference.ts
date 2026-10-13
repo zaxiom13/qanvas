@@ -167,7 +167,7 @@ export const REFERENCE: RefEntry[] = [
   e("ss", "keyword", "Strings", "s ss pattern", "Positions where a pattern occurs, including overlaps.", ["\"banana\" ss \"an\"", "\"aaa\" ss \"aa\""]),
   e("ssr", "keyword", "Strings", "ssr[s;find;replace]", "Search and replace.", ["ssr[\"banana\";\"an\";\"AN\"]"]),
   e("vs", "keyword", "Strings", "sep vs s", "Split a string on a separator. An empty symbol on the left splits text into lines.", ["\",\" vs \"a,b,c\"", "` vs \"a\\nb\""]),
-  e("sv", "keyword", "Strings", "sep sv strings", "Join strings with a separator ('scalar from vector').", ["\"-\" sv (\"ab\";\"cd\";\"ef\")"]),
+  e("sv", "keyword", "Strings", "sep sv strings", "Join strings with a separator. An empty symbol joins lines, with a newline after each. 0b sv turns 8, 16, 32 or 64 bits into an integer.", ["\"-\" sv (\"ab\";\"cd\";\"ef\")", "` sv (\"one\";\"two\";\"three\")", "0b sv 8#1b"]),
 
   // ---------------- types & misc ----------------
   e("type", "keyword", "Types", "type x", "The type number: negative for atoms, positive for lists (7 long, 9 float, 11 symbol...).", ["type 1", "type 1 2", "type `a", "type 1.5"]),

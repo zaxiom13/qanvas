@@ -9,6 +9,7 @@
   import Stage from "./Stage.svelte";
   import HeroArt from "./HeroArt.svelte";
   import { runHeadless } from "../qanvas/headless";
+  import { nudgeInto, type Bounds } from "../lib/pip";
   import { X, ArrowLeft, ArrowRight, CircleCheck, Compass, Maximize, Minimize, Palette, Sparkles } from "./icons";
 
   let { mobile }: { mobile: boolean } = $props();
@@ -44,15 +45,27 @@
 
   let pipClosed = $state(false);
   let pipPos = $state<[number, number]>([0, 0]);
+  function learnBounds(): Bounds {
+    const nav = document.querySelector("nav.bottom");
+    const bottom = nav ? nav.getBoundingClientRect().top : window.innerHeight;
+    return { left: 0, top: 0, right: window.innerWidth, bottom };
+  }
   function pipDown(e: PointerEvent) {
     const start = [e.clientX, e.clientY], from = [...pipPos];
     let moved = false;
     const el = e.currentTarget as HTMLElement;
+    const card = el.closest("aside.stage") as HTMLElement;
+    const startRect = card.getBoundingClientRect();
     el.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - start[0], dy = ev.clientY - start[1];
       if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-      if (moved) pipPos = [from[0] + dx, from[1] + dy];
+      if (!moved) return;
+      const [nx, ny] = nudgeInto(
+        { left: startRect.left + dx, top: startRect.top + dy, width: startRect.width, height: startRect.height },
+        learnBounds(),
+      );
+      pipPos = [from[0] + dx + nx, from[1] + dy + ny];
     };
     const up = () => {
       el.removeEventListener("pointermove", move);
@@ -62,6 +75,18 @@
     el.addEventListener("pointermove", move);
     el.addEventListener("pointerup", up);
   }
+
+  onMount(() => {
+    const reclamp = () => {
+      const card = document.querySelector("aside.stage.pip");
+      if (!(card instanceof HTMLElement)) return;
+      const r = card.getBoundingClientRect();
+      const [dx, dy] = nudgeInto(r, learnBounds());
+      if (dx || dy) pipPos = [pipPos[0] + dx, pipPos[1] + dy];
+    };
+    window.addEventListener("resize", reclamp);
+    return () => window.removeEventListener("resize", reclamp);
+  });
 
   async function runSketch(code: string): Promise<Explained | null> {
     if (!stage) return null;

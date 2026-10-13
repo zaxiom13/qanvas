@@ -2,9 +2,10 @@
   import { Dialog } from "bits-ui";
   import { EXAMPLES, LEVELS, type Example } from "../content/examples";
   import { sketchesFromBundle, sketchesToBundle } from "../lib/backup";
+  import { copySketch } from "../lib/sketchCopy";
   import { deleteSketch, listSketches, saveSketch, type Sketch } from "../lib/storage";
   import { thumbnail } from "../lib/thumbs";
-  import { Download, Trash, Upload, X } from "./icons";
+  import { Copy, Download, Trash, Upload, X } from "./icons";
 
   interface Props {
     open: boolean;
@@ -47,7 +48,7 @@
     const file = input.files?.[0];
     input.value = "";
     if (!file) return;
-    const parsed = sketchesFromBundle(await file.text(), mine.map((s) => s.id));
+    const parsed = sketchesFromBundle(await file.text(), mine);
     if ("error" in parsed) {
       noteBad = true;
       note = parsed.error;
@@ -57,11 +58,21 @@
     mine = await listSketches();
     const n = parsed.add.length;
     noteBad = false;
-    note = n
-      ? `Imported ${n} sketch${n === 1 ? "" : "es"}${parsed.skipped ? `. Skipped ${parsed.skipped}.` : "."}`
-      : parsed.skipped
-        ? `Nothing new. Skipped ${parsed.skipped}.`
-        : "Nothing new in that file.";
+    if (!n && parsed.already && !parsed.skipped) note = "Already on this device.";
+    else if (!n && parsed.already) note = `Already on this device. Skipped ${parsed.skipped}.`;
+    else if (n) {
+      let msg = `Imported ${n} sketch${n === 1 ? "" : "es"}`;
+      if (parsed.already) msg += `. ${parsed.already} already here`;
+      if (parsed.skipped) msg += `. Skipped ${parsed.skipped}`;
+      note = msg + ".";
+    } else note = parsed.skipped ? `Nothing new. Skipped ${parsed.skipped}.` : "Nothing new in that file.";
+  }
+
+  async function duplicate(s: Sketch) {
+    await saveSketch(copySketch(s));
+    mine = await listSketches();
+    noteBad = false;
+    note = `Duplicated “${s.name}”.`;
   }
 
   async function remove(s: Sketch) {
@@ -136,6 +147,7 @@
                     <span>{ago(s.updated)}</span>
                   </div>
                 </button>
+                <button class="dup btn sm ghost icon" aria-label={`Duplicate ${s.name}`} title="Duplicate" onclick={() => duplicate(s)}><Copy size={14} /></button>
                 <button class="del btn sm ghost icon" aria-label={`Delete ${s.name}`} onclick={() => remove(s)}><Trash size={14} /></button>
               </div>
             {/each}
@@ -299,12 +311,13 @@
     color: var(--text-2);
     line-height: 1.4;
   }
-  .del {
+  .del, .dup {
     position: absolute;
     top: 8px;
-    right: 8px;
     background: color-mix(in srgb, var(--surface) 85%, transparent);
   }
+  .del { right: 8px; }
+  .dup { right: 40px; }
   .empty {
     color: var(--text-2);
     padding: 30px 0;
