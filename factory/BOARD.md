@@ -1,54 +1,75 @@
 # Qanvas board
 
-Reconciled 2026-10-12 (Europe/London) after the night run. `main` is `d06e761` (merge of #39). Five improvement PRs from this run are open drafts. Five improvement PRs from 2026-10-11 are still open drafts and were not edited. Nothing here is a commitment until a card says shipped and the PR is merged.
+Reconciled 2026-10-13 (Europe/London). `main` is `29569f2` (merge of #45). One new improvement draft is open. Two older drafts were updated so they merge again. Nothing here is a commitment until a card says shipped and the PR is merged.
 
 ## This run
 
 | PR | State | What a learner gets |
 | --- | --- | --- |
-| [#47](https://github.com/zaxiom13/qanvas/pull/47) | Open draft | A wildcard `ss` stops with `'stop` when the run budget is spent |
-| [#48](https://github.com/zaxiom13/qanvas/pull/48) | Open draft | A `cross` that would build more than 8,000,000 pairs stops with `'limit` before it allocates |
-| [#49](https://github.com/zaxiom13/qanvas/pull/49) | Open draft | `` ` sv `` joins lines. `0b sv` turns 8, 16, 32 or 64 bits into an integer |
-| [#50](https://github.com/zaxiom13/qanvas/pull/50) | Open draft | Opening a share link shows the sketch name and a picture drawn on the device |
-| [#51](https://github.com/zaxiom13/qanvas/pull/51) | Open draft | Dragging the mini canvas keeps it on screen |
+| [#53](https://github.com/zaxiom13/qanvas/pull/53) | Open draft | On a phone held sideways, sketch code and the drawing sit side by side, and a drawing problem is not squeezed into a sliver |
 
-## Still open from 2026-10-11
+[#41](https://github.com/zaxiom13/qanvas/pull/41) was left as it was. It still merges into `main`, and its three progress tests pass once `fake-indexeddb` is installed.
+
+[#42](https://github.com/zaxiom13/qanvas/pull/42) and [#44](https://github.com/zaxiom13/qanvas/pull/44) did not merge: `StudioView.svelte` and the reference blurb had both changed. Each now contains a merge of `main`. #42 keeps the share-preview imports and the deleted-sketch helpers. #44 keeps the line-split `vs` blurb and the `sv` blurb already on `main`. Check 0 errors, 2 warnings. #42: 20 files, 1422 passed. #44: 20 files, 1421 passed.
+
+[#46](https://github.com/zaxiom13/qanvas/pull/46) is closed and was never merged. Its 2026-10-11 journal is in this branch. Do not merge #46 as-is. It would put the older board back.
+
+## Already on main since the 2026-10-12 board
+
+The board merged in #52 was written before these landed. They are on `main` now:
+
+| PR | What a learner gets |
+| --- | --- |
+| [#40](https://github.com/zaxiom13/qanvas/pull/40) | Deploy path is Cloudflare Workers Builds. A human merged this. Night runs still do not deploy. |
+| [#43](https://github.com/zaxiom13/qanvas/pull/43) | My sketches has Duplicate. The copy does not keep the share key. |
+| [#45](https://github.com/zaxiom13/qanvas/pull/45) | Importing the same sketch backup again does not add another copy. |
+| [#47](https://github.com/zaxiom13/qanvas/pull/47) | A wildcard `ss` stops with `'stop` when the run budget is spent. |
+| [#48](https://github.com/zaxiom13/qanvas/pull/48) | A `cross` that would build more than 8,000,000 pairs stops with `'limit`. |
+| [#49](https://github.com/zaxiom13/qanvas/pull/49) | `` ` sv `` joins lines. `0b sv` turns 8, 16, 32 or 64 bits into an integer. |
+| [#50](https://github.com/zaxiom13/qanvas/pull/50) | Opening a share link shows the sketch name and a picture drawn on the device. |
+| [#51](https://github.com/zaxiom13/qanvas/pull/51) | Dragging the mini canvas keeps it on screen. |
+| [#52](https://github.com/zaxiom13/qanvas/pull/52) | The 2026-10-12 board. |
+
+This run did not merge, push to `main`, or deploy.
+
+## Still open from earlier nights
 
 | PR | State | What a learner gets |
 | --- | --- | --- |
-| [#41](https://github.com/zaxiom13/qanvas/pull/41) | Open draft | Lesson and Dojo progress saved in two tabs at once is kept |
-| [#42](https://github.com/zaxiom13/qanvas/pull/42) | Open draft | Deleting the open sketch, or reloading a deleted id, opens a sketch that still exists |
-| [#43](https://github.com/zaxiom13/qanvas/pull/43) | Open draft | My sketches has Duplicate. The copy does not keep the share key |
-| [#44](https://github.com/zaxiom13/qanvas/pull/44) | Open draft | `` ` vs `` splits lines. A base below 2 raises `'domain` instead of hanging |
-| [#45](https://github.com/zaxiom13/qanvas/pull/45) | Open draft | Importing the same sketch backup again does not add another copy |
+| [#41](https://github.com/zaxiom13/qanvas/pull/41) | Open draft, merges | Lesson and Dojo progress saved in two tabs at once is kept |
+| [#42](https://github.com/zaxiom13/qanvas/pull/42) | Open draft, updated | Deleting the open sketch, or reloading a deleted id, opens a sketch that still exists |
+| [#44](https://github.com/zaxiom13/qanvas/pull/44) | Open draft, updated | `` ` vs `` splits lines. A base below 2 raises `'domain` instead of hanging |
 
-[#46](https://github.com/zaxiom13/qanvas/pull/46) is that night's board draft. This file is the later reconciliation. Merging #46 on top of this one would put the older text back; combine them instead of merging #46 as-is.
-
-[#40](https://github.com/zaxiom13/qanvas/pull/40) is an open draft that switches deploy from GitHub Actions to Cloudflare Workers Builds. Not edited. Not merged. Merging it is a deploy-path change and stays a human decision. It edits `package.json`. #41 also edits `package.json` (devDependency `fake-indexeddb` only).
-
-#42, #43 and #45 all edit `Gallery.svelte` in different functions. This run did not edit that file.
-
-Already on `main`: 2026-10-09 [#28](https://github.com/zaxiom13/qanvas/pull/28) icons, [#29](https://github.com/zaxiom13/qanvas/pull/29) save flush, [#30](https://github.com/zaxiom13/qanvas/pull/30) landscape insets, [#31](https://github.com/zaxiom13/qanvas/pull/31) share-copy dedupe, [#32](https://github.com/zaxiom13/qanvas/pull/32) malformed hash. 2026-10-10 [#34](https://github.com/zaxiom13/qanvas/pull/34) huge-vector `'limit`, [#35](https://github.com/zaxiom13/qanvas/pull/35) pause when hidden, [#36](https://github.com/zaxiom13/qanvas/pull/36) share-length warning, [#37](https://github.com/zaxiom13/qanvas/pull/37) overlapping `ss`, [#38](https://github.com/zaxiom13/qanvas/pull/38) sketch JSON backup. This run did not merge, push to `main`, or deploy.
+#42 edits `StudioView.svelte` and `Gallery.svelte`. #53 also edits `StudioView.svelte`. Merging both needs a small combine. #41 edits `package.json` (devDependency `fake-indexeddb` only) and `src/lib/storage.ts`.
 
 ## Roadmap
 
 1. **Installability — shipped (#28), unchanged.** Real PNGs from `tools/make-icons.mjs`. Not done: a real Android install, an iOS home-screen check, Lighthouse.
-2. **Offline — spot-checked on 2026-10-09, not retested.** Precache on `main` at `d06e761` is 21 entries, 2498.17 KiB (hashed JS, CSS, woff2). The 512 px icons stay out of the precache. Not done: an `autoUpdate` swap mid-session over an unsaved edit.
-3. **Saved work — increments from 2026-10-11 still open (#41, #42, #45), on top of #29 and #38.** Flush on switch, hide and `pagehide` is merged. Sketch JSON backup is merged. Not done: a progress schema version, or backup of lesson and Dojo progress.
-4. **Portrait and landscape — #30 is merged. #51, open, keeps the mini canvas inside the editor.** Phone 390×844 and a short 700×400 viewport were exercised. A drag that used to land at (−51, −12) now stays inside. Not done: the layout still switches on `max-width: 760px` only, so 844×390 is the desktop layout and has no mini canvas. Soft keyboard and a physical notch were not tested.
-5. **Main-thread responsiveness — #34 is merged. #47 and #48 are open.** Lists over 8,000,000 items are `'limit`. A wildcard `ss` now checks the run budget. `cross` uses the same cap and checks the budget while it fills. A Worker is still only a proposal.
-6. **Bundle — measured, not split.** One JS chunk on `main`: 2,156.61 kB (gzip 666.49 kB). The largest branch this run is #51 at 2,158.00 kB (gzip 667.01 kB). No code splitting.
+2. **Offline — not retested this run.** Precache on `main` at `29569f2` is 22 entries, 2502.90 KiB. Not done: an `autoUpdate` swap mid-session over an unsaved edit.
+3. **Saved work — #43 and #45 are merged. #41 and #42 are still open.** Flush on switch, hide and `pagehide` is merged. Sketch JSON backup and duplicate are merged. Not done: a progress schema version, or backup of lesson and Dojo progress.
+4. **Portrait and landscape — #30 and #51 are merged. #53, open, is the short wide layout.** 844×390 was the desktop studio: a small canvas, no symbol bar, and a drawing problem 124px wide. After #53 the sketch is side by side (canvas 280×280, symbol bar present) and the checkerboard problem is 464px beside its picture. Portrait 390×844 and desktop 1280×800 were unchanged. A phone still under 760px wide (667×375) stays on the stacked phone UI. Not done: a physical notch, the soft keyboard, and keeping the same canvas instance across a rotation (the sketch restarts).
+5. **Main-thread responsiveness — #34, #47 and #48 are merged.** Lists over 8,000,000 items are `'limit`. A wildcard `ss` checks the run budget. `cross` uses the same cap. A Worker is still only a proposal.
+6. **Bundle — measured, not split.** One JS chunk on `main`: 2,160.88 kB (gzip 668.89 kB). CSS 52.19 kB (gzip 12.26 kB). #53 is 2,161.66 kB (gzip 669.14 kB) and CSS 53.00 kB (gzip 12.40 kB). No code splitting.
 7. **Android wrapper — parked.** Not confirmed. PWA installability is the committed goal. Do not start a TWA/WebView shell until Zak confirms or the PWA milestones above are done.
 
 ## Feature cards
 
-### F7 Share polish — in progress
+### Phone landscape layout — in progress
 
-- **Shipped:** increment 1, [#31](https://github.com/zaxiom13/qanvas/pull/31), merged. Opening `#/s/…` reuses an unedited copy. A damaged link toasts and falls back to `#/sketch`.
+- **This run:** [#53](https://github.com/zaxiom13/qanvas/pull/53), open. A window at most 500px tall and 761–1024px wide uses a landscape studio and a two-column drawing problem.
+- **Evidence:** `test/viewport.test.ts`. Headless Chrome, light theme, live re-run off. Before and after at 844×390 for the sketch and the checkerboard. Portrait, desktop, 1400×420, 667×375, 932×430, and a dark 844×390 sketch were also opened. No page errors. Tapping a backtick on the symbol bar inserted it. The console opened as a drawer. Rotating 390×844 to 844×390 left the sketch running (Restart, 60 fps).
+- **Rough edges:** the stage is a new instance after rotation, so the animation starts again. The symbol bar scrolls. Dimensions on the canvas toolbar hide when the bar is under 360px. No physical phone.
+- **Next iterations:**
+  1. Exercise the soft keyboard over the symbol bar and the editor.
+  2. Keep one stage instance across rotation so a running sketch does not restart.
+  3. Use the side-by-side studio for a short phone that is still under 760px wide.
+
+### F7 Share polish — in progress, no new increment this run
+
+- **Shipped:** increment 1, [#31](https://github.com/zaxiom13/qanvas/pull/31), merged. Opening `#/s/…` reuses an unedited copy.
 - **Shipped:** increment 2, [#36](https://github.com/zaxiom13/qanvas/pull/36), merged. URLs longer than 8,000 characters ask before they are copied.
-- **This run:** increment 3, [#50](https://github.com/zaxiom13/qanvas/pull/50), open. Opening a link shows `Opened shared sketch “…”` and a 44 px thumbnail rendered on the device. Dismiss hides it. A later reload of the saved sketch does not show it again.
-- **Evidence:** `test/share.test.ts`. Headless Chrome, light theme, live re-run off, phone 390×844 and desktop 1280×800. The sketch was `background 24` / `circle[center;90;\`coral]`.
-- **Rough edges:** the thumbnail is one still from the local renderer and can arrive after the name. 8,000 is still a local guess. Not measured on a chat app.
+- **Shipped:** increment 3, [#50](https://github.com/zaxiom13/qanvas/pull/50), merged. Opening a link shows the name and a 44px thumbnail.
+- **Rough edges:** the thumbnail can arrive after the name. 8,000 is still a local guess.
 - **Next iterations:**
   1. A QR code for phone hand-off, generated locally, no remote service.
   2. Revisit 8,000 if a real chat-app measurement says the line is wrong.
@@ -56,12 +77,13 @@ Already on `main`: 2026-10-09 [#28](https://github.com/zaxiom13/qanvas/pull/28) 
 
 ### F1 Sketch library management — in progress, no new increment this run
 
-- **Shipped:** increment 1, [#38](https://github.com/zaxiom13/qanvas/pull/38), merged. Export downloads `qanvas-sketches.json`. Import adds sketches, remints a taken id, refuses a version other than 1, skips bad entries, and adds at most 500.
-- **Open from 2026-10-11:** increment 2, [#43](https://github.com/zaxiom13/qanvas/pull/43), Duplicate. Increment 3, [#45](https://github.com/zaxiom13/qanvas/pull/45), a second import of the same id, name and code is skipped.
-- **This run:** no new increment. A name filter would edit `Gallery.svelte`, which #42, #43 and #45 already edit and have not merged.
+- **Shipped:** increment 1, [#38](https://github.com/zaxiom13/qanvas/pull/38), merged. Export and import of sketches as JSON.
+- **Shipped:** increment 2, [#43](https://github.com/zaxiom13/qanvas/pull/43), merged. Duplicate.
+- **Shipped:** increment 3, [#45](https://github.com/zaxiom13/qanvas/pull/45), merged. A second import of the same id, name and code is skipped.
+- **Open:** [#42](https://github.com/zaxiom13/qanvas/pull/42) still covers a deleted `lastSketch`. It edits `Gallery.svelte`.
 - **Rough edges:** Duplicate stacks the prefix (`Copy of Copy of …`). Import identity ignores thumbnail-only changes. Lesson and Dojo progress are not in the file.
 - **Next iterations:**
-  1. Filter My sketches by name, after #43 and #45 have merged or been combined.
+  1. Filter My sketches by name, after #42 has merged. #42 and a filter both edit `Gallery.svelte`.
   2. Number copies so the name does not become `Copy of Copy of …`.
   3. Include lesson and Dojo progress in a backup, additively, without wiping what is already stored.
 
@@ -71,10 +93,10 @@ Already on `main`: 2026-10-09 [#28](https://github.com/zaxiom13/qanvas/pull/28) 
 | --- | --- |
 | F2 Animated export | Bundle cost unknown; encoder must be lazy and precached. |
 | F3 Dojo: dictionaries, qSQL, temporals, strings | Needs real-q or cited semantics per problem. |
-| F4 Learn progress: chapter badges, resume cell, reset lesson | Chapter counts already render. Must not wipe `done` / saved answers. #41 only stops two tabs dropping updates. |
+| F4 Learn progress: chapter badges, resume cell, reset lesson | Must not wipe `done` / saved answers. #41 only stops two tabs dropping updates. |
 | F5 Reference: open in Sketch, lesson/Dojo backlinks | |
 | F6 Editor: hover docs, signature hints, shortcuts sheet | |
-| F8 Onboarding | Keep it to a dismissible empty state. No tour (v1 z-index bugs). |
+| F8 Onboarding | Keep it to a dismissible empty state. No tour. |
 | F9 New examples and lessons | Each must pass the existing content suites. |
 
 ## Refinement cards
@@ -85,31 +107,33 @@ A failed share decode toasts (#31, merged). #42, open, covers `lastSketch` and a
 
 ### Not started
 
-R1 error and stop copy. R2 micro-interactions (`prefers-reduced-motion` is already global). R3 visual consistency, both themes. R5 terminology sweep. README still says "number scrubbing", which `1b8e47e` removed. `tools/` still has scratch files (`t.ts`, `t2.ts`, `t3.ts`, `probe1.txt`, `q2.txt`, `typetable.txt`); not deleted, usage not confirmed. The two `state_referenced_locally` warnings in `LessonCell.svelte` and `ChallengeCell.svelte` are unchanged. No AGENTS.md.
+R1 error and stop copy. R2 micro-interactions. R3 visual consistency. R5 terminology sweep. README still says "number scrubbing", which `1b8e47e` removed. `tools/` still has scratch files (`t.ts`, `t2.ts`, `t3.ts`, `probe1.txt`, `q2.txt`, `typetable.txt`); not deleted, usage not confirmed. The two `state_referenced_locally` warnings are unchanged. No AGENTS.md.
 
 ## Draw
 
-Seed `20261012`. One draw:
+Seed `20261013`. One draw:
 
 ```python
-random.Random(20261012).choices(
+random.Random(20261013).choices(
     ["features", "refinement", "q parity", "mobile", "content", "performance", "accessibility", "docs"],
     weights=[20, 15, 20, 12, 10, 10, 8, 5],
     k=1,
 )
 ```
 
-Result: **q parity**. That slot is #49. Checked against the previous seeds: `20261009` is mobile, `20261010` is q parity, `20261011` is q parity, which matches those journals.
+Result: **mobile**. That slot is #53.
 
-Slots this run: reliability (#47 wildcard `ss`), reliability (#48 `cross`), feature F7 increment 3 (#50), q parity (#49), reliability layout (#51 mini canvas). No feature slot was displaced.
+The same call returns mobile for `20261009`, q parity for `20261010`, q parity for `20261011`, and q parity for `20261012`, which matches those journals.
+
+This run did not open five new PRs. The instruction for the night was to avoid another pile of drafts and to put phone landscape first. The other slots were not used. #42 and #44 were repaired instead of replaced.
 
 ## Parked on purpose
 
-- v1 branches (`cursor/*` from before the 2026-09-27 rewrite, closed PRs #10, #16, #18, #20–#23). No merge base with `main`. Not rebased, not revived.
+- v1 branches and closed PRs #10, #16, #18, #20–#23. No merge base with `main`. Not rebased, not revived.
 - Android shell. See roadmap 7.
-- Interpreter Worker. #34, #47 and #48 are guards inside the primitives. A Worker stays a proposal.
-- Spaced boolean vectors such as `where 0 1 1 0 1b`. The corpus case `not 1 0 1b` is `1b`, and the 2026-09-27 oracle treats `1 0 1 1b` as `'type`. Do not change the lexer to make the spaced form a boolean vector.
-- `ssr` still replaces non-overlapping copies. #37 did not change it. #47 only makes a wildcard `ss` interruptible.
-- `0N=0N` stays `1b`, as the corpus recorded from real q on 2026-09-27. Do not "fix" null equality.
-- #40 Workers Builds. Not this run's work. Do not merge it from a night run.
-- `0x0 sv` (bytes to an integer). #49 did not change it.
+- Interpreter Worker. Guards inside the primitives are on `main`. A Worker stays a proposal.
+- Spaced boolean vectors such as `where 0 1 1 0 1b`. Do not change the lexer.
+- `ssr` still replaces non-overlapping copies.
+- `0N=0N` stays `1b`.
+- `0x0 sv` (bytes to an integer). Not changed.
+- Merging #46 on top of this board. Combine by keeping this file.
