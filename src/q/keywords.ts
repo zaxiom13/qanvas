@@ -5,7 +5,7 @@ import { RT } from "./rt";
 import { stringOf } from "./cast";
 import {
   BUILTINS, GLYPHS, OPS, add, cmpValues, countOf, cut, distinct, drop, enlist, eq, fill, find, first, flip, gradeDown,
-  gradeUp, group, iasc, idesc, inList, join, keyOf, keyOfValue, last, matchValues, mkDict, mul, neg, not, nullMask, pick,
+  gradeUp, group, guardVector, iasc, idesc, inList, join, keyOf, keyOfValue, last, matchValues, mkDict, mul, neg, not, nullMask, pick,
   reciprocal, reverse, roll, sub, take, til, trap, typeVerb, unkey, upsertKeyed, valueOf, vmax, vmin, where, floorV, fdiv,
   identityFor,
 } from "./verbs";
@@ -358,7 +358,15 @@ function ss(x: QValue, y: QValue): QValue {
   if (s === null || p === null) throw typeErr("ss needs two strings.");
   const out: number[] = [];
   if (p.includes("*") || p.includes("?") || p.includes("[")) {
-    for (let i = 0; i < s.length; i++) for (let j = i + 1; j <= s.length; j++) if (likeMatch(s.slice(i, j), p)) { out.push(i); break; }
+    // A wildcard scan tries every start and end. That never returns to the interpreter,
+    // so a long miss (for example 8000#"a" ss "b*") used to ignore the run budget.
+    let steps = 0;
+    for (let i = 0; i < s.length; i++) {
+      for (let j = i + 1; j <= s.length; j++) {
+        if ((steps++ & 4095) === 0) RT.checkpoint?.();
+        if (likeMatch(s.slice(i, j), p)) { out.push(i); break; }
+      }
+    }
   } else {
     let i = s.indexOf(p);
     // q reports overlapping matches: "aaa" ss "aa" is 0 1, not just 0.
@@ -420,7 +428,28 @@ function vs(x: QValue, y: QValue): QValue {
   return list(s.split(sep).map((p) => str(p)));
 }
 
+function svBits(y: QValue): QValue {
+  // code.kx.com/q/ref/sv/ "Bits to integer", read 2026-10-12. Not a KDB-X recording.
+  if (!(y instanceof QVec) || y.t !== 1) throw typeErr("0b sv needs a boolean vector of 8, 16, 32 or 64 bits.");
+  const bits = y.d as Float64Array;
+  const n = bits.length;
+  if (n !== 8 && n !== 16 && n !== 32 && n !== 64) throw lengthErr("0b sv needs 8, 16, 32 or 64 bits.");
+  if (n === 8) {
+    let v = 0;
+    for (let i = 0; i < 8; i++) v = (v << 1) | (bits[i] ? 1 : 0);
+    return atom(-4, v);
+  }
+  let v = 0n;
+  for (let i = 0; i < n; i++) v = (v << 1n) | (bits[i] ? 1n : 0n);
+  const sign = 1n << BigInt(n - 1);
+  if (v >= sign) v -= sign << 1n;
+  // Longs past 2^53 are already approximate in this engine. The documented 64-bit case (all ones) is -1, which is exact.
+  return atom(n === 16 ? -5 : n === 32 ? -6 : -7, Number(v));
+}
+
 function sv(x: QValue, y: QValue): QValue {
+  // 0b is a number, so it used to take the base path with base 0 and keep only the last bit.
+  if (x instanceof QAtom && x.t === -1 && x.v === 0) return svBits(y);
   if (x instanceof QAtom && typeof x.v === "number" && x.t !== -9) {
     const base = x.v;
     const d = y instanceof QVec ? Array.from((y.d as Float64Array)) : [];
@@ -433,11 +462,17 @@ function sv(x: QValue, y: QValue): QValue {
     for (let i = 0; i < radix.length; i++) v = v * radix[i] + d[i];
     return long(v);
   }
-  if (x instanceof QAtom && x.t === -11) {
-    if (x.v === "" && y instanceof QVec && y.t === 11) {
+  if (x instanceof QAtom && x.t === -11 && x.v === "") {
+    if (y instanceof QVec && y.t === 11) {
       const parts = y.d as string[];
       if (parts[0]?.startsWith(":")) return sym(parts.join("/"));
       return sym(parts.join("."));
+    }
+    if (y instanceof QVec && y.t === 0 && (y.d as QValue[]).every((e) => e instanceof QVec && e.t === 10)) {
+      // code.kx.com/q/ref/sv/: ` sv ("one";"two";"three") is "one\ntwo\nthree\n".
+      // Assumption: the separator is "\n", that Unix example. The browser has no q host OS, so this is not "\r\n".
+      const parts = (y.d as QVec[]).map((e) => e.d as string);
+      return str(parts.length ? parts.join("\n") + "\n" : "");
     }
   }
   const sep = asText(x);
@@ -479,13 +514,27 @@ function union(x: QValue, y: QValue): QValue {
 function cross(x: QValue, y: QValue): QValue {
   if (x instanceof QTable && y instanceof QTable) {
     const nx = x.n, ny = y.n;
+    const n = nx * ny;
+    // Refuse before the index arrays exist. 1500 cross 1500 (2.25e6 pairs) used about 650MB here.
+    guardVector(n);
     const ix: number[] = [], iy: number[] = [];
-    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) { ix.push(i); iy.push(j); }
+    let k = 0;
+    for (let i = 0; i < nx; i++) for (let j = 0; j < ny; j++) {
+      if ((k++ & 0xffff) === 0) RT.checkpoint?.();
+      ix.push(i);
+      iy.push(j);
+    }
     return table([...x.cols, ...y.cols], [...x.data.map((c) => pick(c, ix)), ...y.data.map((c) => pick(c, iy))]);
   }
   const a = x instanceof QAtom ? [x] : items(x), b = y instanceof QAtom ? [y] : items(y);
+  const n = a.length * b.length;
+  guardVector(n);
   const out: QValue[] = [];
-  for (const e of a) for (const f of b) out.push(join(e, f));
+  let k = 0;
+  for (const e of a) for (const f of b) {
+    if ((k++ & 0xffff) === 0) RT.checkpoint?.();
+    out.push(join(e, f));
+  }
   return fromItems(out);
 }
 

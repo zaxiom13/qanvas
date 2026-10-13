@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
 import { EXAMPLES } from "../src/content/examples";
-import { decodeShare, encodeShare, findSharedCopy, shareKey, SHARE_LINK_WARN, shareUrl, shareWarning, type Sketch } from "../src/lib/storage";
+import { decodeShare, encodeShare, findSharedCopy, shareKey, shareOpenedNote, SHARE_LINK_WARN, shareUrl, shareWarning, type Sketch } from "../src/lib/storage";
 
 const sk = (id: string, code: string, share?: string): Sketch => ({ id, name: "s", code, created: 1, updated: 1, share });
 
@@ -34,6 +34,12 @@ describe("share links", () => {
 
   test("sketches saved before share keys existed never match", () => {
     expect(findSharedCopy([sk("old", "til 3")], shareKey("s", "til 3"), "til 3")).toBeUndefined();
+  });
+
+  test("opening a link names the sketch", () => {
+    expect(shareOpenedNote("Rings")).toBe("Opened shared sketch “Rings”.");
+    expect(shareOpenedNote("  ")).toBe("Opened shared sketch “this sketch”.");
+    expect(shareOpenedNote(decodeShare(encodeShare("Orbits", "circle[center;10;`red]"))!.name)).toBe("Opened shared sketch “Orbits”.");
   });
 
   test("a short sketch does not warn", () => {

@@ -3,8 +3,9 @@
   import { Pane, PaneGroup, PaneResizer } from "paneforge";
   import { app } from "../lib/app.svelte";
   import { DEFAULT_SKETCH, EXAMPLE_BY_ID, type Example } from "../content/examples";
-  import { clearPending, decodeShare, getSketch, listSketches, newId, readPending, recoverPending, saveSketch, shareUrl, shareWarning, stashPending, type Sketch } from "../lib/storage";
+  import { clearPending, decodeShare, getSketch, listSketches, newId, readPending, recoverPending, saveSketch, shareOpenedNote, shareUrl, shareWarning, stashPending, type Sketch } from "../lib/storage";
   import { chooseStudioSketch, forgetSketchPointer, rememberSketch, replaceDeletedSketch } from "../lib/studioOpen";
+  import { thumbnail } from "../lib/thumbs";
   import type { Explained } from "../lib/explain";
   import { parse } from "../q/parser";
   import type { RunState } from "../qanvas/runtime";
@@ -14,6 +15,7 @@
   import Gallery from "./Gallery.svelte";
   import { findSharedCopy, shareKey } from "../lib/storage";
   import { sketchHold } from "../lib/visibility";
+  import { nudgeInto } from "../lib/pip";
   import SymbolBar from "./SymbolBar.svelte";
   import type { EditorView } from "@codemirror/view";
   import { X, Check, Code, FolderOpen, Play, Plus, Share, Sparkles, Terminal, Wand } from "./icons";
@@ -55,11 +57,20 @@
     const start = [e.clientX, e.clientY], from = [...pipPos];
     let moved = false;
     const el = e.currentTarget as HTMLElement;
+    const card = el.closest(".mstage") as HTMLElement;
+    const host = card.parentElement!;
+    const startRect = card.getBoundingClientRect();
     el.setPointerCapture(e.pointerId);
     const move = (ev: PointerEvent) => {
       const dx = ev.clientX - start[0], dy = ev.clientY - start[1];
       if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-      if (moved) pipPos = [from[0] + dx, from[1] + dy];
+      if (!moved) return;
+      const b = host.getBoundingClientRect();
+      const [nx, ny] = nudgeInto(
+        { left: startRect.left + dx, top: startRect.top + dy, width: startRect.width, height: startRect.height },
+        { left: b.left, top: b.top, right: b.right, bottom: b.bottom },
+      );
+      pipPos = [from[0] + dx + nx, from[1] + dy + ny];
     };
     const up = () => {
       el.removeEventListener("pointermove", move);
@@ -143,16 +154,28 @@
       if (next.action === "pause") stage?.pause();
       else if (next.action === "resume") stage?.resume();
     };
+    const reclamp = () => {
+      const card = document.querySelector(".studio .mstage.pip");
+      if (!(card instanceof HTMLElement) || !card.parentElement) return;
+      const r = card.getBoundingClientRect();
+      const b = card.parentElement.getBoundingClientRect();
+      const [dx, dy] = nudgeInto(r, { left: b.left, top: b.top, right: b.right, bottom: b.bottom });
+      if (dx || dy) pipPos = [pipPos[0] + dx, pipPos[1] + dy];
+    };
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", flush);
+    window.addEventListener("resize", reclamp);
     return () => {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", flush);
+      window.removeEventListener("resize", reclamp);
     };
   });
 
   function open(s: Sketch, runNow = true) {
     flush();
+    sharedNote = "";
+    sharedThumb = "";
     sketch = s;
     code = s.code;
     saved = true;
@@ -175,6 +198,18 @@
     open(s);
     app.go(`sketch/${s.id}`);
     persist();
+  }
+
+  let sharedNote = $state("");
+  let sharedThumb = $state("");
+
+  function showShared(name: string, code: string, key: string) {
+    const note = shareOpenedNote(name);
+    sharedNote = note;
+    sharedThumb = "";
+    thumbnail("share:" + key, code).then((u) => {
+      if (sharedNote === note) sharedThumb = u;
+    });
   }
 
   let shareWarn = $state("");
@@ -227,6 +262,7 @@
         const copy = findSharedCopy(await listSketches().catch(() => []), key, d.code);
         const s: Sketch = copy ?? { id: newId(), name: d.name, code: d.code, created: Date.now(), updated: Date.now(), share: key };
         open(s);
+        showShared(s.name, s.code, key);
         if (!copy) persist();
         history.replaceState(null, "", `#/sketch/${s.id}`);
         // replaceState fires no hashchange, so update the route ourselves
@@ -234,6 +270,7 @@
         app.route = { tab: "sketch", parts: [s.id] };
         return;
       }
+      sharedNote = "";
       flash("This share link is damaged or incomplete, so it couldn't be opened.");
       history.replaceState(null, "", "#/sketch");
       loadedKey = "";
@@ -344,6 +381,13 @@
 {/snippet}
 
 <div class="studio" class:hidden={!active}>
+  {#if sharedNote}
+    <div class="arrival" role="status">
+      {#if sharedThumb}<img src={sharedThumb} alt="" />{:else}<span class="arrival-ph" aria-hidden="true"></span>{/if}
+      <p>{sharedNote}</p>
+      <button class="btn sm ghost" onclick={() => (sharedNote = "")}>Dismiss</button>
+    </div>
+  {/if}
   {#if mobile}
     <div class="mtabs" role="tablist">
       <button role="tab" aria-selected={mtab === "code"} class:on={mtab === "code"} onclick={() => (mtab = "code")}><Code size={15} /> Code</button>
@@ -413,6 +457,31 @@
   }
   .studio.hidden {
     display: none;
+  }
+  .arrival {
+    flex: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--line);
+    background: var(--surface);
+  }
+  .arrival img,
+  .arrival-ph {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #15141d;
+    flex: none;
+  }
+  .arrival p {
+    margin: 0;
+    flex: 1;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 600;
   }
   .col {
     display: flex;
