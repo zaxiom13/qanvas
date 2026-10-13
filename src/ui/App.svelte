@@ -7,13 +7,21 @@
   import DojoView from "./DojoView.svelte";
   import RefView from "./RefView.svelte";
   import { BookOpen, Compass, Monitor, Moon, Palette, Sun, Target, Terminal, X } from "./icons";
+  import { NARROW_QUERY, PHONE_LANDSCAPE_QUERY } from "../lib/viewport";
 
-  const mq = matchMedia("(max-width: 760px)");
-  let mobile = $state(mq.matches);
+  const narrowMq = matchMedia(NARROW_QUERY);
+  const landMq = matchMedia(PHONE_LANDSCAPE_QUERY);
+  let mobile = $state(narrowMq.matches);
+  let phoneLand = $state(landMq.matches);
   onMount(() => {
-    const on = () => (mobile = mq.matches);
-    mq.addEventListener("change", on);
-    return () => mq.removeEventListener("change", on);
+    const onNarrow = () => (mobile = narrowMq.matches);
+    const onLand = () => (phoneLand = landMq.matches);
+    narrowMq.addEventListener("change", onNarrow);
+    landMq.addEventListener("change", onLand);
+    return () => {
+      narrowMq.removeEventListener("change", onNarrow);
+      landMq.removeEventListener("change", onLand);
+    };
   });
 
   const TABS: { id: Tab; label: string; icon: typeof Compass }[] = [
@@ -24,7 +32,7 @@
   ];
 
   const tab = $derived(app.route.tab);
-  const consoleDocked = $derived(tab === "sketch");
+  const consoleDocked = $derived(tab === "sketch" && !mobile && !phoneLand);
 
   function cycleTheme() {
     app.setTheme(app.theme === "system" ? (app.dark ? "light" : "dark") : app.theme === "dark" ? "light" : "system");
@@ -68,11 +76,11 @@
   </header>
 
   <main>
-    <StudioView active={tab === "sketch"} {mobile} />
+    <StudioView active={tab === "sketch"} {mobile} {phoneLand} />
     {#if tab === "learn"}
       <LearnView {mobile} />
     {:else if tab === "dojo"}
-      <DojoView {mobile} />
+      <DojoView {mobile} {phoneLand} />
     {:else if tab === "ref"}
       <RefView {mobile} />
     {/if}

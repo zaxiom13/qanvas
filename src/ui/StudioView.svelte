@@ -22,8 +22,9 @@
   interface Props {
     active: boolean;
     mobile: boolean;
+    phoneLand?: boolean;
   }
-  let { active, mobile }: Props = $props();
+  let { active, mobile, phoneLand = false }: Props = $props();
 
   let sketch = $state<Sketch>({ id: newId(), name: "Untitled sketch", code: DEFAULT_SKETCH, created: Date.now(), updated: Date.now() });
   let code = $state(DEFAULT_SKETCH);
@@ -46,6 +47,16 @@
       pendingRun = false;
       run();
     }
+  });
+
+  // Portrait, landscape and desktop each mount their own stage. Crossing
+  // between them used to leave a blank canvas until the learner pressed Run.
+  let stageMounts = 0;
+  $effect(() => {
+    if (!stage) return;
+    stageMounts += 1;
+    if (stageMounts === 1) return;
+    untrack(() => run());
   });
 
   // mobile picture-in-picture: drag to move, tap to open the canvas, × to hide until the next run
@@ -374,6 +385,15 @@
         <Console />
       </div>
     </div>
+  {:else if phoneLand}
+    <div class="land">
+      <div class="col">
+        {@render editorHeader()}
+        {@render editor()}
+        <SymbolBar onInsert={insert} flush />
+      </div>
+      <Stage bind:this={stage} name={sketch.name} {onError} onState={(s) => (runState = s)} onRunRequest={run} />
+    </div>
   {:else}
     <PaneGroup direction="horizontal" autoSaveId="qanvas-studio-h">
       <Pane defaultSize={46} minSize={25}>
@@ -455,11 +475,28 @@
     background: var(--code-bg);
     container-type: inline-size;
   }
-  /* a narrow editor pane (phone landscape, dragged resizer): icons only, so the name stays readable */
+  /* a narrow editor pane (dragged resizer, or a phone on its side): icons only, so the name stays readable */
   @container (max-width: 420px) {
     .lbl {
       display: none;
     }
+  }
+  .land {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(240px, 0.85fr);
+  }
+  .land .col {
+    min-width: 0;
+    border-right: 1px solid var(--line);
+  }
+  .land .lbl {
+    display: none;
+  }
+  .land > :global(.stage) {
+    min-width: 0;
+    min-height: 0;
   }
   .edhead {
     display: flex;

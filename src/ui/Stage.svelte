@@ -206,6 +206,12 @@
     border-bottom: 1px solid var(--line);
     background: var(--surface);
     min-height: 42px;
+    container-type: inline-size;
+  }
+  @container (max-width: 360px) {
+    .dim {
+      display: none;
+    }
   }
   .meta {
     margin: 0 auto 0 8px;
