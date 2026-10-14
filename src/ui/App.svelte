@@ -65,11 +65,11 @@
     {/if}
     <div class="right">
       {#if !consoleDocked || mobile}
-        <button class="btn ghost sm" class:active={app.consoleOpen} onclick={() => (app.consoleOpen = !app.consoleOpen)} title="Console (Ctrl+`)">
+        <button class="btn ghost sm" class:active={app.consoleOpen} onclick={() => (app.consoleOpen = !app.consoleOpen)} title="Console (Ctrl+`)" aria-label={app.consoleOpen ? "Close console" : "Open console"}>
           <Terminal size={16} />{#if !mobile}<span>Console</span>{/if}
         </button>
       {/if}
-      <button class="btn ghost sm icon" onclick={cycleTheme} title={`Theme: ${app.theme}`} aria-label="Change theme">
+      <button class="btn ghost sm icon" onclick={cycleTheme} title={`Theme: ${app.theme}`} aria-label={`Theme: ${app.theme}. Change theme`}>
         {#if app.theme === "system"}<Monitor size={16} />{:else if app.theme === "dark"}<Moon size={16} />{:else}<Sun size={16} />{/if}
       </button>
     </div>

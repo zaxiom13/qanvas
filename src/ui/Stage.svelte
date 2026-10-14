@@ -170,7 +170,7 @@
         <span class="dim">{size[0]}×{size[1]}</span>
       </span>
       <button class="btn sm icon ghost" onclick={download} title="Save as PNG" aria-label="Save as PNG"><Camera size={15} /></button>
-      <button class="btn sm icon ghost" onclick={toggleFull} title={full ? "Exit full view" : "Full view"} aria-label="Toggle full view">
+      <button class="btn sm icon ghost" onclick={toggleFull} title={full ? "Exit full view" : "Full view"} aria-label={full ? "Exit full view" : "Full view"}>
         {#if full}<Minimize size={15} />{:else}<Maximize size={15} />{/if}
       </button>
     </div>
