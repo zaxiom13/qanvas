@@ -950,14 +950,17 @@ export function typeVerb(x: QValue): QValue {
   return atom(-5, typeOf(x));
 }
 
+/** Pad or cut a string to `n` characters. A width past the vector cap is `'limit` before the spaces are built. */
+function padString(n: number, s: string): QValue {
+  const m = Math.abs(n);
+  if (m > MAX_VECTOR_ITEMS) guardVector(m);
+  if (n >= 0) return str(s.length >= n ? s.slice(0, n) : s + " ".repeat(n - s.length));
+  return str(s.length >= m ? s.slice(s.length - m) : " ".repeat(m - s.length) + s);
+}
+
 function dollar(x: QValue, y: QValue): QValue {
   if (x instanceof QAtom && typeof x.v === "number" && (x.t === -7 || x.t === -6 || x.t === -5) && y instanceof QVec && y.t === 10) {
-    // pad
-    const n = x.v;
-    const s = y.d as string;
-    if (n >= 0) return str(s.length >= n ? s.slice(0, n) : s + " ".repeat(n - s.length));
-    const m = -n;
-    return str(s.length >= m ? s.slice(s.length - m) : " ".repeat(m - s.length) + s);
+    return padString(x.v, y.d as string);
   }
   if (x instanceof QAtom && typeof x.v === "number" && (x.t === -7 || x.t === -6 || x.t === -5) && y instanceof QVec && y.t === 0 && (y.d as QValue[]).every((e) => e instanceof QVec && e.t === 10)) {
     return list((y.d as QValue[]).map((e) => dollar(x, e)));
