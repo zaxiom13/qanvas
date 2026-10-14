@@ -30,7 +30,7 @@ On a phone, the bar along the bottom holds the four sections:
 | --- | --- |
 | **Learn** | 30 lessons in 9 chapters, from `til 10` to a ray tracer |
 | **Sketch** | The studio: write q, watch it draw |
-| **Dojo** | 33 short problems with instant checks |
+| **Dojo** | 37 short problems with instant checks |
 | **Ref** | Every primitive and drawing function, with live examples |
 
 The top bar has two buttons on the right: **Console** (a q prompt you can open from anywhere) and **Change theme** (it cycles system, light and dark).
@@ -178,7 +178,7 @@ Output is printed the way q prints it. Chips under a result describe its shape (
 <img src="img/dojo-solved.png" width="260" alt="A solved dojo problem">
 </p>
 
-33 short problems in four sets (lists, iterators and matrices, tables, drawing), each tagged **warm-up** or **core**. Every problem is a challenge like the ones at the end of lessons: change the code so it builds the `answer`, press **Check**, and every check has to pass. Solved problems are ticked and counted in the progress bar (`0 of 33 solved`). The arrow button at the bottom takes you to the next problem.
+37 short problems in five sets (lists, iterators and matrices, tables, drawing, dictionaries), each tagged **warm-up** or **core**. Every problem is a challenge like the ones at the end of lessons: change the code so it builds the `answer`, press **Check**, and every check has to pass. Solved problems are ticked and counted in the progress bar (`0 of 37 solved`). The arrow button at the bottom takes you to the next problem.
 
 ## Ref: the living reference
 
