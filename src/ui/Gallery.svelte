@@ -2,6 +2,7 @@
   import { Dialog } from "bits-ui";
   import { EXAMPLES, LEVELS, type Example } from "../content/examples";
   import { sketchesFromBundle, sketchesToBundle } from "../lib/backup";
+  import { filterByName } from "../lib/sketchFilter";
   import { copySketch } from "../lib/sketchCopy";
   import { deleteSketch, listSketches, saveSketch, type Sketch } from "../lib/storage";
   import { thumbnail } from "../lib/thumbs";
@@ -20,9 +21,14 @@
   let note = $state("");
   let noteBad = $state(false);
   let fileInput = $state<HTMLInputElement>();
+  let nameQuery = $state("");
+  const shown = $derived(filterByName(mine, nameQuery));
 
   $effect(() => {
-    if (!open) return;
+    if (!open) {
+      nameQuery = "";
+      return;
+    }
     current = tab;
     listSketches().then((l) => (mine = l));
     for (const ex of EXAMPLES) thumbnail("ex:" + ex.id, ex.code).then((u) => (thumbs = { ...thumbs, [ex.id]: u }));
@@ -125,6 +131,7 @@
           {/each}
         {:else}
           <div class="tools">
+            <input class="find" bind:value={nameQuery} placeholder="Filter by name" aria-label="Filter sketches by name" />
             <button class="btn sm" onclick={download} disabled={!mine.length}><Download size={14} /> Export</button>
             <button class="btn sm" onclick={() => fileInput?.click()}><Upload size={14} /> Import</button>
             <input bind:this={fileInput} class="file" type="file" accept="application/json,.json" onchange={onFile} aria-label="Import a sketch backup" />
@@ -134,9 +141,13 @@
           <div class="empty">
             <p>Nothing saved yet. Everything you make in the studio is saved on this device automatically. Import brings a backup back onto this device without removing what is already here.</p>
           </div>
+          {:else if !shown.length}
+          <div class="empty">
+            <p>No sketches match “{nameQuery.trim()}”.</p>
+          </div>
           {:else}
           <div class="grid">
-            {#each mine as s (s.id)}
+            {#each shown as s (s.id)}
               <div class="card mine">
                 <button class="open" onclick={() => onOpenSketch(s)}>
                   <div class="thumb">
@@ -328,6 +339,22 @@
     gap: 8px;
     align-items: center;
     margin: 14px 0 4px;
+  }
+  .find {
+    flex: 1 1 12rem;
+    min-width: 0;
+    height: 32px;
+    border-radius: 8px;
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--text);
+    padding: 0 10px;
+    font: inherit;
+    font-size: 14px;
+  }
+  .find:focus {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
   }
   .file {
     position: absolute;
