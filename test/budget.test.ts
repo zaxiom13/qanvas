@@ -24,6 +24,30 @@ test("a list big enough to exhaust the tab is refused before it is allocated", (
   }
 });
 
+test("padding a string past the vector cap is refused before the spaces are built", () => {
+  // last 100000000$"ab" previously returned a space in 61ms (the string is built, not refused).
+  const t0 = performance.now();
+  for (const src of [`count 100000000$"ab"`, `count -100000000$"hi"`, `count 100000000$("ab";"cd")`]) {
+    const e = err(src);
+    expect(e?.qname, src).toBe("limit");
+    expect(e?.hint, src).toMatch(/too large to run in the browser/);
+  }
+  expect(performance.now() - t0).toBeLessThan(500);
+});
+
+test("ordinary string pads are unchanged", () => {
+  const s = new Session();
+  expect(s.evaluate(`10$"ab"`).text).toBe(`"ab        "`);
+  expect(s.evaluate(`-3$"hello"`).text).toBe(`"llo"`);
+  expect(s.evaluate(`0$"hello"`).text).toBe(`""`);
+  expect(s.evaluate(`5$"abcdef"`).text).toBe(`"abcde"`);
+  expect(s.evaluate(`3$"ab"`).text).toBe(`"ab "`);
+  expect(s.evaluate(`-10$"hi"`).text).toBe(`"        hi"`);
+  expect(s.evaluate(`5$("ab";"cdef")`).text).toBe(`"ab   "\n"cdef "`);
+  // A single character is a char atom, so this is a cast, not a pad.
+  expect(s.evaluate(`10$"a"`).text).toBe(`"a"`);
+});
+
 test("sizes the corpus already runs are unchanged", () => {
   const s = new Session();
   expect(s.evaluate("count til 1000000").text).toBe("1000000");
