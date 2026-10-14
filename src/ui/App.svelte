@@ -7,6 +7,7 @@
   import DojoView from "./DojoView.svelte";
   import RefView from "./RefView.svelte";
   import { BookOpen, Compass, Monitor, Moon, Palette, Sun, Target, Terminal, X } from "./icons";
+  import { shellFrame } from "../lib/keyboard";
   import { NARROW_QUERY, PHONE_LANDSCAPE_QUERY } from "../lib/viewport";
 
   const narrowMq = matchMedia(NARROW_QUERY);
@@ -16,11 +17,28 @@
   onMount(() => {
     const onNarrow = () => (mobile = narrowMq.matches);
     const onLand = () => (phoneLand = landMq.matches);
+    const syncShell = () => {
+      const vv = window.visualViewport;
+      const root = document.documentElement;
+      const frame = vv ? shellFrame({ height: vv.height, offsetTop: vv.offsetTop, scale: vv.scale }) : null;
+      if (!frame) {
+        root.style.removeProperty("--app-height");
+        root.style.removeProperty("--app-offset");
+        return;
+      }
+      root.style.setProperty("--app-height", `${frame.height}px`);
+      root.style.setProperty("--app-offset", `${frame.offsetTop}px`);
+    };
+    syncShell();
     narrowMq.addEventListener("change", onNarrow);
     landMq.addEventListener("change", onLand);
+    window.visualViewport?.addEventListener("resize", syncShell);
+    window.visualViewport?.addEventListener("scroll", syncShell);
     return () => {
       narrowMq.removeEventListener("change", onNarrow);
       landMq.removeEventListener("change", onLand);
+      window.visualViewport?.removeEventListener("resize", syncShell);
+      window.visualViewport?.removeEventListener("scroll", syncShell);
     };
   });
 
@@ -108,7 +126,9 @@
 <style>
   /* viewport-fit=cover: keep content out of the notch and home indicator (landscape phones especially) */
   .shell {
-    height: 100dvh;
+    /* 100dvh ignores the keyboard. --app-height is the visual viewport, set from shellFrame. */
+    height: var(--app-height, 100dvh);
+    margin-top: var(--app-offset, 0px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
