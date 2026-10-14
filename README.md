@@ -6,7 +6,7 @@ A creative-coding studio for the **q** language (the language of kdb+), running 
 - **Array-first drawing on p5.js.** A point is `x y`; many points are rows `(xs;ys)`. `circle[(xs;ys);r;hsb[hues;0.7;1]]` draws a thousand coloured circles in one call.
 - **Learn:** 30 lessons in 9 chapters — from `til 10` to flow fields, the Game of Life, the Mandelbrot set, a neural network you can watch think, and a ray tracer. Every lesson ends in a checked challenge.
 - **Sketch:** studio with live re-run, number scrubbing, examples gallery, local saving and share links.
-- **Dojo:** 33 practice problems with instant checks. **Reference:** every primitive and function with live examples.
+- **Dojo:** 37 practice problems with instant checks. **Reference:** every primitive and function with live examples.
 
 **New here?** Read the illustrated [user guide](docs/guide/README.md), or watch the [47-second promo](docs/promo/qanvas-promo.mp4).
 
