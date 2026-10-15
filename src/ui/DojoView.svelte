@@ -58,9 +58,10 @@
         <h2>{set.title}</h2>
         {#each set.problems as p (p.id)}
           <button class="item" class:on={problem?.id === p.id} class:done={!!done[p.id]} onclick={() => open(p.id)}>
-            <span class="dot">{#if done[p.id]}<CircleCheck size={15} />{:else}{p.n}{/if}</span>
+            <span class="dot" aria-hidden="true">{#if done[p.id]}<CircleCheck size={15} />{:else}{p.n}{/if}</span>
             <span class="t">{p.title}</span>
             <span class="lvl lvl-{p.level || 'core'}">{levelLabel(p.level)}</span>
+            {#if done[p.id]}<span class="vh">solved</span>{/if}
           </button>
         {/each}
       {/each}
@@ -187,6 +188,7 @@
     margin: 18px 8px 6px;
   }
   .item {
+    position: relative;
     width: 100%;
     display: flex;
     align-items: center;
