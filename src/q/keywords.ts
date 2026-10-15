@@ -6,7 +6,7 @@ import { stringOf } from "./cast";
 import {
   BUILTINS, GLYPHS, OPS, add, cmpValues, countOf, cut, distinct, drop, enlist, eq, fill, find, first, flip, gradeDown,
   gradeUp, group, guardVector, iasc, idesc, inList, join, keyOf, keyOfValue, last, matchValues, mkDict, mul, neg, not, nullMask, pick,
-  reciprocal, reverse, roll, sub, take, til, trap, typeVerb, unkey, upsertKeyed, valueOf, vmax, vmin, where, floorV, fdiv,
+  reciprocal, reverse, roll, sub, take, tickItems, til, trap, typeVerb, unkey, upsertKeyed, valueOf, vmax, vmin, where, floorV, fdiv,
   identityFor,
 } from "./verbs";
 import {
@@ -99,14 +99,21 @@ function running(name: string, x: QValue, f: (acc: number, v: number, i: number)
   if (d) {
     const out = new Float64Array(d.length);
     let acc = NaN;
-    for (let i = 0; i < d.length; i++) out[i] = acc = i === 0 ? f(NaN, d[0], 0) : f(acc, d[i], i);
+    for (let i = 0; i < d.length; i++) {
+      tickItems(i);
+      out[i] = acc = i === 0 ? f(NaN, d[0], 0) : f(acc, d[i], i);
+    }
     return vec(rtype((x as QVec).t), out);
   }
   if (x instanceof QVec && x.t === 0) {
     const its = x.d as QValue[];
     const out: QValue[] = [];
     let acc: QValue | null = null;
-    for (const e of its) out.push((acc = acc === null ? e : gen(acc, e)));
+    for (let i = 0; i < its.length; i++) {
+      tickItems(i);
+      const e = its[i];
+      out.push((acc = acc === null ? e : gen(acc, e)));
+    }
     return fromItems(out);
   }
   throw typeErr(`${name} needs numbers.`);
@@ -127,6 +134,7 @@ function avgs(x: QValue): QValue {
   const out = new Float64Array(d.length);
   let s = 0, n = 0;
   for (let i = 0; i < d.length; i++) {
+    tickItems(i);
     if (d[i] === d[i]) { s += d[i]; n++; }
     out[i] = n ? s / n : NaN;
   }
@@ -154,27 +162,33 @@ function deltas(x: QValue): QValue {
     const t = (x as QVec).t;
     const rt = t >= 12 ? (t === 14 || t === 13 ? 6 : t === 12 ? 16 : t === 15 ? 9 : t) : sumType(t);
     const out = new Float64Array(d.length);
-    for (let i = 0; i < d.length; i++) out[i] = i === 0 ? d[0] : d[i] - d[i - 1];
+    for (let i = 0; i < d.length; i++) {
+      tickItems(i);
+      out[i] = i === 0 ? d[0] : d[i] - d[i - 1];
+    }
     return vec(rt, out);
   }
   const its = items(x);
-  return fromItems(its.map((e, i) => (i === 0 ? e : sub(e, its[i - 1]))));
+  return fromItems(its.map((e, i) => (tickItems(i), i === 0 ? e : sub(e, its[i - 1]))));
 }
 
 function ratios(x: QValue): QValue {
   const d = numVec(x);
   if (d) {
     const out = new Float64Array(d.length);
-    for (let i = 0; i < d.length; i++) out[i] = i === 0 ? d[0] : d[i] / d[i - 1];
+    for (let i = 0; i < d.length; i++) {
+      tickItems(i);
+      out[i] = i === 0 ? d[0] : d[i] / d[i - 1];
+    }
     return vec(9, out);
   }
   const its = items(x);
-  return fromItems(its.map((e, i) => (i === 0 ? e : fdiv(e, its[i - 1]))));
+  return fromItems(its.map((e, i) => (tickItems(i), i === 0 ? e : fdiv(e, its[i - 1]))));
 }
 
 function differ(x: QValue): QValue {
   const its = items(x);
-  return bools(its.map((e, i) => (i === 0 ? 1 : matchValues(e, its[i - 1]) ? 0 : 1)));
+  return bools(its.map((e, i) => (tickItems(i), i === 0 ? 1 : matchValues(e, its[i - 1]) ? 0 : 1)));
 }
 
 function shift(n: number, x: QValue): QValue {
@@ -192,11 +206,17 @@ function fills(x: QValue): QValue {
   if (x instanceof QVec && x.t > 0) {
     const mask = (nullMask(x) as QVec).d as Float64Array;
     const d = x.t === 10 ? Array.from(x.d as string) : (x.d as any).slice();
-    for (let i = 1; i < d.length; i++) if (mask[i]) d[i] = d[i - 1];
+    for (let i = 1; i < d.length; i++) {
+      tickItems(i);
+      if (mask[i]) d[i] = d[i - 1];
+    }
     return x.t === 10 ? str(d.join("")) : vec(x.t, d);
   }
   const its = [...items(x)];
-  for (let i = 1; i < its.length; i++) if (its[i] instanceof QAtom && isNullAtom(its[i] as QAtom)) its[i] = its[i - 1];
+  for (let i = 1; i < its.length; i++) {
+    tickItems(i);
+    if (its[i] instanceof QAtom && isNullAtom(its[i] as QAtom)) its[i] = its[i - 1];
+  }
   return fromItems(its);
 }
 

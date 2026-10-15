@@ -27,7 +27,7 @@ export function guardVector(n: number) {
 }
 
 /** Deadline check every 65536 steps inside a primitive that would otherwise never return to the interpreter. */
-function tickItems(i: number) {
+export function tickItems(i: number) {
   if ((i & 0xffff) === 0) RT.checkpoint?.();
 }
 
@@ -85,12 +85,15 @@ export function keyOf(x: QValue): string | number {
 function elemKeys(x: QValue): (string | number)[] {
   if (x instanceof QVec) {
     const t = x.t;
-    if (t === 0) return (x.d as QValue[]).map(keyOf);
+    if (t === 0) return (x.d as QValue[]).map((v, i) => (tickItems(i), keyOf(v)));
     if (t === 10) return Array.from(x.d as string);
     if (t === 11 || t === 2) return x.d as string[];
     const d = x.d as Float64Array;
     const out = new Array(d.length);
-    for (let i = 0; i < d.length; i++) out[i] = d[i] !== d[i] ? "N" : d[i];
+    for (let i = 0; i < d.length; i++) {
+      tickItems(i);
+      out[i] = d[i] !== d[i] ? "N" : d[i];
+    }
     return out;
   }
   if (x instanceof QTable) return items(x).map(keyOf);
@@ -135,7 +138,9 @@ export function gradeUp(x: QValue): number[] {
     const n = x.n;
     const idx = Array.from({ length: n }, (_, i) => i);
     const cols = x.data.map((c) => (c instanceof QVec && c.t > 0 ? c : null));
+    let step = 0;
     return idx.sort((i, j) => {
+      tickItems(step++);
       for (let k = 0; k < x.data.length; k++) {
         const c = cols[k];
         let r: number;
@@ -150,12 +155,14 @@ export function gradeUp(x: QValue): number[] {
   const n = x.d.length;
   const idx = Array.from({ length: n }, (_, i) => i);
   const d = x.d as any;
+  let step = 0;
+  const bump = () => tickItems(step++);
   if (x.t === 0) {
     const its = d as QValue[];
-    return idx.sort((i, j) => cmpValues(its[i], its[j]) || i - j);
+    return idx.sort((i, j) => (bump(), cmpValues(its[i], its[j]) || i - j));
   }
-  if (x.t === 10 || x.t === 11 || x.t === 2) return idx.sort((i, j) => cmpStr(d[i], d[j]) || i - j);
-  return idx.sort((i, j) => cmpNum(d[i], d[j]) || i - j);
+  if (x.t === 10 || x.t === 11 || x.t === 2) return idx.sort((i, j) => (bump(), cmpStr(d[i], d[j]) || i - j));
+  return idx.sort((i, j) => (bump(), cmpNum(d[i], d[j]) || i - j));
 }
 
 export function gradeDown(x: QValue): number[] {
@@ -172,7 +179,9 @@ export function gradeDown(x: QValue): number[] {
   };
   const out: number[] = [];
   let end = up.length;
+  let step = 0;
   while (end > 0) {
+    tickItems(step++);
     let start = end - 1;
     while (start > 0 && eq(up[start - 1], up[end - 1])) start--;
     for (let k = start; k < end; k++) out.push(up[k]);
@@ -413,6 +422,7 @@ export function distinct(x: QValue): QValue {
   const seen = new Set<string | number>();
   const idx: number[] = [];
   keys.forEach((k, i) => {
+    tickItems(i);
     if (!seen.has(k)) {
       seen.add(k);
       idx.push(i);
@@ -427,6 +437,7 @@ export function group(x: QValue): QValue {
   const keys = elemKeys(x);
   const m = new Map<string | number, number[]>();
   keys.forEach((k, i) => {
+    tickItems(i);
     let g = m.get(k);
     if (!g) m.set(k, (g = []));
     g.push(i);
