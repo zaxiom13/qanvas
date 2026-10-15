@@ -2,7 +2,8 @@ import type { Session } from "./interp";
 import { Builtin } from "./fns";
 import { RT } from "./rt";
 import { QAtom, QValue, QVec, atom, float, list, str, sym } from "./value";
-import { typeErr } from "./errors";
+import { domainErr, typeErr } from "./errors";
+import { guardVector, MAX_VECTOR_ITEMS } from "./verbs";
 
 const MS_2000 = 946684800000;
 
@@ -58,13 +59,20 @@ export function installBootstrap(s: Session) {
   Q.set(
     "fmt",
     new Builtin(".Q.fmt", 3, undefined, undefined, ([w, d, x]) => {
+      const width = (w as QAtom).v as number;
+      // A width past the vector cap builds one giant string per number.
+      // count .Q.fmt[9000000;0;1.2] returned 9000000 on 2026-10-15. The spaces were allocated.
+      if (typeof width !== "number" || !Number.isFinite(width)) throw domainErr(".Q.fmt needs a finite width.");
+      if (width < 0) throw domainErr(".Q.fmt needs a width of 0 or more.");
+      if (width > MAX_VECTOR_ITEMS) guardVector(width);
+      const decimals = (d as QAtom).v as number;
       const one = (v: number) => {
-        const s = v.toFixed((d as QAtom).v);
-        const width = (w as QAtom).v;
+        const s = v.toFixed(decimals);
         return str(s.length > width ? "*".repeat(width) : s.padStart(width));
       };
       if (x instanceof QAtom) return one(x.v);
-      return list(Array.from((x as QVec).d as Float64Array, one));
+      if (!(x instanceof QVec)) throw typeErr(".Q.fmt needs numbers.");
+      return list(Array.from(x.d as Float64Array, one));
     }),
   );
   s.nsMap(".z");
