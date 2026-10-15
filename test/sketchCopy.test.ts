@@ -32,3 +32,14 @@ test("a very long name is cut so it still fits the backup limit", () => {
   expect(copy.name.length).toBe(200);
   expect(copy.name.startsWith("Copy of ")).toBe(true);
 });
+
+test("duplicating a copy numbers it instead of stacking Copy of", () => {
+  const once = copySketch(rings, 50, "copy1");
+  expect(once.name).toBe("Copy of Rings");
+  const twice = copySketch(once, 60, "copy2");
+  expect(twice.name).toBe("Copy 2 of Rings");
+  const thrice = copySketch(twice, 70, "copy3");
+  expect(thrice.name).toBe("Copy 3 of Rings");
+  const stacked = copySketch({ ...rings, name: "Copy of Copy of Rings" }, 80, "copy4");
+  expect(stacked.name).toBe("Copy 3 of Rings");
+});
