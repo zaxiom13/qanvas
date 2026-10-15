@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
+  import { checkLine } from "../lib/checkStatus";
   import { checkCode, offscreenCtx, type CheckOutcome } from "../lib/checker";
   import type { Explained } from "../lib/explain";
   import { getProgress, markDone, saveAnswer } from "../lib/storage";
@@ -95,7 +96,7 @@
   {/if}
 
   {#if outcome}
-    <div class="result" class:ok={outcome.ok}>
+    <div class="result" class:ok={outcome.ok} role="status">
       {#if outcome.runError}
         <ErrorCard e={outcome.runError} compact />
       {:else if outcome.ok}
@@ -108,7 +109,7 @@
           {#each outcome.results as r, i (i)}
             <li class:pass={r.pass}>
               {#if r.pass}<CircleCheck size={15} />{:else}<CircleX size={15} />{/if}
-              <span>{r.pass ? r.msg.replace(/^(Draw|Make|Give|Put|Use)\b/, "✓ $1") : r.msg}{#if r.error}<small> ({r.error})</small>{/if}</span>
+              <span>{checkLine(r.pass, r.msg, r.error)}</span>
             </li>
           {/each}
         </ul>
@@ -231,9 +232,6 @@
   .checks :global(svg) {
     flex: none;
     margin-top: 3px;
-  }
-  .checks small {
-    color: var(--text-3);
   }
   .win {
     position: relative;

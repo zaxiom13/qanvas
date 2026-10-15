@@ -160,8 +160,9 @@
             {#each c.lessons as l (l.id)}
               <li>
                 <button onclick={() => app.go(`learn/${l.id}`)} class:done={!!done[l.id]}>
-                  <span class="dot">{#if done[l.id]}<CircleCheck size={15} />{:else}{l.n}{/if}</span>
+                  <span class="dot" aria-hidden="true">{#if done[l.id]}<CircleCheck size={15} />{:else}{l.n}{/if}</span>
                   <span class="t">{l.title}<small>{l.blurb}</small></span>
+                  {#if done[l.id]}<span class="vh">solved</span>{/if}
                 </button>
               </li>
             {/each}
@@ -179,7 +180,8 @@
           <div class="sc">{c.title}</div>
           {#each c.lessons as l (l.id)}
             <button class="sl" class:on={l.id === lesson.id} class:done={!!done[l.id]} onclick={() => app.go(`learn/${l.id}`)}>
-              <span class="dot">{#if done[l.id]}<CircleCheck size={13} />{:else}{l.n}{/if}</span>{l.title}
+              <span class="dot" aria-hidden="true">{#if done[l.id]}<CircleCheck size={13} />{:else}{l.n}{/if}</span>{l.title}
+              {#if done[l.id]}<span class="vh">solved</span>{/if}
             </button>
           {/each}
         {/each}
@@ -355,6 +357,7 @@
     padding: 0;
   }
   .chapter li button {
+    position: relative;
     width: 100%;
     display: flex;
     gap: 10px;
@@ -444,6 +447,7 @@
     margin: 14px 8px 6px;
   }
   .sl {
+    position: relative;
     width: 100%;
     display: flex;
     align-items: center;
