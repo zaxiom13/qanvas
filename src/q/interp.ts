@@ -693,11 +693,17 @@ export class Session {
           }
           let acc = its[0];
           if (!scan) {
-            for (let i = 1; i < its.length; i++) acc = this.apply(f, [acc, its[i]]);
+            for (let i = 1; i < its.length; i++) {
+              this.tick();
+              acc = this.apply(f, [acc, its[i]]);
+            }
             return acc;
           }
           const out = [acc];
-          for (let i = 1; i < its.length; i++) out.push((acc = this.apply(f, [acc, its[i]])));
+          for (let i = 1; i < its.length; i++) {
+            this.tick();
+            out.push((acc = this.apply(f, [acc, its[i]])));
+          }
           return keepShape(xs, out);
         }
         // seeded fold: x f/ y (or f/[x;y;z...])
@@ -711,6 +717,7 @@ export class Session {
         const its = rest.map((a) => (a instanceof QAtom ? null : items(a)));
         const out: QValue[] = [];
         for (let i = 0; i < n; i++) {
+          this.tick();
           acc = this.apply(f, [acc, ...its.map((it, j) => (it ? it[i] : rest[j]))]);
           if (scan) out.push(acc);
         }
@@ -723,48 +730,64 @@ export class Session {
           if (!its.length) return xs;
           const seed = priorSeed(f, its[0]);
           const out: QValue[] = [seed === undefined ? its[0] : this.apply(f, [its[0], seed])];
-          for (let i = 1; i < its.length; i++) out.push(this.apply(f, [its[i], its[i - 1]]));
+          for (let i = 1; i < its.length; i++) {
+            this.tick();
+            out.push(this.apply(f, [its[i], its[i - 1]]));
+          }
           return keepShape(xs, out);
         }
         const [x0, ys] = args;
         const its = items(ys);
         const out: QValue[] = [];
-        for (let i = 0; i < its.length; i++) out.push(this.apply(f, [its[i], i ? its[i - 1] : x0]));
+        for (let i = 0; i < its.length; i++) {
+          this.tick();
+          out.push(this.apply(f, [its[i], i ? its[i - 1] : x0]));
+        }
         return keepShape(ys, out);
       }
       case "/:": {
         if (args.length !== 2) throw rankErr("each-right (/:) takes two arguments.");
         const [x, y] = args;
         if (y instanceof QAtom) return this.apply(f, [x, y]);
-        if (y instanceof QDict && !isKeyed(y)) return dict(y.k, fromItems(items(y.v).map((e) => this.apply(f, [x, e]))));
-        return fromItems(items(y).map((e) => this.apply(f, [x, e])));
+        if (y instanceof QDict && !isKeyed(y)) return dict(y.k, this.eachList(f, items(y.v), (e) => [x, e]));
+        return this.eachList(f, items(y), (e) => [x, e]);
       }
       case "\\:": {
         if (args.length !== 2) throw rankErr("each-left (\\:) takes two arguments.");
         const [x, y] = args;
         if (x instanceof QAtom) return this.apply(f, [x, y]);
-        if (x instanceof QDict && !isKeyed(x)) return dict(x.k, fromItems(items(x.v).map((e) => this.apply(f, [e, y]))));
-        return fromItems(items(x).map((e) => this.apply(f, [e, y])));
+        if (x instanceof QDict && !isKeyed(x)) return dict(x.k, this.eachList(f, items(x.v), (e) => [e, y]));
+        return this.eachList(f, items(x), (e) => [e, y]);
       }
     }
     throw typeErr("unknown iterator");
+  }
+
+  /** Apply f to each item, checking the run budget. A builtin each never entered a lambda, so nothing else checked the deadline. */
+  eachList(f: QValue, its: QValue[], args: (e: QValue) => QValue[]): QValue {
+    const out = new Array<QValue>(its.length);
+    for (let i = 0; i < its.length; i++) {
+      this.tick();
+      out[i] = this.apply(f, args(its[i]));
+    }
+    return fromItems(out);
   }
 
   each(f: QValue, args: QValue[]): QValue {
     if (args.length === 1) {
       const x = args[0];
       if (x instanceof QAtom) return this.apply(f, [x]);
-      if (x instanceof QDict && !isKeyed(x)) return dict(x.k, fromItems(items(x.v).map((e) => this.apply(f, [e]))));
-      const its = items(x);
-      const out = new Array<QValue>(its.length);
-      for (let i = 0; i < its.length; i++) out[i] = this.apply(f, [its[i]]);
-      return fromItems(out);
+      if (x instanceof QDict && !isKeyed(x)) return dict(x.k, this.eachList(f, items(x.v), (e) => [e]));
+      return this.eachList(f, items(x), (e) => [e]);
     }
     const n = conformCount(args);
     if (n < 0) return this.apply(f, args);
     const its = args.map((a) => (a instanceof QAtom ? null : items(a)));
     const out = new Array<QValue>(n);
-    for (let i = 0; i < n; i++) out[i] = this.apply(f, its.map((it, j) => (it ? it[i] : args[j])));
+    for (let i = 0; i < n; i++) {
+      this.tick();
+      out[i] = this.apply(f, its.map((it, j) => (it ? it[i] : args[j])));
+    }
     const d = args.find((a) => a instanceof QDict && !isKeyed(a)) as QDict | undefined;
     if (d) return dict(d.k, fromItems(out));
     return fromItems(out);
