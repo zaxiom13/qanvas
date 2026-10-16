@@ -6,10 +6,11 @@ import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { EditorState, StateEffect, StateField, type Extension } from "@codemirror/state";
 import {
   Decoration, EditorView, MatchDecorator, ViewPlugin, drawSelection, highlightActiveLine, highlightActiveLineGutter, hoverTooltip, keymap,
-  lineNumbers, placeholder as cmPlaceholder, type DecorationSet, type ViewUpdate,
+  lineNumbers, placeholder as cmPlaceholder, showTooltip, type DecorationSet, type Tooltip, type ViewUpdate,
 } from "@codemirror/view";
 import { KIND_LABEL, REFERENCE, REF_BY_NAME } from "../content/reference";
 import { qSyntax } from "./qlang";
+import { callHint, hintParts } from "./signature";
 
 export const editorTheme = EditorView.theme({
   "&": {
@@ -38,6 +39,13 @@ export const editorTheme = EditorView.theme({
     boxShadow: "var(--shadow-lg)",
     overflow: "hidden",
   },
+  ".cm-q-sig": {
+    padding: "4px 8px",
+    fontFamily: "var(--font-code)",
+    fontSize: "12.5px",
+    color: "var(--text)",
+  },
+  ".cm-q-sig b": { color: "var(--accent)", fontWeight: "700" },
   ".cm-tooltip-autocomplete > ul": { fontFamily: "var(--font-code)", fontSize: "13px", maxHeight: "16em" },
   ".cm-tooltip-autocomplete > ul > li": { padding: "3px 10px !important" },
   ".cm-tooltip-autocomplete > ul > li[aria-selected]": { background: "var(--accent)", color: "var(--accent-text)" },
@@ -145,6 +153,40 @@ const qHover = hoverTooltip((view, pos) => {
   };
 }, { hoverTime: 350 });
 
+// ---------- signature hint while the cursor is inside name[ ... ] ----------
+function signatureTooltip(state: EditorState): Tooltip | null {
+  const sel = state.selection.main;
+  if (sel.from !== sel.to) return null;
+  const hint = callHint(state.doc.toString(), sel.head);
+  if (!hint) return null;
+  return {
+    pos: sel.head,
+    above: true,
+    create() {
+      const dom = document.createElement("div");
+      dom.className = "cm-q-sig";
+      dom.setAttribute("role", "status");
+      const parts = hintParts(hint);
+      dom.append(document.createTextNode(parts.lead));
+      if (parts.active != null) {
+        const mark = document.createElement("b");
+        mark.textContent = parts.active;
+        dom.append(mark);
+      }
+      dom.append(document.createTextNode(parts.tail));
+      return { dom };
+    },
+  };
+}
+
+const signatureHints = StateField.define<Tooltip | null>({
+  create: signatureTooltip,
+  update(value, tr) {
+    return tr.docChanged || tr.selection ? signatureTooltip(tr.state) : value;
+  },
+  provide: (f) => showTooltip.from(f),
+});
+
 // ---------- error diagnostics (pushed from the runtime) ----------
 export const setQError = (view: EditorView, err: { from: number; to: number; message: string } | null) => {
   const diags: Diagnostic[] = [];
@@ -200,6 +242,7 @@ export function qExtensions(o: EditorOpts): Extension[] {
     highlightSelectionMatches(),
     autocompletion({ override: [qComplete], icons: false, activateOnTypingDelay: 120 }),
     qHover,
+    signatureHints,
     linter(null),
     EditorView.lineWrapping,
     ...(o.console ? [consoleKeys(o)] : []),
