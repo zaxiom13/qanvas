@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Explained } from "../lib/explain";
+  import { errorCardText, type Explained } from "../lib/explain";
   import { CircleX, Lightbulb } from "./icons";
 
   interface Props {
@@ -8,20 +8,21 @@
     onJump?: () => void;
   }
   let { e, compact = false, onJump }: Props = $props();
+  const copy = $derived(errorCardText(e, compact));
 </script>
 
 <div class="err" class:compact role="alert">
   <div class="head">
     <CircleX size={15} />
     <span class="name">'{e.name}</span>
-    {#if e.help && !compact}<span class="help">{e.help}</span>{/if}
+    {#if copy.beside}<span class="help">{copy.beside}</span>{/if}
     {#if onJump && e.where}<button class="jump" onclick={onJump}>show me</button>{/if}
   </div>
   {#if e.caretLine !== undefined}
     <pre class="code"><span>{e.caretLine}</span>
 <span class="caret">{" ".repeat(e.caretCol ?? 0)}{"^".repeat(e.caretLen ?? 1)}</span></pre>
   {/if}
-  {#if e.hint}<p class="hint">{e.hint}</p>{/if}
+  {#if copy.body}<p class="hint">{copy.body}</p>{/if}
   {#if e.tip}<p class="tip"><Lightbulb size={14} /> {e.tip}</p>{/if}
 </div>
 

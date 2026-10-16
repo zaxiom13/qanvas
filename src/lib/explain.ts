@@ -32,6 +32,15 @@ export function explainError(err: QError, src: string): Explained {
   if (!ERROR_HELP[err.qname] && /^[a-zA-Z_.][\w.]*$/.test(err.qname) && !out.hint) {
     out.help = `'${err.qname} usually means the name ${err.qname} has no value yet — define it before you use it.`;
   }
-  if (err.qname === "stop") out.help = undefined;
+  if (err.qname === "stop") {
+    out.help = undefined;
+    if (!out.hint) out.hint = "Stopped.";
+  }
   return out;
+}
+
+/** What the error card says. A compact card hides the short line beside the name, so a missing hint used to leave only `'type`. */
+export function errorCardText(e: Explained, compact: boolean): { beside: string | null; body: string | null } {
+  if (e.hint) return { beside: compact ? null : (e.help ?? null), body: e.hint };
+  return { beside: null, body: e.help ?? null };
 }
