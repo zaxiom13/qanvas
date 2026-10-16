@@ -552,8 +552,16 @@ function bin(x: QValue, y: QValue, right: boolean): QValue {
     return right ? r + 1 : r;
   };
   if (y instanceof QAtom) return long(one(y));
-  if (x instanceof QVec && x.t > 0 && y instanceof QVec && y.t === x.t) return longs(items(y).map(one));
-  return longs(items(y).map(one));
+  // A long right argument maps a binary search over every item and never returned to the interpreter.
+  // With the deadline already expired, til[1000000] bin 1000000?1000000 ran for 1351ms.
+  RT.checkpoint?.();
+  const ys = items(y);
+  const out = new Array<number>(ys.length);
+  for (let i = 0; i < ys.length; i++) {
+    if ((i & 0xffff) === 0) RT.checkpoint?.();
+    out[i] = one(ys[i]);
+  }
+  return longs(out);
 }
 
 function within(x: QValue, y: QValue): QValue {
