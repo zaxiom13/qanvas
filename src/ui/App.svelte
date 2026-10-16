@@ -14,13 +14,24 @@
   let mobile = $state(narrowMq.matches);
   let phoneLand = $state(landMq.matches);
   onMount(() => {
-    const onNarrow = () => (mobile = narrowMq.matches);
-    const onLand = () => (phoneLand = landMq.matches);
-    narrowMq.addEventListener("change", onNarrow);
-    landMq.addEventListener("change", onLand);
+    // Width and height can change as two events while the phone turns. Reading
+    // them on the next frame keeps portrait and landscape from passing through
+    // the desktop layout, which would throw the running sketch away.
+    let frame = 0;
+    const sync = () => {
+      const id = ++frame;
+      requestAnimationFrame(() => {
+        if (id !== frame) return;
+        mobile = narrowMq.matches;
+        phoneLand = landMq.matches;
+      });
+    };
+    narrowMq.addEventListener("change", sync);
+    landMq.addEventListener("change", sync);
     return () => {
-      narrowMq.removeEventListener("change", onNarrow);
-      landMq.removeEventListener("change", onLand);
+      frame++;
+      narrowMq.removeEventListener("change", sync);
+      landMq.removeEventListener("change", sync);
     };
   });
 

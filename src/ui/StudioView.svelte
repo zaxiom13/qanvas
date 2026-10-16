@@ -49,8 +49,9 @@
     }
   });
 
-  // Portrait, landscape and desktop each mount their own stage. Crossing
-  // between them used to leave a blank canvas until the learner pressed Run.
+  // Desktop mounts its own stage. Portrait and landscape share one, so turning
+  // the phone does not restart a running sketch. Crossing to the desktop layout
+  // still mounts a new stage and runs again, which used to leave a blank canvas.
   let stageMounts = 0;
   $effect(() => {
     if (!stage) return;
@@ -363,36 +364,38 @@
       <button class="btn sm ghost" onclick={() => (sharedNote = "")}>Dismiss</button>
     </div>
   {/if}
-  {#if mobile}
-    <div class="mtabs" role="tablist">
-      <button role="tab" aria-selected={mtab === "code"} class:on={mtab === "code"} onclick={() => (mtab = "code")}><Code size={15} /> Code</button>
-      <button role="tab" aria-selected={mtab === "canvas"} class:on={mtab === "canvas"} onclick={() => (mtab = "canvas")}><Sparkles size={15} /> Canvas</button>
-      <button role="tab" aria-selected={mtab === "console"} class:on={mtab === "console"} onclick={() => (mtab = "console")}><Terminal size={15} /> Console</button>
-    </div>
-    <div class="mbody">
-      <div class="mpane" class:show={mtab === "code"}>
-        {@render editorHeader()}
-        {@render editor()}
-        <SymbolBar onInsert={insert} />
+  {#if mobile || phoneLand}
+    <div class="phone" class:land={phoneLand}>
+      {#if !phoneLand}
+        <div class="mtabs" role="tablist">
+          <button role="tab" aria-selected={mtab === "code"} class:on={mtab === "code"} onclick={() => (mtab = "code")}><Code size={15} /> Code</button>
+          <button role="tab" aria-selected={mtab === "canvas"} class:on={mtab === "canvas"} onclick={() => (mtab = "canvas")}><Sparkles size={15} /> Canvas</button>
+          <button role="tab" aria-selected={mtab === "console"} class:on={mtab === "console"} onclick={() => (mtab = "console")}><Terminal size={15} /> Console</button>
+        </div>
+      {/if}
+      <div class="phone-body" class:land={phoneLand}>
+        <div class="mpane" class:show={phoneLand || mtab === "code"}>
+          {@render editorHeader()}
+          {@render editor()}
+          <SymbolBar onInsert={insert} flush={phoneLand} />
+        </div>
+        <div
+          class="mstage"
+          class:pip={pip && !phoneLand}
+          class:show={phoneLand || mtab === "canvas" || pip}
+          style:translate={pip && !phoneLand ? `${pipPos[0]}px ${pipPos[1]}px` : null}
+        >
+          {#if pip && !phoneLand}<button class="pipx" aria-label="Hide the mini canvas" onclick={() => (pipClosed = true)}><X size={14} /></button>{/if}
+          <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+          <div class="pipclick" onpointerdown={pipDown}></div>
+          <Stage bind:this={stage} name={sketch.name} {onError} onState={(s) => (runState = s)} onRunRequest={run} />
+        </div>
+        {#if !phoneLand}
+          <div class="mpane" class:show={mtab === "console"}>
+            <Console />
+          </div>
+        {/if}
       </div>
-      <div class="mstage" class:pip class:show={mtab === "canvas" || pip} style:translate={pip ? `${pipPos[0]}px ${pipPos[1]}px` : null}>
-        {#if pip}<button class="pipx" aria-label="Hide the mini canvas" onclick={() => (pipClosed = true)}><X size={14} /></button>{/if}
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <div class="pipclick" onpointerdown={pipDown}></div>
-        <Stage bind:this={stage} name={sketch.name} {onError} onState={(s) => (runState = s)} onRunRequest={run} />
-      </div>
-      <div class="mpane" class:show={mtab === "console"}>
-        <Console />
-      </div>
-    </div>
-  {:else if phoneLand}
-    <div class="land">
-      <div class="col">
-        {@render editorHeader()}
-        {@render editor()}
-        <SymbolBar onInsert={insert} flush />
-      </div>
-      <Stage bind:this={stage} name={sketch.name} {onError} onState={(s) => (runState = s)} onRunRequest={run} />
     </div>
   {:else}
     <PaneGroup direction="horizontal" autoSaveId="qanvas-studio-h">
@@ -481,22 +484,39 @@
       display: none;
     }
   }
-  .land {
+  .phone {
     flex: 1;
     min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .phone-body {
+    position: relative;
+    flex: 1;
+    min-height: 0;
+  }
+  .phone-body.land {
     display: grid;
     grid-template-columns: minmax(0, 1.15fr) minmax(240px, 0.85fr);
   }
-  .land .col {
-    min-width: 0;
-    border-right: 1px solid var(--line);
-  }
-  .land .lbl {
-    display: none;
-  }
-  .land > :global(.stage) {
+  .phone-body.land .mpane {
+    position: relative;
+    inset: auto;
+    display: flex;
     min-width: 0;
     min-height: 0;
+    border-right: 1px solid var(--line);
+  }
+  .phone-body.land .mstage {
+    position: relative;
+    inset: auto;
+    visibility: visible;
+    pointer-events: auto;
+    min-width: 0;
+    min-height: 0;
+  }
+  .phone.land .lbl {
+    display: none;
   }
   .edhead {
     display: flex;
@@ -606,11 +626,6 @@
     background: var(--surface-2);
     border-color: var(--line);
     color: var(--text);
-  }
-  .mbody {
-    position: relative;
-    flex: 1;
-    min-height: 0;
   }
   .mpane {
     position: absolute;
