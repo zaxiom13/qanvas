@@ -44,9 +44,14 @@ export const ERROR_HELP: Record<string, string> = {
   stack: "Too much recursion.",
   mismatch: "Tables being combined have different columns.",
   wsfull: "Out of memory for this operation.",
-  "assign": "Can't assign to a reserved word or built-in.",
-  "cond": "$[...] needs an odd number of arguments or a trailing default.",
-  "stop": "Execution was interrupted.",
+  assign: "Can't assign to a reserved word or built-in.",
+  cond: "$[...] needs an odd number of arguments or a trailing default.",
+  stop: "Execution was interrupted.",
+  params: "A function can take at most 8 parameters.",
+  return: "A return (`:`) was used outside a function.",
+  "s-fail": "The list was marked sorted, but it is not in order.",
+  "u-fail": "The list was marked unique, but an item is repeated.",
+  internal: "The interpreter hit a problem it did not expect.",
 };
 
 /** Render an error the way KDB-X does (with caret), plus a friendly hint. */
