@@ -7,17 +7,20 @@
   import LessonCell from "./LessonCell.svelte";
   import ChallengeCell from "./ChallengeCell.svelte";
   import Stage from "../../ui/Stage.svelte";
-  import HeroArt from "./HeroArt.svelte";
   import { runHeadless } from "../../runtime/headless";
-  import { nudgeInto, type Bounds } from "../../app/layout/pip";
-  import { X, ArrowLeft, ArrowRight, CircleCheck, Compass, Maximize, Minimize, Palette, Sparkles } from "../../ui/icons";
+  import { buzz } from "../../ui/haptics";
+  import { ArrowLeft, ArrowRight, Check, ChevronDown, Palette, Route, Sparkles, X } from "../../ui/icons";
 
   let { mobile }: { mobile: boolean } = $props();
+
+  // Each chapter is a line on the map, in its own colour.
+  const LINE_COLOURS = ["#ff5a1f", "#ffce00", "#00b25d", "#0098d8", "#c4127a", "#f49ac1", "#9aa0a6", "#4f6bff", "#c07a14", "#00b3a1"];
+  const lineOf = (chapter: string) => LINE_COLOURS[Math.max(0, CHAPTERS.findIndex((c) => c.title === chapter)) % LINE_COLOURS.length];
 
   let done = $state<Record<string, number>>({});
   let stage = $state<Stage>();
   let article = $state<HTMLElement>();
-  let stageOpen = $state(false); // mobile: expanded canvas
+  let canvasOpen = $state(false); // phone: the canvas strip at the top
   let hasDrawn = $state(false);
 
   const lesson = $derived<Lesson | undefined>(LESSON_BY_ID.get(app.route.parts[0] ?? ""));
@@ -26,73 +29,69 @@
   const next = $derived(idx >= 0 && idx < LESSONS.length - 1 ? LESSONS[idx + 1] : undefined);
   const nextUp = $derived(LESSONS.find((l) => !done[l.id]) ?? LESSONS[0]);
   const doneCount = $derived(LESSONS.filter((l) => done[l.id]).length);
+  const colour = $derived(lesson ? lineOf(lesson.chapter) : LINE_COLOURS[0]);
+
+  // ---------- bites: on a phone a lesson is a short run of steps, each ending in something to run ----------
+  const steps = $derived.by(() => {
+    if (!lesson) return [] as number[][];
+    const out: number[][] = [];
+    let cur: number[] = [];
+    lesson.blocks.forEach((b, i) => {
+      cur.push(i);
+      if (b.kind !== "html") {
+        out.push(cur);
+        cur = [];
+      }
+    });
+    if (cur.length) {
+      if (out.length) out[out.length - 1].push(...cur);
+      else out.push(cur);
+    }
+    return out;
+  });
+  let step = $state(0);
+  const stepOf = $derived.by(() => {
+    const m = new Map<number, number>();
+    steps.forEach((s, si) => s.forEach((b) => m.set(b, si)));
+    return m;
+  });
+  const stepKey = (id: string) => `qanvas:step:${id}`;
+  function goStep(n: number) {
+    if (!lesson) return;
+    step = Math.max(0, Math.min(steps.length - 1, n));
+    try { localStorage.setItem(stepKey(lesson.id), String(step)); } catch { /* storage unavailable */ }
+    void tick().then(() => article?.scrollTo({ top: 0 }));
+  }
+  function nextStep() {
+    buzz(8);
+    if (step < steps.length - 1) goStep(step + 1);
+    else if (next) app.go(`learn/${next.id}`);
+    else app.go("sketch");
+  }
 
   onMount(async () => {
     done = { ...(await getProgress()).done };
   });
 
-  // new lesson: reset canvas + scroll to top
+  // new lesson: reset canvas, scroll to top, resume where this lesson was left
   $effect(() => {
     const l = lesson;
     if (!l) return;
     hasDrawn = false;
-    stageOpen = false;
+    canvasOpen = false;
+    let saved = 0;
+    try { saved = Number(localStorage.getItem(stepKey(l.id)) ?? 0) || 0; } catch { /* storage unavailable */ }
+    step = saved;
     tick().then(() => {
       article?.scrollTo({ top: 0 });
       stage?.run("background 21 20 29");
     });
   });
 
-  let pipClosed = $state(false);
-  let pipPos = $state<[number, number]>([0, 0]);
-  function learnBounds(): Bounds {
-    const nav = document.querySelector("nav.bottom");
-    const bottom = nav ? nav.getBoundingClientRect().top : window.innerHeight;
-    return { left: 0, top: 0, right: window.innerWidth, bottom };
-  }
-  function pipDown(e: PointerEvent) {
-    const start = [e.clientX, e.clientY], from = [...pipPos];
-    let moved = false;
-    const el = e.currentTarget as HTMLElement;
-    const card = el.closest("aside.stage") as HTMLElement;
-    const startRect = card.getBoundingClientRect();
-    el.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - start[0], dy = ev.clientY - start[1];
-      if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-      if (!moved) return;
-      const [nx, ny] = nudgeInto(
-        { left: startRect.left + dx, top: startRect.top + dy, width: startRect.width, height: startRect.height },
-        learnBounds(),
-      );
-      pipPos = [from[0] + dx + nx, from[1] + dy + ny];
-    };
-    const up = () => {
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", up);
-      if (!moved) stageOpen = true;
-    };
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up);
-  }
-
-  onMount(() => {
-    const reclamp = () => {
-      const card = document.querySelector("aside.stage.pip");
-      if (!(card instanceof HTMLElement)) return;
-      const r = card.getBoundingClientRect();
-      const [dx, dy] = nudgeInto(r, learnBounds());
-      if (dx || dy) pipPos = [pipPos[0] + dx, pipPos[1] + dy];
-    };
-    window.addEventListener("resize", reclamp);
-    return () => window.removeEventListener("resize", reclamp);
-  });
-
   async function runSketch(code: string): Promise<Explained | null> {
     if (!stage) return null;
     hasDrawn = true;
-    pipClosed = false;
-    if (mobile) stageOpen = true;
+    if (mobile) canvasOpen = true;
     return stage.run(code);
   }
 
@@ -111,6 +110,7 @@
     if (!lesson) return;
     await markDone(lesson.id);
     done = { ...done, [lesson.id]: Date.now() };
+    buzz(30);
   }
 
   // inline `code` in prose runs in the console
@@ -122,405 +122,419 @@
   }
 
   const chapterDone = (c: (typeof CHAPTERS)[number]) => c.lessons.filter((l) => done[l.id]).length;
+  const visible = (i: number) => !mobile || stepOf.get(i) === step;
 </script>
 
 {#if !lesson}
-  <div class="overview scroll">
-    <section class="hero">
-      <div class="copy">
-        <p class="kicker"><Sparkles size={14} /> An array language, one drawing at a time</p>
-        <h1>Learn <span class="q">q</span> by drawing.</h1>
-        <p class="lede">
-          q is the language behind kdb+ — terse, fast, and built on arrays. Here you'll learn it the fun way: circles,
-          colours, particles, fractals, a neural network and a ray tracer. Everything runs right here in your browser, even offline.
-        </p>
-        <div class="cta">
-          <button class="btn primary big" onclick={() => app.go(`learn/${nextUp.id}`)}>
-            {doneCount ? "Continue" : "Start the journey"} <ArrowRight size={17} />
-          </button>
-          <button class="btn big" onclick={() => app.go("sketch")}><Palette size={17} /> Open the studio</button>
-        </div>
-        {#if doneCount}
-          <p class="progress-line">{doneCount} of {LESSONS.length} lessons done · next: <b>{nextUp.title}</b></p>
-        {/if}
-      </div>
-      <div class="art"><HeroArt /></div>
-    </section>
+  <div class="map scroll">
+    <header class="head">
+      <p class="label">the q line · {doneCount} of {LESSONS.length} stops</p>
+      <h1>Learn q,<br />one stop at a time.</h1>
+      <p class="lede">Thirty short lessons, from your first circle to a ray tracer. Each one ends with something to draw. Pick up wherever you left off, even offline.</p>
+      <button class="btn go big" onclick={() => app.go(`learn/${nextUp.id}`)}>
+        <Route size={19} /> {doneCount ? "Next stop" : "Start"}: {nextUp.title} <ArrowRight size={18} />
+      </button>
+    </header>
 
-    <section class="chapters">
+    <div class="lines">
       {#each CHAPTERS as c, ci (c.title)}
-        <article class="chapter">
+        <section class="line" style:--track={LINE_COLOURS[ci % LINE_COLOURS.length]}>
           <header>
-            <span class="num">{String(ci + 1).padStart(2, "0")}</span>
+            <span class="roundel">{ci + 1}</span>
             <h2>{c.title}</h2>
             <span class="count">{chapterDone(c)}/{c.lessons.length}</span>
           </header>
-          <div class="bar"><span style:width="{(100 * chapterDone(c)) / c.lessons.length}%"></span></div>
           <ol>
             {#each c.lessons as l (l.id)}
               <li>
-                <button onclick={() => app.go(`learn/${l.id}`)} class:done={!!done[l.id]}>
-                  <span class="dot">{#if done[l.id]}<CircleCheck size={15} />{:else}{l.n}{/if}</span>
-                  <span class="t">{l.title}<small>{l.blurb}</small></span>
+                <button class="stop" class:done={!!done[l.id]} class:here={l.id === nextUp.id} onclick={() => app.go(`learn/${l.id}`)}>
+                  <span class="station">{#if done[l.id]}<Check size={13} strokeWidth={3.5} />{/if}</span>
+                  <span class="t"><b>{l.title}</b><small>{l.blurb}</small></span>
+                  {#if l.id === nextUp.id}<span class="you">next stop</span>{/if}
                 </button>
               </li>
             {/each}
           </ol>
-        </article>
+        </section>
       {/each}
-    </section>
+    </div>
   </div>
 {:else}
-  <div class="lesson" class:mobile>
+  <div class="lesson" class:mobile style:--track={colour}>
     {#if !mobile}
       <nav class="side scroll" aria-label="Lessons">
-        <button class="back" onclick={() => app.go("learn")}><Compass size={15} /> All lessons</button>
-        {#each CHAPTERS as c (c.title)}
-          <div class="sc">{c.title}</div>
-          {#each c.lessons as l (l.id)}
-            <button class="sl" class:on={l.id === lesson.id} class:done={!!done[l.id]} onclick={() => app.go(`learn/${l.id}`)}>
-              <span class="dot">{#if done[l.id]}<CircleCheck size={13} />{:else}{l.n}{/if}</span>{l.title}
-            </button>
-          {/each}
+        <button class="back" onclick={() => app.go("learn")}><Route size={15} /> Line map</button>
+        {#each CHAPTERS as c, ci (c.title)}
+          <div class="sc" style:--track={LINE_COLOURS[ci % LINE_COLOURS.length]}>{c.title}</div>
+          <div class="sline" style:--track={LINE_COLOURS[ci % LINE_COLOURS.length]}>
+            {#each c.lessons as l (l.id)}
+              <button class="sl" class:on={l.id === lesson.id} class:done={!!done[l.id]} onclick={() => app.go(`learn/${l.id}`)}>
+                <span class="station sm">{#if done[l.id]}<Check size={10} strokeWidth={4} />{/if}</span>{l.title}
+              </button>
+            {/each}
+          </div>
         {/each}
       </nav>
     {/if}
 
+    {#if mobile}
+      <header class="mhead">
+        <button class="btn sm ghost icon" onclick={() => app.go("learn")} aria-label="Back to the line map"><X size={20} /></button>
+        <div class="mt">
+          <span class="label">stop {lesson.n} · {lesson.chapter}</span>
+          <b>{lesson.title}</b>
+        </div>
+        {#if hasDrawn}
+          <button class="btn sm icon" class:on={canvasOpen} onclick={() => (canvasOpen = !canvasOpen)} aria-label={canvasOpen ? "Fold the canvas away" : "Show the canvas"}>
+            {#if canvasOpen}<ChevronDown size={18} />{:else}<Sparkles size={18} />{/if}
+          </button>
+        {/if}
+      </header>
+      <div class="progress" aria-label={`Step ${step + 1} of ${steps.length}`}>
+        {#each steps as _, si (si)}<button class:past={si < step} class:now={si === step} onclick={() => goStep(si)} aria-label={`Step ${si + 1}`}></button>{/each}
+      </div>
+    {/if}
+
+    <aside class="stage" class:open={!mobile || canvasOpen}>
+      <Stage bind:this={stage} name={lesson?.title ?? "lesson"} compact hideToolbar={mobile} />
+    </aside>
+
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_noninteractive_element_interactions -->
     <article class="article scroll" bind:this={article} onclick={proseClick}>
       <div class="inner">
-        <p class="crumb">{lesson.chapter} · lesson {lesson.n}</p>
-        <h1>{lesson.title}</h1>
-        <p class="blurb">{lesson.blurb}</p>
+        {#if !mobile || step === 0}
+          <p class="crumb label">{lesson.chapter} · stop {lesson.n}</p>
+          <h1>{lesson.title}</h1>
+          <p class="blurb">{lesson.blurb}</p>
+        {/if}
         {#each lesson.blocks as b, i (lesson.id + i)}
-          {#if b.kind === "html"}
-            <div class="prose">{@html b.html}</div>
-          {:else if b.kind === "cell"}
-            <LessonCell code={b.code} sketch={b.sketch} evaluate={evaluateAt(i)} trace={traceAt(i)} {runSketch} />
-          {:else}
-            <ChallengeCell id={b.id} goal={b.goal} starter={b.starter} checks={b.checks} hints={b.hints} solution={b.solution} {runSketch} onSolved={solved} />
-          {/if}
+          <div class="block" class:hidden={!visible(i)}>
+            {#if b.kind === "html"}
+              <div class="prose">{@html b.html}</div>
+            {:else if b.kind === "cell"}
+              <LessonCell code={b.code} sketch={b.sketch} evaluate={evaluateAt(i)} trace={traceAt(i)} {runSketch} touch={mobile} />
+            {:else}
+              <ChallengeCell id={b.id} goal={b.goal} starter={b.starter} checks={b.checks} hints={b.hints} solution={b.solution} {runSketch} onSolved={solved} touch={mobile} />
+            {/if}
+          </div>
         {/each}
-        <footer class="pager">
-          {#if prev}
-            <button class="btn" onclick={() => app.go(`learn/${prev.id}`)}><ArrowLeft size={16} /> {prev.title}</button>
-          {:else}<span></span>{/if}
-          {#if next}
-            <button class="btn primary" onclick={() => app.go(`learn/${next.id}`)}>{next.title} <ArrowRight size={16} /></button>
-          {:else}
-            <button class="btn primary" onclick={() => app.go("sketch")}>Go make something <Palette size={16} /></button>
-          {/if}
-        </footer>
+        {#if !mobile}
+          <footer class="pager">
+            {#if prev}
+              <button class="btn" onclick={() => app.go(`learn/${prev.id}`)}><ArrowLeft size={16} /> {prev.title}</button>
+            {:else}<span></span>{/if}
+            {#if next}
+              <button class="btn go" onclick={() => app.go(`learn/${next.id}`)}>Next stop: {next.title} <ArrowRight size={16} /></button>
+            {:else}
+              <button class="btn primary" onclick={() => app.go("sketch")}>Go make something <Palette size={16} /></button>
+            {/if}
+          </footer>
+        {/if}
       </div>
     </article>
 
-    <aside class="stage" class:pip={mobile && !stageOpen} class:open={mobile && stageOpen} class:hide={mobile && (!hasDrawn || pipClosed)} style:translate={mobile && !stageOpen ? `${pipPos[0]}px ${pipPos[1]}px` : null}>
-      {#if mobile && !stageOpen}
-        <!-- svelte-ignore a11y_no_static_element_interactions -->
-        <div class="drag" onpointerdown={pipDown}></div>
-        <button class="pipx" aria-label="Hide the mini canvas" onclick={() => (pipClosed = true)}><X size={14} /></button>
-      {/if}
-      {#if mobile}
-        <button class="grow btn sm icon" onclick={() => (stageOpen = !stageOpen)} aria-label={stageOpen ? "Shrink canvas" : "Expand canvas"}>
-          {#if stageOpen}<Minimize size={15} />{:else}<Maximize size={15} />{/if}
+    {#if mobile}
+      <footer class="mnav">
+        <button class="btn big" onclick={() => (step > 0 ? goStep(step - 1) : prev ? app.go(`learn/${prev.id}`) : app.go("learn"))} aria-label="Back">
+          <ArrowLeft size={22} />
         </button>
-      {/if}
-      <Stage bind:this={stage} name={lesson?.title ?? "lesson"} compact={!mobile || !stageOpen} hideToolbar={mobile && !stageOpen} />
-    </aside>
+        <button class="btn go big grow" onclick={nextStep}>
+          {#if step < steps.length - 1}Next <span class="faintish">{step + 1}/{steps.length}</span>{:else if next}Next stop <span class="faintish">{next.title}</span>{:else}Go make something{/if}
+          <ArrowRight size={20} />
+        </button>
+      </footer>
+    {/if}
   </div>
 {/if}
 
 <style>
-  /* ---------- overview ---------- */
-  .overview {
+  /* ---------- the line map ---------- */
+  .map {
     height: 100%;
-    padding: 0 24px 60px;
+    padding: 40px 40px 80px;
   }
-  .hero {
-    max-width: 1120px;
-    margin: 0 auto;
-    display: grid;
-    grid-template-columns: 1.1fr 0.9fr;
-    gap: 40px;
-    align-items: center;
-    padding: 48px 0 36px;
+  .head {
+    max-width: 1180px;
+    margin: 0 auto 34px;
   }
-  .kicker {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 12.5px;
-    font-weight: 650;
-    color: var(--coral);
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    margin: 0 0 14px;
-  }
-  h1 {
-    font-size: clamp(38px, 6vw, 68px);
-    line-height: 1.02;
-    letter-spacing: -0.035em;
-    margin: 0 0 18px;
-    font-weight: 780;
-  }
-  h1 .q {
-    background: linear-gradient(135deg, var(--coral), #b86bff 55%, var(--accent));
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
-    font-family: var(--font-code);
+  .head h1 {
+    font-size: clamp(38px, 5.4vw, 68px);
+    margin: 8px 0 14px;
     font-weight: 700;
   }
   .lede {
-    font-size: 17.5px;
-    line-height: 1.6;
+    font-size: 17px;
+    line-height: 1.55;
     color: var(--text-2);
-    max-width: 56ch;
-    margin: 0 0 26px;
+    max-width: 58ch;
+    margin: 0 0 22px;
   }
-  .cta {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-  }
-  .btn.big {
-    height: 46px;
-    padding: 0 20px;
-    font-size: 15.5px;
-    border-radius: 13px;
-  }
-  .progress-line {
-    color: var(--text-3);
-    font-size: 13.5px;
-    margin-top: 14px;
-  }
-  .art {
-    aspect-ratio: 1;
-    border-radius: 28px;
-    overflow: hidden;
-    box-shadow: var(--shadow-lg);
-    background: var(--stage);
-  }
-  .chapters {
-    max-width: 1120px;
+  .lines {
+    max-width: 1180px;
     margin: 0 auto;
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
+    columns: 3 320px;
+    column-gap: 22px;
   }
-  .chapter {
+  .line {
+    break-inside: avoid;
+    margin: 0 0 22px;
+    padding: 16px 14px 10px;
+    border-radius: var(--r-lg);
     background: var(--surface);
     border: 1px solid var(--line);
-    border-radius: 18px;
-    padding: 16px 16px 10px;
   }
-  .chapter header {
+  .line header {
     display: flex;
-    align-items: baseline;
+    align-items: center;
     gap: 10px;
+    margin-bottom: 8px;
   }
-  .num {
+  .roundel {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
     font-family: var(--font-code);
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--accent);
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    background: var(--track);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--track) 25%, transparent);
+    text-shadow: 0 1px 2px #0006;
   }
-  .chapter h2 {
-    font-size: 17px;
+  .line h2 {
     margin: 0;
-    letter-spacing: -0.01em;
+    font-size: 18px;
   }
   .count {
     margin-left: auto;
+    font-family: var(--font-code);
     font-size: 12px;
     color: var(--text-3);
-    font-variant-numeric: tabular-nums;
   }
-  .bar {
-    height: 3px;
-    border-radius: 3px;
-    background: var(--surface-3);
-    margin: 10px 0 8px;
-    overflow: hidden;
-  }
-  .bar span {
-    display: block;
-    height: 100%;
-    background: linear-gradient(90deg, var(--good), var(--accent));
-    transition: width 500ms var(--ease);
-  }
-  .chapter ol {
+  .line ol {
     list-style: none;
     margin: 0;
     padding: 0;
+    position: relative;
   }
-  .chapter li button {
+  /* the coloured track runs through every station */
+  .line ol::before {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 18px;
+    bottom: 18px;
+    width: 8px;
+    border-radius: 4px;
+    background: var(--track);
+  }
+  .stop {
+    position: relative;
     width: 100%;
     display: flex;
-    gap: 10px;
-    align-items: flex-start;
+    gap: 14px;
+    align-items: center;
     border: none;
     background: none;
     text-align: left;
-    padding: 8px 6px;
-    border-radius: 10px;
+    padding: 9px 6px 9px 6px;
+    border-radius: 12px;
     cursor: pointer;
+    color: var(--text);
+    touch-action: manipulation;
   }
-  .chapter li button:hover {
+  .stop:hover {
     background: var(--surface-2);
   }
-  .dot {
+  .station {
     flex: none;
-    width: 22px;
-    height: 22px;
+    position: relative;
+    z-index: 1;
+    width: 26px;
+    height: 26px;
     border-radius: 50%;
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 11px;
-    font-weight: 700;
-    color: var(--text-2);
-    background: var(--surface-2);
-    border: 1px solid var(--line);
+    display: grid;
+    place-items: center;
+    background: var(--surface);
+    border: 5px solid var(--track);
+    color: #fff;
   }
-  .done .dot {
-    color: var(--good);
-    background: var(--good-soft);
-    border-color: transparent;
+  .station.sm {
+    width: 18px;
+    height: 18px;
+    border-width: 4px;
+  }
+  .done .station {
+    background: var(--track);
+    border-color: color-mix(in srgb, var(--track) 70%, #fff);
+  }
+  .here .station {
+    animation: pulse 1.6s var(--ease) infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--track) 60%, transparent); }
+    50% { box-shadow: 0 0 0 8px transparent; }
   }
   .t {
+    flex: 1;
+    min-width: 0;
     display: flex;
     flex-direction: column;
-    font-weight: 600;
-    font-size: 14.5px;
+  }
+  .t b {
+    font-size: 15px;
+    font-weight: 650;
   }
   .t small {
-    font-weight: 400;
     color: var(--text-2);
     font-size: 13px;
-    line-height: 1.4;
-    margin-top: 2px;
+    line-height: 1.35;
+    margin-top: 1px;
+  }
+  .you {
+    flex: none;
+    font-family: var(--font-code);
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: var(--go);
+    color: var(--go-text);
   }
 
-  /* ---------- lesson ---------- */
+  /* ---------- a lesson ---------- */
   .lesson {
     height: 100%;
     display: grid;
-    grid-template-columns: 250px minmax(0, 1fr) minmax(320px, 440px);
+    grid-template-columns: 250px minmax(0, 1fr) minmax(340px, 460px);
+    grid-template-areas: "side article stage";
     min-height: 0;
   }
-  .lesson.mobile {
-    grid-template-columns: 1fr;
-  }
   .side {
+    grid-area: side;
     border-right: 1px solid var(--line);
-    padding: 14px 10px 30px;
+    padding: 16px 12px 30px;
     background: var(--surface);
   }
   .back {
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 7px;
     border: none;
     background: none;
     color: var(--text-2);
     font-weight: 600;
-    font-size: 13px;
-    padding: 6px 8px;
-    border-radius: 8px;
+    font-size: 13.5px;
+    padding: 7px 8px;
+    border-radius: 10px;
     cursor: pointer;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
   .back:hover {
     background: var(--surface-2);
     color: var(--text);
   }
   .sc {
-    font-size: 11px;
+    font-family: var(--font-code);
+    font-size: 10.5px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: var(--text-3);
-    margin: 14px 8px 6px;
+    letter-spacing: 0.12em;
+    color: var(--track);
+    margin: 16px 8px 4px;
+  }
+  .sline {
+    position: relative;
+  }
+  .sline::before {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 12px;
+    bottom: 12px;
+    width: 4px;
+    border-radius: 2px;
+    background: var(--track);
+    opacity: 0.85;
   }
   .sl {
+    position: relative;
     width: 100%;
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 10px;
     border: none;
     background: none;
     text-align: left;
-    padding: 6px 8px;
-    border-radius: 8px;
+    padding: 5px 8px;
+    border-radius: 9px;
     font-size: 13.5px;
     color: var(--text-2);
     cursor: pointer;
-  }
-  .sl .dot {
-    width: 20px;
-    height: 20px;
-    font-size: 10.5px;
   }
   .sl:hover {
     background: var(--surface-2);
     color: var(--text);
   }
   .sl.on {
-    background: var(--accent-soft);
+    background: color-mix(in srgb, var(--track) 16%, transparent);
     color: var(--text);
-    font-weight: 600;
+    font-weight: 650;
   }
   .article {
+    grid-area: article;
     min-height: 0;
     height: 100%;
   }
   .inner {
     max-width: 720px;
     margin: 0 auto;
-    padding: 36px 28px 80px;
-  }
-  .mobile .inner {
-    padding: 22px 16px 120px;
+    padding: 40px 30px 90px;
   }
   .crumb {
-    font-size: 12.5px;
-    font-weight: 650;
-    color: var(--accent);
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    margin: 0 0 6px;
+    color: var(--track);
+    margin: 0 0 8px;
   }
   .inner h1 {
-    font-size: clamp(30px, 4vw, 42px);
-    margin: 0 0 8px;
+    font-size: clamp(32px, 4vw, 46px);
+    margin: 0 0 10px;
   }
   .blurb {
     font-size: 17px;
     color: var(--text-2);
-    margin: 0 0 20px;
+    margin: 0 0 22px;
     line-height: 1.5;
+  }
+  .block.hidden {
+    display: none;
   }
   .prose :global(p),
   .prose :global(li) {
-    font-size: 16px;
+    font-size: 16.5px;
     line-height: 1.7;
   }
   .prose :global(h2) {
-    font-size: 23px;
-    letter-spacing: -0.015em;
-    margin: 36px 0 8px;
+    font-size: 25px;
+    margin: 38px 0 8px;
   }
   .prose :global(h3) {
-    font-size: 18px;
+    font-size: 19px;
     margin: 26px 0 6px;
   }
+  .prose :global(strong) {
+    color: var(--text);
+  }
   .prose :global(code.qi) {
-    font-size: 0.9em;
-    padding: 1px 5px;
-    border-radius: 5px;
+    font-size: 0.88em;
+    padding: 2px 6px;
+    border-radius: 7px;
     background: var(--surface-2);
     border: 1px solid var(--line);
+    border-bottom-width: 2px;
     cursor: pointer;
     white-space: nowrap;
   }
@@ -549,136 +563,178 @@
     border-bottom: 1px solid var(--line);
   }
   .prose :global(th) {
-    font-size: 12px;
+    font-family: var(--font-code);
+    font-size: 11px;
     text-transform: uppercase;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.1em;
     color: var(--text-3);
   }
   .prose :global(.callout) {
     margin: 18px 0;
-    padding: 12px 16px;
-    border-radius: 12px;
+    padding: 14px 16px;
+    border-radius: 14px;
     background: var(--surface-2);
-    border-left: 3px solid var(--accent);
+    border: 1px solid var(--line);
+    border-left: 5px solid var(--accent);
   }
   .prose :global(.callout p) {
     margin: 0;
-    font-size: 15px;
+    font-size: 15.5px;
   }
   .prose :global(.callout.headsup) {
     border-left-color: var(--warn);
   }
   .prose :global(.callout.tryit) {
-    border-left-color: var(--coral);
+    border-left-color: var(--go);
   }
   .pager {
     display: flex;
     justify-content: space-between;
     gap: 10px;
     margin-top: 48px;
-    padding-top: 20px;
+    padding-top: 22px;
     border-top: 1px solid var(--line);
     flex-wrap: wrap;
   }
   .stage {
+    grid-area: stage;
     border-left: 1px solid var(--line);
     min-height: 0;
     display: flex;
     flex-direction: column;
-    padding: 14px;
-    background: var(--bg);
-    position: relative;
+    padding: 16px;
+    background: color-mix(in srgb, var(--bg) 70%, #000);
   }
   .stage :global(.stage) {
     background: transparent;
   }
-  .mobile .stage {
-    position: fixed;
-    z-index: 30;
-    border: 1px solid var(--line-strong);
-    box-shadow: var(--shadow-lg);
-    padding: 0;
-    overflow: hidden;
-    transition: all 260ms var(--ease);
+
+  /* ---------- a lesson on a phone: canvas strip, one step, big keys ---------- */
+  .lesson.mobile {
+    display: flex;
+    flex-direction: column;
   }
-  .mobile .stage.pip {
-    right: 12px;
-    bottom: calc(var(--bottomnav-h) + 14px);
-    width: 132px;
-    height: 132px;
-    border-radius: 16px;
-  }
-  .mobile .stage.open {
-    left: 8px;
-    right: 8px;
-    bottom: calc(var(--bottomnav-h) + 10px);
-    height: min(70dvh, 560px);
-    border-radius: 18px;
-  }
-  .mobile .stage.hide {
-    transform: translateY(20px);
-    opacity: 0;
-    pointer-events: none;
-  }
-  .drag {
-    position: absolute;
-    inset: 0;
-    z-index: 2;
-    touch-action: none;
-  }
-  .pipx {
-    position: absolute;
-    top: 4px;
-    left: 4px;
-    z-index: 4;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: none;
+  .mhead {
+    flex: none;
     display: flex;
     align-items: center;
-    justify-content: center;
-    background: color-mix(in srgb, #000 55%, transparent);
+    gap: 6px;
+    padding: 6px 8px 4px;
+  }
+  .mt {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.2;
+  }
+  .mt .label {
+    color: var(--track);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mt b {
+    font-size: 17px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .mhead .on {
+    background: var(--track);
     color: #fff;
   }
-  .grow {
-    z-index: 4 !important;
-    position: absolute;
-    top: 6px;
-    right: 6px;
-    z-index: 3;
-    background: color-mix(in srgb, var(--surface) 80%, transparent);
+  .progress {
+    flex: none;
+    display: flex;
+    gap: 4px;
+    padding: 4px 12px 8px;
+  }
+  .progress button {
+    flex: 1;
+    height: 8px;
+    padding: 0;
+    border: none;
+    border-radius: 4px;
+    background: var(--surface-3);
+    touch-action: manipulation;
+  }
+  .progress button.past {
+    background: color-mix(in srgb, var(--track) 55%, var(--surface-3));
+  }
+  .progress button.now {
+    background: var(--track);
+  }
+  .mobile .stage {
+    flex: none;
+    height: 0;
+    padding: 0 12px;
+    border: none;
+    background: transparent;
+    overflow: hidden;
+    transition: height 260ms var(--ease);
+  }
+  .mobile .stage.open {
+    height: min(38dvh, 340px);
+    padding-bottom: 8px;
+  }
+  .mobile .article {
+    flex: 1;
+  }
+  .mobile .inner {
+    padding: 8px 16px 28px;
+  }
+  .mobile .inner h1 {
+    font-size: 30px;
+  }
+  .mobile .prose :global(p),
+  .mobile .prose :global(li) {
+    font-size: 17px;
+    line-height: 1.6;
+  }
+  .mnav {
+    flex: none;
+    display: flex;
+    gap: 10px;
+    padding: 10px 12px 12px;
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+  }
+  .mnav .grow {
+    flex: 1;
+    min-width: 0;
+    justify-content: space-between;
+  }
+  .faintish {
+    opacity: 0.6;
+    font-weight: 500;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    min-width: 0;
   }
 
   @media (max-width: 1180px) and (min-width: 761px) {
     .lesson {
-      grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+      grid-template-columns: minmax(0, 1fr) minmax(300px, 400px);
+      grid-template-areas: "article stage";
     }
     .side {
       display: none;
     }
   }
   @media (max-width: 760px) {
-    .overview {
-      padding: 0 16px 40px;
+    .map {
+      padding: 20px 14px 40px;
     }
-    .hero {
-      grid-template-columns: 1fr;
-      padding: 26px 0 20px;
-      gap: 20px;
-    }
-    .art {
-      order: -1;
-      max-height: 260px;
-      aspect-ratio: auto;
-      height: 260px;
-      border-radius: 20px;
+    .head h1 {
+      font-size: 36px;
     }
     .lede {
       font-size: 16px;
     }
-    .chapters {
-      grid-template-columns: 1fr;
+    .head .btn {
+      width: 100%;
+      justify-content: space-between;
     }
   }
 </style>

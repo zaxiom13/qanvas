@@ -10,6 +10,7 @@ import type { RunState, RuntimeEvents, RuntimeOptions } from "../../runtime/cont
 export type { RunState, RuntimeEvents, RuntimeOptions } from "../../runtime/contracts";
 import { createSketchSession, nils } from "../../runtime/session";
 import { BrowserMedia } from "./media";
+import { readMotion } from "./motion";
 
 const KEY_NAMES: Record<string, string> = {
   " ": "space", ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right", Enter: "enter",
@@ -35,8 +36,9 @@ export class QanvasRuntime {
   private lastT = 0;
   private opts: Required<RuntimeOptions>;
   // input state
-  private mouse = [0, 0];
-  private pmouse = [0, 0];
+  // until the first touch, the pointer rests in the middle so "follow the mouse" sketches look right
+  private mouse = [300, 300];
+  private pmouse = [300, 300];
   private down = false;
   private clickedFlag = false;
   private releasedFlag = false;
@@ -70,6 +72,9 @@ export class QanvasRuntime {
       startMic: () => void this.media.startMic(),
       startCamera: (w, h) => this.media.startCamera(w, h),
       log: (t) => this.ev.output("info", t),
+      vibrate: (ms) => {
+        try { navigator.vibrate?.(ms); } catch { /* unsupported */ }
+      },
     };
     const rt = this;
     this.api = new Api(surface);
@@ -239,6 +244,9 @@ export class QanvasRuntime {
     ns.set("wheel", float(this.wheel));
     const ts = [...this.touches.values()];
     ns.set("touches", list([floats(ts.map((t) => t[0])), floats(ts.map((t) => t[1]))]));
+    const motion = readMotion();
+    ns.set("tilt", floats(motion.tilt));
+    ns.set("shake", float(motion.shake));
     this.media.publish(ns);
     syncSize(ns, this.api);
   }

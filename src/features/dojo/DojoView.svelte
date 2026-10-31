@@ -84,6 +84,7 @@
             show={problem.show}
             badge="Problem"
             {runSketch}
+            touch={mobile}
             onSolved={() => (done = { ...done, [problem.id]: Date.now() })}
           />
         {/key}

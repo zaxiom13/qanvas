@@ -17,10 +17,10 @@
   import Stage from "../../ui/Stage.svelte";
   import Gallery from "./Gallery.svelte";
   import { sketchHold } from "../../app/layout/visibility";
-  import { nudgeInto } from "../../app/layout/pip";
   import SymbolBar from "../../ui/SymbolBar.svelte";
+  import TweakCode from "../../ui/TweakCode.svelte";
   import type { EditorView } from "@codemirror/view";
-  import { X, Check, Code, FolderOpen, Play, Plus, Share, Sparkles, Terminal, Wand } from "../../ui/icons";
+  import { Check, FolderOpen, Hand, Keyboard, Play, Plus, Share, Sparkles, Terminal, Wand } from "../../ui/icons";
 
   interface Props {
     active: boolean;
@@ -37,7 +37,19 @@
   let saved = $state(true);
   let galleryOpen = $state(false);
   let galleryTab = $state<"examples" | "mine">("examples");
-  let mtab = $state<"code" | "canvas" | "console">("code");
+  // phones: change values by tapping (tweak) or write code with the keyboard (type)
+  const MODE_KEY = "qanvas:studioMode";
+  let mmode = $state<"tweak" | "type">((() => { try { return localStorage.getItem(MODE_KEY) === "type" ? "type" : "tweak"; } catch { return "tweak"; } })());
+  function setMode(m: "tweak" | "type") {
+    mmode = m;
+    try { localStorage.setItem(MODE_KEY, m); } catch { /* storage unavailable */ }
+  }
+  let tweakTimer: ReturnType<typeof setTimeout> | undefined;
+  function tweaked(v: string) {
+    workflow.edit(v);
+    clearTimeout(tweakTimer);
+    tweakTimer = setTimeout(run, 120);
+  }
   let runState = $state<RunState>("idle");
   let toast = $state("");
   let loadedKey: string | null = null;
@@ -65,47 +77,13 @@
     untrack(() => run());
   });
 
-  // mobile picture-in-picture: drag to move, tap to open the canvas, × to hide until the next run
-  let pipClosed = $state(false);
-  let pipPos = $state<[number, number]>([0, 0]);
-  const pip = $derived(mtab === "code" && runState !== "idle" && runState !== "error" && !pipClosed);
-  function pipDown(e: PointerEvent) {
-    const start = [e.clientX, e.clientY], from = [...pipPos];
-    let moved = false;
-    const el = e.currentTarget as HTMLElement;
-    const card = el.closest(".mstage") as HTMLElement;
-    const host = card.parentElement!;
-    const startRect = card.getBoundingClientRect();
-    el.setPointerCapture(e.pointerId);
-    const move = (ev: PointerEvent) => {
-      const dx = ev.clientX - start[0], dy = ev.clientY - start[1];
-      if (Math.abs(dx) + Math.abs(dy) > 6) moved = true;
-      if (!moved) return;
-      const b = host.getBoundingClientRect();
-      const [nx, ny] = nudgeInto(
-        { left: startRect.left + dx, top: startRect.top + dy, width: startRect.width, height: startRect.height },
-        { left: b.left, top: b.top, right: b.right, bottom: b.bottom },
-      );
-      pipPos = [from[0] + dx + nx, from[1] + dy + ny];
-    };
-    const up = () => {
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", up);
-      if (!moved) mtab = "canvas";
-    };
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up);
-  }
-
   function run() {
     workflow.cancelRun();
-    pipClosed = false;
     if (!stage) {
       pendingRun = true;
       return;
     }
     stage.run(code);
-    if (mobile && mtab === "code" && runState === "idle") mtab = "canvas";
   }
 
   function onError(e: Explained | null) {
@@ -126,21 +104,11 @@
       if (next.action === "pause") stage?.pause();
       else if (next.action === "resume") stage?.resume();
     };
-    const reclamp = () => {
-      const card = document.querySelector(".studio .mstage.pip");
-      if (!(card instanceof HTMLElement) || !card.parentElement) return;
-      const r = card.getBoundingClientRect();
-      const b = card.parentElement.getBoundingClientRect();
-      const [dx, dy] = nudgeInto(r, { left: b.left, top: b.top, right: b.right, bottom: b.bottom });
-      if (dx || dy) pipPos = [pipPos[0] + dx, pipPos[1] + dy];
-    };
     document.addEventListener("visibilitychange", onHide);
     window.addEventListener("pagehide", flush);
-    window.addEventListener("resize", reclamp);
     return () => {
       document.removeEventListener("visibilitychange", onHide);
       window.removeEventListener("pagehide", flush);
-      window.removeEventListener("resize", reclamp);
       workflow.dispose();
     };
   });
@@ -163,7 +131,15 @@
   }
 
   function newSketch() {
-    const s: Sketch = { id: newId(), name: "Untitled sketch", code: "background 20\ncircle[center;100;`coral]\n", created: Date.now(), updated: Date.now() };
+    const draft = app.takeDraft();
+    const s: Sketch = {
+      id: newId(),
+      name: draft?.name ?? "Untitled sketch",
+      code: draft?.code ?? "background 20\ncircle[center;100;`coral]\n",
+      created: Date.now(),
+      updated: Date.now(),
+      ...(draft?.from ? { from: draft.from } : {}),
+    };
     open(s);
     app.go(`sketch/${s.id}`);
     persist();
@@ -282,7 +258,7 @@
   }
 </script>
 
-{#snippet editorHeader()}
+{#snippet editorHeader(sub: boolean)}
   <div class="edhead">
     <input
       class="name"
@@ -299,14 +275,16 @@
     <button class="btn sm ghost icon" onclick={newSketch} title="New sketch" aria-label="New sketch"><Plus size={16} /></button>
     <button class="btn sm ghost icon" onclick={share} title="Copy a share link" aria-label="Share"><Share size={15} /></button>
   </div>
+  {#if sub}
   <div class="edsub">
     <label class="toggle" title="Re-run automatically as you type">
       <input type="checkbox" checked={app.autoRun} onchange={(e) => app.setAutoRun((e.currentTarget as HTMLInputElement).checked)} />
       <Wand size={13} /> live
     </label>
     <div class="spacer"></div>
-    <button class="btn sm primary" onclick={run} title="Run (Ctrl+Enter)"><Play size={14} /> Run</button>
+    <button class="btn sm go" onclick={run} title="Run (Ctrl+Enter)"><Play size={14} /> Run</button>
   </div>
+  {/if}
 {/snippet}
 
 {#snippet editor()}
@@ -324,31 +302,32 @@
     </div>
   {/if}
   {#if mobile}
-    <div class="mtabs" role="tablist">
-      <button role="tab" aria-selected={mtab === "code"} class:on={mtab === "code"} onclick={() => (mtab = "code")}><Code size={15} /> Code</button>
-      <button role="tab" aria-selected={mtab === "canvas"} class:on={mtab === "canvas"} onclick={() => (mtab = "canvas")}><Sparkles size={15} /> Canvas</button>
-      <button role="tab" aria-selected={mtab === "console"} class:on={mtab === "console"} onclick={() => (mtab = "console")}><Terminal size={15} /> Console</button>
+    {@render editorHeader(false)}
+    <div class="mcanvas">
+      <Stage bind:this={stage} name={sketch.name} {onError} onState={(s) => (runState = s)} onRunRequest={run} compact hideToolbar />
+    </div>
+    <div class="mbar">
+      <div class="seg" role="tablist" aria-label="How to change the code">
+        <button role="tab" aria-selected={mmode === "tweak"} class:on={mmode === "tweak"} onclick={() => setMode("tweak")}><Hand size={17} /> Tweak</button>
+        <button role="tab" aria-selected={mmode === "type"} class:on={mmode === "type"} onclick={() => setMode("type")}><Keyboard size={17} /> Type</button>
+      </div>
+      <button class="btn sm icon" onclick={() => (app.consoleOpen = !app.consoleOpen)} aria-label="Console"><Terminal size={18} /></button>
+      <button class="btn sm go" onclick={run}><Play size={16} /> Run</button>
     </div>
     <div class="mbody">
-      <div class="mpane" class:show={mtab === "code"}>
-        {@render editorHeader()}
+      {#if mmode === "tweak"}
+        {#key sketch.id}
+          <TweakCode {code} onChange={tweaked} hideComments hint="Tap a number or colour to change it. Switch to Type to write code." label="Sketch code" />
+        {/key}
+      {:else}
         {@render editor()}
         <SymbolBar onInsert={insert} />
-      </div>
-      <div class="mstage" class:pip class:show={mtab === "canvas" || pip} style:translate={pip ? `${pipPos[0]}px ${pipPos[1]}px` : null}>
-        {#if pip}<button class="pipx" aria-label="Hide the mini canvas" onclick={() => (pipClosed = true)}><X size={14} /></button>{/if}
-        <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-        <div class="pipclick" onpointerdown={pipDown}></div>
-        <Stage bind:this={stage} name={sketch.name} {onError} onState={(s) => (runState = s)} onRunRequest={run} />
-      </div>
-      <div class="mpane" class:show={mtab === "console"}>
-        <Console />
-      </div>
+      {/if}
     </div>
   {:else if phoneLand}
     <div class="land">
       <div class="col">
-        {@render editorHeader()}
+        {@render editorHeader(true)}
         {@render editor()}
         <SymbolBar onInsert={insert} flush />
       </div>
@@ -358,7 +337,7 @@
     <PaneGroup direction="horizontal" autoSaveId="qanvas-studio-h">
       <Pane defaultSize={46} minSize={25}>
         <div class="col">
-          {@render editorHeader()}
+          {@render editorHeader(true)}
           {@render editor()}
         </div>
       </Pane>
@@ -540,101 +519,67 @@
   :global(.resizer:hover) {
     background: var(--accent);
   }
-  /* mobile */
-  .mtabs {
+  /* ---------- phone: canvas on top, code below ---------- */
+  .mcanvas {
+    flex: none;
+    height: min(calc(100vw + 30px), 44dvh);
+    border-bottom: 1px solid var(--line);
+  }
+  .mbar {
+    flex: none;
     display: flex;
-    gap: 4px;
-    padding: 6px 8px;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 10px;
     background: var(--surface);
     border-bottom: 1px solid var(--line);
   }
-  .mtabs button {
+  .seg {
     flex: 1;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    padding: 4px;
+    border-radius: 14px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+  }
+  .seg button {
     display: inline-flex;
     align-items: center;
     justify-content: center;
     gap: 6px;
     height: 36px;
+    border: none;
     border-radius: 10px;
-    border: 1px solid transparent;
     background: transparent;
     color: var(--text-2);
     font-weight: 600;
-    font-size: 14px;
+    font-size: 14.5px;
+    touch-action: manipulation;
   }
-  .mtabs button.on {
-    background: var(--surface-2);
-    border-color: var(--line);
+  .seg button.on {
+    background: var(--key);
     color: var(--text);
+    box-shadow: 0 2px 0 var(--key-edge), inset 0 0 0 1px var(--key-line);
   }
   .mbody {
-    position: relative;
     flex: 1;
     min-height: 0;
-  }
-  .mpane {
-    position: absolute;
-    inset: 0;
-    display: none;
+    display: flex;
     flex-direction: column;
     background: var(--code-bg);
   }
-  .mpane.show {
-    display: flex;
-  }
-  .mstage {
-    position: absolute;
-    inset: 0;
-    visibility: hidden;
-    pointer-events: none;
-  }
-  .mstage.show {
-    visibility: visible;
-    pointer-events: auto;
-  }
-  .mstage.pip {
-    inset: auto 12px 60px auto;
-    width: 118px;
-    height: 118px;
-    border-radius: 14px;
-    overflow: hidden;
-    box-shadow: var(--shadow-lg);
-    z-index: 5;
-    border: 1px solid var(--line-strong);
-  }
-  .mstage.pip :global(.bar) {
-    display: none;
-  }
-  .pipx {
-    display: flex;
-    position: absolute;
-    top: 4px;
-    right: 4px;
-    z-index: 3;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: none;
-    align-items: center;
-    justify-content: center;
-    background: color-mix(in srgb, #000 55%, transparent);
-    color: #fff;
-  }
-  .pipclick {
-    touch-action: none;
-    display: none;
-  }
-  .mstage.pip .pipclick {
-    display: block;
-    position: absolute;
-    inset: 0;
-    z-index: 2;
+  .mbody > :global(.tweak),
+  .mbody > :global(.edbody) {
+    flex: 1;
+    min-height: 0;
   }
   .share-warn {
     position: fixed;
     z-index: 80;
     left: 50%;
-    bottom: calc(var(--bottomnav-h) + 16px);
+    bottom: calc(var(--dock-h) + 16px);
     transform: translateX(-50%);
     width: min(440px, calc(100vw - 24px));
     background: var(--surface);
@@ -657,7 +602,7 @@
   .toast {
     position: fixed;
     left: 50%;
-    bottom: calc(var(--bottomnav-h) + 24px);
+    bottom: calc(var(--dock-h) + 24px);
     transform: translateX(-50%);
     background: var(--text);
     color: var(--bg);

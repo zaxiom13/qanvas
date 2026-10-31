@@ -196,9 +196,13 @@
   .side {
     display: flex;
     flex-direction: column;
+    min-width: 0;
     min-height: 0;
     border-right: 1px solid var(--line);
     background: var(--surface);
+  }
+  .mobile .side {
+    border-right: none;
   }
   .search {
     display: flex;
@@ -248,6 +252,7 @@
   }
   .index {
     flex: 1;
+    min-width: 0;
     min-height: 0;
     padding: 0 8px 30px;
   }
@@ -263,6 +268,7 @@
     display: flex;
     flex-direction: column;
     width: 100%;
+    min-width: 0;
     text-align: left;
     border: none;
     background: none;
@@ -284,6 +290,7 @@
   .sm {
     font-size: 12.5px;
     color: var(--text-2);
+    max-width: 100%;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;

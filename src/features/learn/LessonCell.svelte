@@ -6,9 +6,10 @@
   import { inline } from "../../q/format";
   import { shapeLabel } from "../../presentation/shape";
   import CodeEditor from "../../ui/CodeEditor.svelte";
+  import TweakCode from "../../ui/TweakCode.svelte";
   import ErrorCard from "../../ui/ErrorCard.svelte";
   import ValueView, { hasVisual, isTabular } from "../../ui/ValueView.svelte";
-  import { Eye, Footprints, Play, RotateCcw, Sparkles, Terminal } from "../../ui/icons";
+  import { Footprints, Hand, Keyboard, Play, RotateCcw, Sparkles, Terminal } from "../../ui/icons";
   import type { QValue } from "../../q/index";
 
   interface Props {
@@ -17,8 +18,17 @@
     evaluate: (src: string) => EvalResult | null;
     trace: (src: string) => { steps: { s: number; e: number; value: QValue }[] } | null;
     runSketch: (src: string) => Promise<Explained | null>;
+    /** phone: start in tweak mode (tap values) rather than the keyboard editor */
+    touch?: boolean;
   }
-  let { code: original, sketch, evaluate, trace, runSketch }: Props = $props();
+  let { code: original, sketch, evaluate, trace, runSketch, touch = false }: Props = $props();
+  let typing = $state(untrack(() => !touch));
+  let tweakTimer: ReturnType<typeof setTimeout> | undefined;
+  function tweaked(v: string) {
+    code = v;
+    clearTimeout(tweakTimer);
+    tweakTimer = setTimeout(run, 140);
+  }
 
   let code = $state(untrack(() => original));
   let result = $state<{ text: string; value?: QValue } | null>(null);
@@ -67,15 +77,24 @@
 
 <div class="cell" class:sketch>
   <div class="ed">
-    <CodeEditor value={code} onChange={(v) => (code = v)} onRun={run} compact error={edError} label={sketch ? "Sketch cell" : "q cell"} />
+    {#if typing}
+      <CodeEditor value={code} onChange={(v) => (code = v)} onRun={run} compact error={edError} label={sketch ? "Sketch cell" : "q cell"} />
+    {:else}
+      <TweakCode {code} onChange={tweaked} hint="" label={sketch ? "Sketch cell" : "q cell"} />
+    {/if}
     <div class="actions">
+      {#if touch}
+        <button class="btn sm ghost icon" onclick={() => (typing = !typing)} aria-label={typing ? "Tap to tweak values" : "Type with the keyboard"} title={typing ? "Tweak" : "Type"}>
+          {#if typing}<Hand size={16} />{:else}<Keyboard size={16} />{/if}
+        </button>
+      {/if}
       {#if code !== original}
         <button class="btn sm ghost icon" onclick={reset} title="Reset to original" aria-label="Reset cell"><RotateCcw size={14} /></button>
       {/if}
       {#if !sketch}
         <button class="btn sm ghost icon" onclick={() => app.tryInConsole(code.trim())} title="Try in the console" aria-label="Try in console"><Terminal size={14} /></button>
       {/if}
-      <button class="btn sm {ran ? '' : 'primary'}" onclick={run} title="Run (Ctrl+Enter)">
+      <button class="btn sm {ran ? '' : sketch ? 'go' : 'primary'}" onclick={run} title="Run (Ctrl+Enter)">
         {#if sketch}<Sparkles size={14} />{:else}<Play size={14} />{/if}
         {sketch ? "Draw" : "Run"}
       </button>
@@ -126,8 +145,9 @@
   .ed {
     position: relative;
   }
-  .ed :global(.cm-content) {
-    padding-right: 120px !important;
+  .ed :global(.cm-content),
+  .ed :global(.tweak .code) {
+    padding-right: 132px !important;
   }
   .actions {
     position: absolute;

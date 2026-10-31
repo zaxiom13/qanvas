@@ -31,7 +31,9 @@ class AppState {
   autoRun = $state<boolean>(load("autoRun", true));
   /** a line queued for the console (e.g. "try in console" buttons) */
   consoleInject = $state<{ src: string; n: number } | null>(null);
-  lastTab = $state<Record<Tab, string>>(load("lastTab", { learn: "", sketch: "", dojo: "", ref: "" }));
+  lastTab = $state<Record<Tab, string>>({ play: "", learn: "", sketch: "", dojo: "", ref: "", ...load<Partial<Record<Tab, string>>>("lastTab", {}) });
+  /** code handed to the studio by "make it mine" */
+  draft: { name: string; code: string; from?: string } | null = null;
 
   constructor() {
     window.addEventListener("hashchange", () => {
@@ -75,6 +77,18 @@ class AppState {
   setAutoRun(v: boolean) {
     this.autoRun = v;
     save("autoRun", v);
+  }
+
+  /** Open the studio on a new sketch with this code. */
+  remix(name: string, code: string, from?: string) {
+    this.draft = { name, code, from };
+    this.go("sketch/new");
+  }
+
+  takeDraft() {
+    const d = this.draft;
+    this.draft = null;
+    return d;
   }
 
   tryInConsole(src: string) {

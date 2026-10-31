@@ -1,5 +1,5 @@
-// Hash routes: #/learn, #/sketch/<id>, #/s/<data>, #/dojo, #/ref.
-export type Tab = "learn" | "sketch" | "dojo" | "ref";
+// Hash routes: #/ (play), #/play/<toy>, #/learn, #/sketch/<id>, #/s/<data>, #/dojo, #/ref.
+export type Tab = "play" | "learn" | "sketch" | "dojo" | "ref";
 
 export interface Route {
   tab: Tab;
@@ -22,5 +22,6 @@ export function parseHash(hash: string): Route {
   if (head === "dojo") return { tab: "dojo", parts };
   if (head === "ref") return { tab: "ref", parts };
   if (head === "learn") return { tab: "learn", parts };
-  return { tab: "learn", parts: [] };
+  if (head === "play") return { tab: "play", parts };
+  return { tab: "play", parts: [] };
 }

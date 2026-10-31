@@ -4,7 +4,8 @@ import {
   NIL, QAtom, QDict, QTable, QValue, QVec, Session, atom, bool, count, float, floats, items, list, long, str, sym, syms,
   inline,
 } from "../q/index";
-import { Paint, colormapLUT, hsb2rgb, paint } from "./color";
+import { PALETTES, Paint, colormapLUT, hsb2rgb, paint } from "./color";
+import { DEFAULT_BG } from "./defaults";
 import { lengthErr, nums, num, points, spread, text, texts, typeErr } from "./convert";
 
 import type { Surface } from "./surface";
@@ -19,6 +20,8 @@ export interface Style {
   align: CanvasTextAlign;
   baseline: CanvasTextBaseline;
   depth: number;
+  /** soft light around shapes, in pixels (0 = off) */
+  glow: number;
 }
 
 export const defaultStyle = (): Style => ({
@@ -30,6 +33,7 @@ export const defaultStyle = (): Style => ({
   align: "left",
   baseline: "alphabetic",
   depth: 0,
+  glow: 0,
 });
 
 const FONTS: Record<string, string> = {
@@ -43,12 +47,25 @@ export class Api {
   stack: Style[] = [];
   /** shapes drawn since the last reset, by kind (used by lesson checks) */
   drawn: Record<string, number> = {};
+  /** the last solid background, which fade paints over */
+  lastBg = DEFAULT_BG;
   constructor(public s: Surface) {}
 
   reset() {
     this.style = defaultStyle();
     this.stack = [];
     this.drawn = {};
+    this.lastBg = DEFAULT_BG;
+  }
+
+  /** Light up whatever is drawn next in colour css (or switch the glow off). */
+  private glowFor(c: CanvasRenderingContext2D, css: string | null) {
+    if (!this.style.glow || !css) {
+      if (c.shadowBlur) c.shadowBlur = 0;
+      return;
+    }
+    c.shadowBlur = this.style.glow;
+    c.shadowColor = css;
   }
 
   tally(kind: string, n: number) {
@@ -83,6 +100,7 @@ export class Api {
     if (this.uniform()) {
       const f = this.fillAt(0), st = this.strokeAt(0);
       if (!f && !st) return;
+      this.glowFor(c, f && closedFill ? f : st);
       c.beginPath();
       for (let i = 0; i < n; i++) trace(c, i);
       if (f && closedFill) {
@@ -93,12 +111,14 @@ export class Api {
         c.strokeStyle = st;
         c.stroke();
       }
+      if (this.style.glow) c.shadowBlur = 0;
       return;
     }
     for (let i = 0; i < n; i++) {
       const f = this.fillAt(i), st = this.strokeAt(i);
       if (!f && !st) continue;
       c.lineWidth = this.weightAt(i);
+      this.glowFor(c, f && closedFill ? f : st);
       c.beginPath();
       trace(c, i);
       if (f && closedFill) {
@@ -110,12 +130,14 @@ export class Api {
         c.stroke();
       }
     }
+    if (this.style.glow) c.shadowBlur = 0;
   }
 
   // ---------- shapes ----------
   circle(p: QValue, r: QValue) {
     if (p instanceof QTable) return this.fromTable(p, "circle");
     const P = points(p, "circle position");
+    if (!P.n) return;
     const n = Math.max(P.n, count(r));
     const xs = spread(P.single ? floats(P.xs) : floats(P.xs), n, "circle position"), ys = spread(floats(P.ys), n, "circle position");
     const rs = spread(r, n, "circle radius");
@@ -129,6 +151,7 @@ export class Api {
 
   ellipse(p: QValue, r: QValue) {
     const P = points(p, "ellipse position");
+    if (!P.n) return;
     let rx: Float64Array, ry: Float64Array;
     if (r instanceof QAtom) rx = ry = new Float64Array(P.n).fill(num(r, "ellipse radius"));
     else {
@@ -149,6 +172,7 @@ export class Api {
   rect(p: QValue, wh: QValue) {
     if (p instanceof QTable) return this.fromTable(p, "rect");
     const P = points(p, "rect corner");
+    if (!P.n) return;
     let W: Float64Array, H: Float64Array;
     if (wh instanceof QAtom) W = H = Float64Array.of(num(wh, "rect size"));
     else {
@@ -165,6 +189,7 @@ export class Api {
 
   line(a: QValue, b: QValue) {
     const A = points(a, "line start"), B = points(b, "line end");
+    if (!A.n || !B.n) return;
     const n = Math.max(A.n, B.n);
     const ax = spread(floats(A.xs), n, "line start"), ay = spread(floats(A.ys), n, "line start");
     const bx = spread(floats(B.xs), n, "line end"), by = spread(floats(B.ys), n, "line end");
@@ -203,12 +228,14 @@ export class Api {
       for (let i = 0; i < P.n; i++) c.fillRect(P.xs[i] - r, P.ys[i] - r, r * 2, r * 2);
       return;
     }
+    this.glowFor(c, col);
     c.beginPath();
     for (let i = 0; i < P.n; i++) {
       c.moveTo(P.xs[i] + r, P.ys[i]);
       c.arc(P.xs[i], P.ys[i], r, 0, Math.PI * 2);
     }
     c.fill();
+    if (this.style.glow) c.shadowBlur = 0;
   }
 
   /** closed polygon(s) */
@@ -276,6 +303,7 @@ export class Api {
 
   tri(a: QValue, b: QValue, cc: QValue) {
     const A = points(a, "triangle corner"), B = points(b, "triangle corner"), C = points(cc, "triangle corner");
+    if (!A.n || !B.n || !C.n) return;
     const n = Math.max(A.n, B.n, C.n);
     const X = [A, B, C].map((P) => spread(floats(P.xs), n, "triangle corner"));
     const Y = [A, B, C].map((P) => spread(floats(P.ys), n, "triangle corner"));
@@ -290,6 +318,7 @@ export class Api {
 
   arc(p: QValue, r: QValue, ang: QValue) {
     const P = points(p, "arc centre");
+    if (!P.n) return;
     const a = nums(ang, "arc angles");
     const n = Math.max(P.n, count(r));
     const xs = spread(floats(P.xs), n, "arc centre"), ys = spread(floats(P.ys), n, "arc centre"), rs = spread(r, n, "arc radius");
@@ -312,6 +341,7 @@ export class Api {
 
   text(p: QValue, s: QValue, fmt: (v: QValue) => string) {
     const P = points(p, "text position");
+    if (!P.n) return;
     const strs = texts(s, fmt);
     const n = Math.max(P.n, strs.length);
     const xs = spread(floats(P.xs), n, "text position"), ys = spread(floats(P.ys), n, "text position");
@@ -324,6 +354,7 @@ export class Api {
     for (let i = 0; i < n; i++) {
       const t = strs[i % strs.length];
       const f = this.fillAt(i), st = this.strokeAt(i);
+      this.glowFor(c, f ?? st);
       if (st) {
         c.strokeStyle = st;
         c.strokeText(t, xs[i], ys[i]);
@@ -333,6 +364,7 @@ export class Api {
         c.fillText(t, xs[i], ys[i]);
       }
     }
+    if (this.style.glow) c.shadowBlur = 0;
   }
 
   private fromTable(t: QTable, shape: "circle" | "rect") {
@@ -449,9 +481,24 @@ export class Api {
     else {
       ctx.globalAlpha = 1;
       ctx.globalCompositeOperation = "source-over";
+      ctx.shadowBlur = 0;
       ctx.fillStyle = p.kind === "one" ? p.css : p.css[0];
+      this.lastBg = p.kind === "one" ? p.css : p.css[0];
       ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     }
+    ctx.restore();
+  }
+  /** Paint the last background over the canvas, partly see-through: what was drawn before fades into trails. */
+  fade(amount: number) {
+    this.tally("fade", 1);
+    const ctx = this.s.ctx();
+    ctx.save();
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalCompositeOperation = "source-over";
+    ctx.shadowBlur = 0;
+    ctx.globalAlpha = Math.max(0, Math.min(255, amount)) / 255;
+    ctx.fillStyle = this.lastBg;
+    ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.restore();
   }
   push() {
@@ -511,6 +558,15 @@ export function installApi(session: Session, api: Api) {
   }));
   set("background", b1("background", (x) => (api.background(x), unit)));
   set("clear", b1("clear", () => (api.background(sym("none")), unit)));
+  set("fade", b1("fade", (x) => (api.fade(num(x, "fade amount")), unit)));
+  set("glow", b1("glow", (x) => ((api.style.glow = Math.max(0, Math.min(200, num(x, "glow")))), unit)));
+  set("palette", b1("palette", (x) => {
+    const name = text(x);
+    const pal = name === null ? undefined : PALETTES[name];
+    if (!pal) throw typeErr("palette takes one of " + Object.keys(PALETTES).map((k) => "`" + k).join("") + ".");
+    return list(pal.map((c) => str(c)));
+  }));
+  set("buzz", b1("buzz", (x) => (api.s.vibrate?.(Math.max(0, Math.min(1000, num(x, "buzz milliseconds")))), unit)));
   set("ink", b1("ink", (x) => (api.setInk(x), unit)));
   set("pen", b1("pen", (x) => (api.setPen(x), unit)));
   set("weight", b1("weight", (x) => {
@@ -639,6 +695,10 @@ export function installApi(session: Session, api: Api) {
     return unit;
   }));
 
+  // motion sensors: hosts that have them overwrite these every frame
+  set("tilt", floats([0, 0]));
+  set("shake", float(0));
+
   syncSize(ns, api);
 }
 
@@ -664,8 +724,10 @@ function zipNum(a: QValue, b: QValue, f: (x: number, y: number) => number, what:
 
 function colorRows(a: QValue, b: QValue, c: QValue, f: (a: number, b: number, c: number) => [number, number, number]): QValue {
   const A = nums(a, "colour"), B = nums(b, "colour"), C = nums(c, "colour");
-  const n = Math.max(A.length, B.length, C.length);
-  for (const v of [A, B, C]) if (v.length !== 1 && v.length !== n) throw lengthErr("Colour channels have different lengths.");
+  // atoms apply to every colour; lists must agree (an empty list gives no colours)
+  const lists = [a, b, c].map((x, i) => (x instanceof QAtom ? null : [A, B, C][i])).filter((v): v is Float64Array => v !== null);
+  const n = lists.length ? Math.max(...lists.map((v) => v.length)) : 1;
+  for (const v of lists) if (v.length !== n && v.length !== 1) throw lengthErr("Colour channels have different lengths.");
   const g = (v: Float64Array, i: number) => (v.length === 1 ? v[0] : v[i]);
   if (n === 1 && a instanceof QAtom && b instanceof QAtom && c instanceof QAtom) return floats(f(A[0], B[0], C[0]).map(Math.round));
   const r = new Float64Array(n), gg = new Float64Array(n), bb = new Float64Array(n);

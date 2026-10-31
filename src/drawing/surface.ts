@@ -12,5 +12,7 @@ export interface Surface {
   startMic(): void;
   startCamera(w: number, h: number): void;
   log(text: string): void;
+  /** Phone vibration, in milliseconds. Optional: hosts without it ignore buzz. */
+  vibrate?(ms: number): void;
 }
 

@@ -18,6 +18,10 @@ grid:{[w;h] (til[w*h] mod w;til[w*h] div w)}
 gauss:{[n] sqrt[-2*log 1-n?1f]*cos tau*n?1f}
 mix:{[a;b;t] a+t*b-a}
 rot:{[a;p] c:cos a;s:sin a;((c*p 0)-s*p 1;(s*p 0)+c*p 1)}
+ngon:{[p;r;n] poly p+polar[r;(tau*til[n]%n)-pi%2]}
+star:{[p;r;n] poly p+polar[(2*n)#r,0.45*r;(pi*til[2*n]%n)-pi%2]}
+wave:{0.5+0.5*sin tau*time%x}
+note:{tone[440*2 xexp (x-69)%12;0.3]}
 \d .
 
 .cx.new:{[re;im] (re;im)}
