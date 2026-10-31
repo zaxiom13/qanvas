@@ -1,10 +1,11 @@
 ---
+id: drawing
 title: Drawing puzzles
 chapter: Dojo
 blurb: Picture puzzles — each one a few array expressions.
 ---
 
-```q challenge
+```q challenge id=dojo:drawing:checkerboard
 %% title Checkerboard
 %% level warmup
 %% goal Draw an 8×8 checkerboard of 75-pixel squares, alternating two colours.
@@ -22,7 +23,7 @@ ink gray 40+200*(g[0]+g[1]) mod 2
 rect[75*g;75]
 ```
 
-```q challenge
+```q challenge id=dojo:drawing:target
 %% title Target
 %% level warmup
 %% goal Draw a target: 6 rings, from radius 270 down to 45, alternating coral and white. One circle call.
@@ -39,7 +40,7 @@ ink 6#`coral`white
 circle[center;270-45*til 6]
 ```
 
-```q challenge
+```q challenge id=dojo:drawing:sine-of-dots
 %% title Sine of dots
 %% level warmup
 %% goal Draw 60 dots along one full sine wave across the canvas.
@@ -55,7 +56,7 @@ ink `sky
 circle[(10*til 60;300+120*sin tau*til[60]%60);5]
 ```
 
-```q challenge
+```q challenge id=dojo:drawing:spiral
 %% title Spiral
 %% level core
 %% goal Draw a spiral of 200 dots: each dot a little further round and a little further out than the last.
@@ -72,7 +73,7 @@ ink `lemon
 circle[center+(1.2*i*cos 0.2*i;1.2*i*sin 0.2*i);4]
 ```
 
-```q challenge
+```q challenge id=dojo:drawing:clock-face
 %% title Clock face
 %% level core
 %% goal Draw 60 tick lines around a clock face — every fifth one (the hours) longer and thicker.
@@ -93,7 +94,7 @@ weight ?[hour;6;2]
 line[center+(r0*cos a;r0*sin a);center+(240*cos a;240*sin a)]
 ```
 
-```q challenge
+```q challenge id=dojo:drawing:colour-field
 %% title Colour field
 %% level core
 %% goal Fill the canvas with a 20×20 grid of squares, where hue follows x and brightness follows y.

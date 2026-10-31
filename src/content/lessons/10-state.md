@@ -1,4 +1,5 @@
 ---
+id: state
 title: Remembering things
 chapter: Motion
 blurb: Keep values from frame to frame — and turn one bouncing ball into a thousand.
@@ -6,7 +7,7 @@ blurb: Keep values from frame to frame — and turn one bouncing ball into a tho
 
 `draw` runs from the top every frame. To remember something between frames — a position, a speed, a score — keep it in a **global**: a name defined outside `draw`.
 
-```q sketch
+```q sketch id=state:0
 px:0
 draw:{
   background 20;
@@ -25,7 +26,7 @@ draw:{
 
 A ball needs a position and a velocity, and both are points — pairs of numbers:
 
-```q sketch
+```q sketch id=state:1
 p:300 150f
 v:4 0f
 draw:{
@@ -51,7 +52,7 @@ No `if`, no indexing — the whole bounce is pair arithmetic.
 
 Here's the magic. Turn `p` and `v` into **rows** of points and the same ideas move a thousand balls. Each `if` becomes a `?[ ]`, because every ball decides for itself:
 
-```q sketch
+```q sketch id=state:2
 n:1000
 p:(n?600f;n?300f)
 v:(-3+n?6f;n#0f)
@@ -74,7 +75,7 @@ draw:{
 
 The sketch below should grow a circle forever, but it throws an error. Run it, read the message, then fix it.
 
-```q challenge
+```q challenge id=state:3
 %% goal Keep a counter r that grows by 2 every frame, and draw a circle of radius r mod 250.
 r:0
 draw:{

@@ -1,4 +1,5 @@
 ---
+id: interaction
 title: Poke it
 chapter: Motion
 blurb: The mouse, the keyboard and your fingers.
@@ -6,7 +7,7 @@ blurb: The mouse, the keyboard and your fingers.
 
 `mouse` is the pointer's position as a point, refreshed every frame:
 
-```q sketch
+```q sketch id=interaction:0
 draw:{
   background 20;
   ink `lemon;
@@ -18,7 +19,7 @@ Move your pointer over the canvas — or drag a finger, on a phone.
 
 `mousedown` is `1b` while the button (or a finger) is down, and `clicked` is `1b` only on the frame a click begins:
 
-```q sketch
+```q sketch id=interaction:1
 r:30f
 draw:{
   background 20;
@@ -32,7 +33,7 @@ draw:{
 
 `pmouse` is where the pointer was on the previous frame. A line from `pmouse` to `mouse` makes a smooth stroke. Leave out `background` and every stroke stays:
 
-```q sketch
+```q sketch id=interaction:2
 setup:{background 245 240 230}
 draw:{
   if[mousedown;
@@ -48,7 +49,7 @@ draw:{
 
 `held` lists the keys being held down right now, as symbols like `` `left `` or `` `a ``. Click the canvas first so it has the keyboard's attention.
 
-```q sketch
+```q sketch id=interaction:3
 p:300 300f
 draw:{
   background 20;
@@ -65,7 +66,7 @@ draw:{
 
 ## Your turn
 
-```q challenge
+```q challenge id=interaction:4
 %% goal Draw a ring of 12 small circles that always surrounds the mouse pointer.
 draw:{
   background 20;

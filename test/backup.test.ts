@@ -1,6 +1,6 @@
 import { expect, test } from "vitest";
-import { sketchesFromBundle, sketchesToBundle, MAX_IMPORT } from "../src/lib/backup";
-import type { Sketch } from "../src/lib/storage";
+import { sketchesFromBundle, sketchesToBundle, MAX_IMPORT } from "../src/sketches/backup";
+import type { Sketch } from "../src/sketches/model";
 
 const sketch = (id: string, code = "til 3", name = "Rings"): Sketch => ({ id, name, code, created: 10, updated: 20, from: "hello" });
 

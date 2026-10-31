@@ -1,4 +1,5 @@
 ---
+id: decisions
 title: Deciding, all at once
 chapter: Functions
 blurb: Booleans, $[if;then;else], and the array trick of choosing for every item in one go.
@@ -8,13 +9,13 @@ blurb: Booleans, $[if;then;else], and the array trick of choosing for every item
 
 Comparisons give **booleans**: `1b` for true and `0b` for false.
 
-```q
+```q id=decisions:0
 3>2
 ```
 
 Compare a list and you get a list of booleans — one per item:
 
-```q
+```q id=decisions:1
 x:4 9 1 7 3
 x>5
 ```
@@ -23,13 +24,13 @@ x>5
 
 `$[condition;then;else]` picks one of two values:
 
-```q
+```q id=decisions:2
 {$[x>5;`big;`small]} 7
 ```
 
 Add more pairs for "else if":
 
-```q
+```q id=decisions:3
 grade:{$[x>=90;`A;x>=70;`B;`C]}
 grade 95
 ```
@@ -40,14 +41,14 @@ That's great for one value — but what about a whole list?
 
 `?[booleans;a;b]` chooses **item by item**: from `a` where the boolean is true, from `b` where it's false.
 
-```q
+```q id=decisions:4
 x:4 9 1 7 3
 ?[x>5;100;0]
 ```
 
 No loops, no `if`. This is how you decide things in array land. Let's use it to size circles by which half of the canvas they're in:
 
-```q sketch
+```q sketch id=decisions:5
 xs:30+60*til 10
 r:?[xs<300;10;28]
 background 20
@@ -59,7 +60,7 @@ circle[(xs;300);r]
 
 ## Your turn
 
-```q challenge
+```q challenge id=decisions:6
 %% goal Draw 20 circles in a row. Circles on the left half should have radius 8; circles on the right half, radius 20.
 xs:15+30*til 20
 background 20

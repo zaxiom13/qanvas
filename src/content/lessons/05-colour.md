@@ -1,4 +1,5 @@
 ---
+id: colour
 title: Colour
 chapter: First light
 blurb: Grays, names, red-green-blue — and whole rainbows at once.
@@ -16,7 +17,7 @@ Qanvas understands colour written in several shapes:
 | `255 120 0 100` | …plus opacity, 0–255 |
 | `"#3ddc97"` | a hex colour, written as a string |
 
-```q sketch
+```q sketch id=colour:0
 background 245 240 230
 circle[150 300;100;`coral]
 circle[300 300;100;0 150 255 160]
@@ -27,13 +28,13 @@ circle[450 300;100;"#3ddc97"]
 
 `hsb[hue;saturation;brightness]` builds colours from a hue (0 to 1 goes once around the rainbow), a saturation and a brightness. It's just a function that returns numbers — try it:
 
-```q
+```q id=colour:1
 hsb[0.6;0.8;1]
 ```
 
 Hand it a **list** of hues and you get a list of colours: three rows (reds; greens; blues), one column per shape. Pass that as the fill, and each circle gets its own:
 
-```q sketch
+```q sketch id=colour:2
 n:24
 background 20
 circle[(12+25*til n;300);12;hsb[til[n]%n;0.8;1]]
@@ -47,7 +48,7 @@ circle[(12+25*til n;300);12;hsb[til[n]%n;0.8;1]]
 
 Outlines use `pen`, with `weight` for thickness, and `` `none `` switches fill or outline off:
 
-```q sketch
+```q sketch id=colour:3
 background 20
 ink `none
 pen hsb[til[8]%8;0.7;1]
@@ -59,7 +60,7 @@ One call, eight rings, eight colours: `circle` got one centre and eight radii.
 
 ## Your turn
 
-```q challenge
+```q challenge id=colour:4
 %% goal Draw 36 circles around a big ring, each a different hue.
 background 20
 a:6.28*til[36]%36

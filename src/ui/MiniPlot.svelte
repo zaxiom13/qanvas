@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { colormapLUT } from "../qanvas/color";
+  import { colormapLUT } from "../drawing/color";
 
   interface Props {
     kind: "line" | "scatter" | "heat";

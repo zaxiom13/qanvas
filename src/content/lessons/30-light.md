@@ -1,4 +1,5 @@
 ---
+id: light
 title: Light and shadow
 chapter: Light
 blurb: A whole scene in a table, the nearest hit for every pixel, and shadows — your own ray tracer.
@@ -6,7 +7,7 @@ blurb: A whole scene in a table, the nearest hit for every pixel, and shadows �
 
 One sphere is a demo. A **scene** is many — and a table is the perfect way to describe one: a row per sphere, with its centre, radius and colour.
 
-```q
+```q id=light:0
 S:([] c:(0 0 3.5;-1.25 -0.35 4.4;1.3 -0.45 3.6;0 -101 4); r:1 0.65 0.55 100; col:(1 0.36 0.3;0.3 0.62 1;1 0.85 0.3;0.92 0.9 0.86))
 S
 ```
@@ -17,7 +18,7 @@ The last sphere is huge (radius 100) and far below: it's our floor.
 
 Put the hit test in a function, and run it for each sphere with `each`. That gives one row of distances per sphere:
 
-```q
+```q id=light:1
 hit:{[s] b:sum s[`c]*dir; q:(b*b)-(sum s[`c]*s`c)-s[`r]*s`r; t:b-sqrt q; ?[(q>0)&t>0.001;t;0w]}
 ```
 
@@ -30,13 +31,13 @@ Then for every pixel, the nearest sphere wins:
 
 A point is in shadow if something sits between it and the light. So from every hit point, cast one more ray — toward the light — and test it against every sphere. Same maths, new origin:
 
-```q
+```q id=light:2
 blocked:{[s] o:P-s`c; b:sum o*light; q:(b*b)-(sum o*o)-s[`r]*s`r; (q>0)&0.001<(neg b)+sqrt q}
 ```
 
 ## All together
 
-```q sketch
+```q sketch id=light:3
 w:200; h:200
 px:(til[w*h] mod w)%w; py:(til[w*h] div w)%h
 dir:unit (px-0.5;0.5-py;(w*h)#1f)
@@ -68,7 +69,7 @@ Take a breath. A few lessons ago, `til 10` was new. Now you're writing the kind 
 
 ## Your turn
 
-```q challenge
+```q challenge id=light:4
 %% goal Add a fifth sphere to the scene table S — anywhere you like, in any colour.
 w:200; h:200
 px:(til[w*h] mod w)%w; py:(til[w*h] div w)%h

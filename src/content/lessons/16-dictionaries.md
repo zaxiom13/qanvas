@@ -1,4 +1,5 @@
 ---
+id: dictionaries
 title: Dictionaries
 chapter: Data
 blurb: Keys and values — q's way of giving things names.
@@ -6,24 +7,24 @@ blurb: Keys and values — q's way of giving things names.
 
 A **dictionary** maps keys to values. Build one with `!` — keys on the left, values on the right:
 
-```q
+```q id=dictionaries:0
 d:`red`green`blue!255 128 0
 d
 ```
 
 Look values up by key — exactly the way you index a list:
 
-```q
+```q id=dictionaries:1
 d`green
 ```
 
-```q
+```q id=dictionaries:2
 d`red`blue
 ```
 
 `key` and `value` pull the two halves apart:
 
-```q
+```q id=dictionaries:3
 key d
 ```
 
@@ -31,7 +32,7 @@ key d
 
 Dictionaries are perfect for naming things. Here's a palette of colours, looked up by name:
 
-```q sketch
+```q sketch id=dictionaries:4
 pal:`sky`sea`sand`sun!(135 206 235;20 90 160;240 220 170;255 200 60)
 background pal`sky
 ink pal`sea; rect[0 380;600 220]
@@ -43,14 +44,14 @@ ink pal`sun; circle[460 130;60]
 
 Arithmetic works on the values and keeps the keys:
 
-```q
+```q id=dictionaries:5
 prices:`apple`pear`fig!1.2 0.8 3.5
 prices*2
 ```
 
 Two dictionaries line up **by key**, not by position:
 
-```q
+```q id=dictionaries:6
 (`a`b!1 2)+`b`c!10 20
 ```
 
@@ -58,13 +59,13 @@ Two dictionaries line up **by key**, not by position:
 
 `count each group` counts how many times each item appears — a dictionary from item to count:
 
-```q
+```q id=dictionaries:7
 count each group "mississippi"
 ```
 
 That's a chart waiting to happen:
 
-```q sketch
+```q sketch id=dictionaries:8
 s:"the quick brown fox jumps over the lazy dog and keeps on running"
 c:count each group s except " "
 k:asc key c
@@ -78,7 +79,7 @@ text[(29+22*til count k;580);string k]
 
 ## Your turn
 
-```q challenge
+```q challenge id=dictionaries:9
 %% goal Make a dictionary sizes mapping `small`medium`large to 20 50 90, then draw three circles in a row using those sizes.
 sizes:20 50 90
 background 20

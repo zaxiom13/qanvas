@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, test } from "vitest";
-import { clearPending, readPending, recoverPending, stashPending, type Sketch } from "../src/lib/storage";
+import { clearPending, readPending, stashPending } from "../src/adapters/browser/persistence";
+import { recoverPending as recover } from "../src/sketches/recovery";
+import type { Sketch } from "../src/sketches/model";
+
+const recoverPending = (id: string, stored: Sketch | undefined, pending = readPending(id)) => recover(id, stored, pending);
 
 const mem = new Map<string, string>();
 globalThis.localStorage = {

@@ -1,6 +1,6 @@
 import { HighlightStyle, StreamLanguage, syntaxHighlighting, type StringStream } from "@codemirror/language";
 import { tags as t } from "@lezer/highlight";
-import { REFERENCE } from "../content/reference";
+import { REFERENCE } from "../content/reference.ts";
 
 const Q_KEYWORDS = new Set(
   REFERENCE.filter((r) => r.kind === "keyword" || r.kind === "iterator").map((r) => r.name).concat([

@@ -1,4 +1,5 @@
 ---
+id: projections
 title: Half a function
 chapter: Functions
 blurb: Fill in some arguments now and the rest later. q calls these projections.
@@ -6,7 +7,7 @@ blurb: Fill in some arguments now and the rest later. q calls these projections.
 
 Give a two-argument function just its first argument, and you get back a function waiting for the second one:
 
-```q
+```q id=projections:0
 add:{x+y}
 add5:add[5]
 add5 10
@@ -14,7 +15,7 @@ add5 10
 
 `add[5]` is called a **projection** — the function `add`, with `x` fixed to 5. You can leave *any* argument empty with nothing between the semicolons:
 
-```q
+```q id=projections:1
 minus:{x-y}
 from100:minus[100;]
 less100:minus[;100]
@@ -25,7 +26,7 @@ less100:minus[;100]
 
 Built-in functions project too. `circle[;8]` is "a circle of radius 8, position to be decided":
 
-```q sketch
+```q sketch id=projections:2
 dot:circle[;8]
 background 20
 ink `mint
@@ -36,7 +37,7 @@ dot (300;40+60*til 10)
 
 A whole family of tools, one line each:
 
-```q sketch
+```q sketch id=projections:3
 big:circle[;120]
 small:circle[;20]
 background 30
@@ -48,14 +49,14 @@ ink `lemon; small center
 
 `+` is a function of two arguments. Wrap it in brackets and you can project it just like `add`:
 
-```q
+```q id=projections:4
 twice:*[2]
 twice 1 2 3
 ```
 
 ## Your turn
 
-```q challenge
+```q challenge id=projections:5
 %% goal Make a projection of rect called tile that always draws 40-pixel squares. Then use it to draw a row of 10 squares.
 tile:rect
 background 20

@@ -1,4 +1,5 @@
 ---
+id: qsql-motion
 title: qSQL in motion
 chapter: Data
 blurb: A particle system that lives in a table, updated sixty times a second.
@@ -6,20 +7,20 @@ blurb: A particle system that lives in a table, updated sixty times a second.
 
 `update` changes columns (or adds new ones) and returns a new table:
 
-```q
+```q id=qsql-motion:0
 t:([] n:1 2 3 4)
 update m:n*10 from t
 ```
 
 With a `where`, only matching rows change:
 
-```q
+```q id=qsql-motion:1
 update n:0 from t where n>2
 ```
 
 `delete` removes rows:
 
-```q
+```q id=qsql-motion:2
 delete from t where n=2
 ```
 
@@ -27,7 +28,7 @@ delete from t where n=2
 
 Let's build a fountain as a table. Each row is a particle with a position `p`, a velocity `v` and a `life` that ticks down. Every frame is three small queries:
 
-```q sketch
+```q sketch id=qsql-motion:3
 spawn:{[k] ([] p:k#enlist 300 560f; v:flip (-2+k?4f;-12+k?5f); life:k#1f)}
 world:spawn 0
 draw:{
@@ -49,7 +50,7 @@ Look at the physics line: one `update` moves *every* particle, pulls every veloc
 
 ## Your turn
 
-```q challenge
+```q challenge id=qsql-motion:4
 %% goal Use update to move every ball 100 pixels to the right (keep the result in balls), then draw the table.
 balls:([] p:(100 100;100 300;100 500); r:30 40 50)
 background 20

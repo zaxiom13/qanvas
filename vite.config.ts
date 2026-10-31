@@ -1,4 +1,5 @@
 import { defineConfig } from "vite";
+import { contentPlugin } from "./tools/content-plugin.ts";
 import { svelte } from "@sveltejs/vite-plugin-svelte";
 import { VitePWA } from "vite-plugin-pwa";
 import { versionJsonPlugin } from "./tools/version-json.mjs";
@@ -7,6 +8,7 @@ export default defineConfig({
   base: "./",
   plugins: [
     svelte(),
+    contentPlugin(),
     versionJsonPlugin(),
     VitePWA({
       registerType: "autoUpdate",

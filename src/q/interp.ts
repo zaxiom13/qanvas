@@ -1,9 +1,9 @@
 import type { Node, NodeOf } from "./ast";
 import { QError, lengthErr, rankErr, typeErr, indexErr, domainErr, formatError } from "./errors";
 import { Builtin, Comp, Derived, Lambda, Proj } from "./fns";
-import { DEFAULT_FMT, FmtOpts, inline, setFnFormatter, show } from "./format";
+import { DEFAULT_FMT, FmtOpts, inline, show } from "./format";
 import { parse, type Program } from "./parser";
-import { RT } from "./rt";
+import { RT, withRuntime, type Runtime } from "./rt";
 import {
   NIL, QAtom, QDict, QFn, QIdentity, QTable, QValue, QVec, T, atom, count, dict, emptyList, fromItems, isKeyed,
   item, items, list, list2vec, long, longs, nullItem, nullLike, nullOf, str, sym, syms, table, typeOf, vec, TYPE_NAMES,
@@ -55,6 +55,10 @@ export interface SessionHost {
   stdout?: (s: string) => void;
   stderr?: (s: string) => void;
   files?: Map<string, string>;
+  now?: () => number;
+  timezoneOffset?: () => number;
+  /** Disable specialized derived verbs for conformance comparisons. */
+  fastPaths?: boolean;
 }
 
 export class Session {
@@ -67,6 +71,7 @@ export class Session {
   /** namespaces searched after root and .q for unqualified names (e.g. the Qanvas drawing API) */
   imports: string[] = [];
   host: SessionHost;
+  private readonly runtime: Runtime;
   /** set by hosts to interrupt long loops */
   interrupt = false;
   steps = 0;
@@ -82,61 +87,62 @@ export class Session {
     this.ns.set(".q", q);
     this.ns.set(".Q", new Map());
     this.ns.set(".z", new Map());
-    this.bind();
+    this.runtime = this.createRuntime();
     installBootstrap(this);
   }
 
-  /** point the late-bound runtime at this session */
-  bind() {
-    RT.apply = (f, a) => this.apply(f, a);
-    (RT as any).amend = (x: QValue, idx: (QValue | undefined)[], f: QValue | undefined, y: QValue | undefined) => this.amendPath(x, idx, f, y);
-    RT.applyDerived = (f, adv, a) => this.applyDerived(new Derived(f, adv, rankOf(f)), a);
-    RT.evalStr = (s) => this.run(s);
-    RT.parseStr = (s) => parseToQ(s);
-    RT.getGlobal = (n) => this.lookupGlobal(n, this.cur);
-    RT.setGlobal = (n, v) => this.setGlobal(n, v, this.cur);
-    RT.stdout = (s) => (this.host.stdout ?? ((t: string) => console.log(t)))(s);
-    RT.stderr = (s) => (this.host.stderr ?? ((t: string) => console.error(t)))(s);
-    RT.random = () => this.rand();
-    RT.seed = (n) => (this.rand = prng(n));
-    RT.show = (x) => show(x, this.fmt);
-    RT.inline = (x) => inline(x, this.fmt.precision);
-    RT.now = () => Date.now();
-    RT.tzOffsetMin = () => -new Date().getTimezoneOffset();
-    RT.checkpoint = () => {
+  private createRuntime(): Runtime {
+    const runtime = {} as Runtime;
+    runtime.apply = (f, a) => this.apply(f, a);
+    (runtime as any).amend = (x: QValue, idx: (QValue | undefined)[], f: QValue | undefined, y: QValue | undefined) => this.amendPath(x, idx, f, y);
+    runtime.applyDerived = (f, adv, a) => this.applyDerived(new Derived(f, adv, rankOf(f)), a);
+    runtime.evalStr = (s) => this.run(s);
+    runtime.parseStr = (s) => parseToQ(s);
+    runtime.getGlobal = (n) => this.lookupGlobal(n, this.cur);
+    runtime.setGlobal = (n, v) => this.setGlobal(n, v, this.cur);
+    runtime.stdout = (s) => (this.host.stdout ?? ((t: string) => console.log(t)))(s);
+    runtime.stderr = (s) => (this.host.stderr ?? ((t: string) => console.error(t)))(s);
+    runtime.random = () => this.rand();
+    runtime.seed = (n) => (this.rand = prng(n));
+    runtime.show = (x) => show(x, this.fmt);
+    runtime.inline = (x) => inline(x, this.fmt.precision);
+    runtime.now = () => (this.host.now ?? Date.now)();
+    runtime.tzOffsetMin = () => this.host.timezoneOffset?.() ?? -new Date().getTimezoneOffset();
+    runtime.checkpoint = () => {
       if (this.interrupt) throw new QError("stop", "Stopped.");
       if (this.deadline && performance.now() > this.deadline) {
         this.deadline = 0;
         throw new QError("stop", this.budgetHint || "This took too long, so it was stopped.");
       }
     };
-    RT.tables = (ns) => [...(this.ns.get(ns === "." ? "" : ns) ?? new Map()).entries()].filter(([, v]) => v instanceof QTable || isKeyed(v)).map(([k]) => k).sort();
-    RT.names = (ns, kind) => {
+    runtime.tables = (ns) => [...(this.ns.get(ns === "." ? "" : ns) ?? new Map()).entries()].filter(([, v]) => v instanceof QTable || isKeyed(v)).map(([k]) => k).sort();
+    runtime.names = (ns, kind) => {
       const m = this.ns.get(ns === "." ? "" : ns) ?? new Map();
       return [...m.entries()]
         .filter(([, v]) => (kind === "f" ? v instanceof QFn : kind === "a" ? v instanceof QTable || isKeyed(v) : true))
         .map(([k]) => k)
         .sort();
     };
-    setFnFormatter((f) => fmtFn(f, this.fmt.precision));
+    return runtime;
   }
 
   // ---------------- public API ----------------
 
   /** Evaluate source as the q) prompt would. Never throws. */
   evaluate(src: string): EvalResult {
-    const t0 = performance.now();
-    this.bind();
-    this.interrupt = false;
-    try {
-      const prog = parse(src);
-      const { value, silent } = this.runProgram(prog);
-      const quiet = silent || value === undefined || value === NIL || isAssignLast(prog);
-      return { value, text: quiet ? "" : show(value!, this.fmt), silent: quiet, ms: performance.now() - t0 };
-    } catch (e) {
-      const err = toQError(e);
-      return { error: err, errorText: formatError(err, src), text: "", silent: false, ms: performance.now() - t0 };
-    }
+    return withRuntime(this.runtime, () => {
+      const t0 = performance.now();
+      this.interrupt = false;
+      try {
+        const prog = parse(src);
+        const { value, silent } = this.runProgram(prog);
+        const quiet = silent || value === undefined || value === NIL || isAssignLast(prog);
+        return { value, text: quiet ? "" : show(value!, this.fmt), silent: quiet, ms: performance.now() - t0 };
+      } catch (e) {
+        const err = toQError(e);
+        return { error: err, errorText: formatError(err, src), text: "", silent: false, ms: performance.now() - t0 };
+      }
+    });
   }
 
   /** Evaluate and return the value, throwing QError on failure. */
@@ -146,38 +152,52 @@ export class Session {
   }
 
   runProgram(prog: Program): { value: QValue | undefined; silent: boolean } {
-    const fr: Frame = { lam: null, locals: null, ns: this.cur, parent: null };
-    let value: QValue | undefined;
-    for (const st of prog.stmts) {
-      fr.ns = this.cur;
-      try {
-        value = this.ev(st, fr);
-      } catch (e) {
-        if (e instanceof Return) {
-          value = e.v;
-          break;
+    return withRuntime(this.runtime, () => {
+      const fr: Frame = { lam: null, locals: null, ns: this.cur, parent: null };
+      let value: QValue | undefined;
+      for (const st of prog.stmts) {
+        fr.ns = this.cur;
+        try {
+          value = this.ev(st, fr);
+        } catch (e) {
+          if (e instanceof Return) {
+            value = e.v;
+            break;
+          }
+          const err = toQError(e);
+          if (err.span && !err.span.src) err.span.src = prog.src;
+          throw err;
         }
-        const err = toQError(e);
-        if (err.span && !err.span.src) err.span.src = prog.src;
-        throw err;
       }
-    }
-    return { value, silent: prog.silent };
+      return { value, silent: prog.silent };
+    });
   }
 
   /** Call a q function value from JS. */
   call(f: QValue | string, ...args: QValue[]): QValue {
-    this.bind();
-    const fn = typeof f === "string" ? this.lookupGlobal(f, "") : f;
-    if (fn === undefined) throw new QError(String(f), `${f} is not defined`);
-    return this.apply(fn, args);
+    return withRuntime(this.runtime, () => {
+      const fn = typeof f === "string" ? this.lookupGlobal(f, "") : f;
+      if (fn === undefined) throw new QError(String(f), `${f} is not defined`);
+      return this.apply(fn, args);
+    });
   }
 
   get(name: string): QValue | undefined {
-    return this.lookupGlobal(name, "");
+    return withRuntime(this.runtime, () => this.lookupGlobal(name, ""));
   }
   set(name: string, v: QValue) {
     this.setGlobal(name, v, "");
+  }
+
+  /** Scoped cooperative execution limit; nested calls cannot extend the caller's budget. */
+  withBudget<T>(milliseconds: number, action: () => T, hint = ""): T {
+    if (!Number.isFinite(milliseconds) || milliseconds <= 0) throw new RangeError("Budget must be a positive finite duration.");
+    const previous = this.deadline, previousHint = this.budgetHint;
+    const next = performance.now() + milliseconds;
+    this.deadline = previous ? Math.min(previous, next) : next;
+    this.budgetHint = previous && previous <= next ? previousHint : hint;
+    try { return action(); }
+    finally { this.deadline = previous; this.budgetHint = previousHint; }
   }
 
   // ---------------- names ----------------
@@ -664,7 +684,7 @@ export class Session {
 
   applyDerived(d: Derived, args: QValue[]): QValue {
     const f = d.f;
-    const fast = fastDerived(d, args);
+    const fast = this.host.fastPaths === false ? undefined : fastDerived(d, args);
     if (fast !== undefined) return fast;
     const fr = d.baseRank;
     switch (d.adv) {
@@ -1334,24 +1354,7 @@ function editDistance(a: string, b: string): number {
   return dp[m][n];
 }
 
-export function fmtFn(f: QFn, p: number): string {
-  if (f instanceof QIdentity) return "::";
-  if (f instanceof Lambda) return f.src;
-  if (f instanceof Builtin) return f.name;
-  if (f instanceof Proj) {
-    const base = f.f instanceof QFn ? fmtFn(f.f, p) : inline(f.f, p);
-    const b = f.f instanceof Derived || (f.f instanceof Builtin && f.f.glyph) ? base : base;
-    const args = [...f.args];
-    while (args.length > 1 && args[args.length - 1] === undefined) args.pop();
-    return `${b}[${args.map((a) => (a === undefined ? "" : inline(a, p))).join(";")}]`;
-  }
-  if (f instanceof Derived) {
-    const base = f.f instanceof QFn ? fmtFn(f.f, p) : inline(f.f, p);
-    return base + f.adv;
-  }
-  if (f instanceof Comp) return "'[" + f.fs.map((g) => (g instanceof QFn ? fmtFn(g, p) : inline(g, p))).join(";") + "]";
-  return "<fn>";
-}
+export { fmtFn } from "./format";
 
 /** parse (keyword) – returns a parse tree in q form */
 function parseToQ(src: string): QValue {

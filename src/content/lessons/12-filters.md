@@ -1,4 +1,5 @@
 ---
+id: filters
 title: Filters
 chapter: Thinking in arrays
 blurb: Booleans pick things out of lists, and where turns them into positions.
@@ -6,18 +7,18 @@ blurb: Booleans pick things out of lists, and where turns them into positions.
 
 A comparison gives a list of booleans — one per item. `where` turns that into the **positions** of the trues:
 
-```q
+```q id=filters:0
 x:30 5 80 12 65
 x>20
 ```
 
-```q
+```q id=filters:1
 where x>20
 ```
 
 Index a list with positions and you pick those items out:
 
-```q
+```q id=filters:2
 x where x>20
 ```
 
@@ -27,14 +28,14 @@ Read it right to left: *which are bigger than 20 → where are they → take tho
 
 Points work the same way — pick the same positions from both rows. `p[;i]` means "every row, at positions `i`":
 
-```q
+```q id=filters:3
 p:(10 20 30 40;1 2 3 4)
 p[;1 3]
 ```
 
 Let's light up just the stars near the mouse:
 
-```q sketch
+```q sketch id=filters:4
 n:2000
 p:(n?600f;n?600f)
 draw:{
@@ -53,13 +54,13 @@ draw:{
 
 A boolean is really a tiny number — `1b` counts as 1 — so `sum` of a boolean list counts the trues:
 
-```q
+```q id=filters:5
 sum 30 5 80 12 65>20
 ```
 
 ## Your turn
 
-```q challenge
+```q challenge id=filters:6
 %% goal Scatter 1000 dots. Draw the ones in the right half gray and the ones in the left half coral — every dot exactly once.
 n:1000
 p:(n?600f;n?600f)

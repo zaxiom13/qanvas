@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { formatError } from "../src/q/errors";
 import { runSketch, sketchSession } from "./helpers";
 import { Lambda } from "../src/q/fns";
-import { nils } from "../src/qanvas/headless";
+import { nils } from "../src/runtime/headless";
 import "./dom-shims";
 
 const shapes = (calls: string[]) => calls.filter((c) => /^(arc|rect)\(/.test(c)).map((c) => c.split("(")[0]);

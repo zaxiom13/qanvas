@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Explained } from "../lib/explain";
+  import type { Explained } from "../presentation/explain";
   import { CircleX, Lightbulb } from "./icons";
 
   interface Props {

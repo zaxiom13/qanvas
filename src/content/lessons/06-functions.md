@@ -1,4 +1,5 @@
 ---
+id: functions
 title: Your own functions
 chapter: Functions
 blurb: Wrap an idea in curly braces and give it a name.
@@ -6,13 +7,13 @@ blurb: Wrap an idea in curly braces and give it a name.
 
 A **function** in q is code wrapped in curly braces. Inside it, `x` means "whatever you were given":
 
-```q
+```q id=functions:0
 {x*x} 5
 ```
 
 Give it a name and use it like any built-in:
 
-```q
+```q id=functions:1
 sq:{x*x}
 sq 1 2 3 4
 ```
@@ -23,21 +24,21 @@ Because `x*x` works on whole lists, so does `sq`. You wrote it thinking about on
 
 Use `x` and `y` (and `z`) for more arguments, and call with square brackets:
 
-```q
+```q id=functions:2
 hyp:{sqrt (x*x)+y*y}
 hyp[3;4]
 ```
 
 Prefer your own names? Declare them in square brackets at the start:
 
-```q
+```q id=functions:3
 area:{[w;h] w*h}
 area[3;5]
 ```
 
 And yes — lists still just work:
 
-```q
+```q id=functions:4
 area[1 2 3;10]
 ```
 
@@ -45,7 +46,7 @@ area[1 2 3;10]
 
 A function can draw, too. Here's `flower`, which draws petals around any centre:
 
-```q sketch
+```q sketch id=functions:5
 flower:{[c;r]
   a:6.28*til[8]%8;
   ink `rose; circle[c+(r*cos a;r*sin a);r*0.6];
@@ -63,7 +64,7 @@ flower[250 480;25]
 
 ## Your turn
 
-```q challenge
+```q challenge id=functions:6
 %% goal Write a function ring[c;r] that draws 12 small circles evenly around a circle of radius r at centre c. Then draw at least three rings.
 ring:{[c;r]
   circle[c;r]

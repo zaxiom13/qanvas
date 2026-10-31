@@ -24,4 +24,18 @@ export interface Runtime {
   checkpoint(): void;
 }
 
-export const RT: Runtime = {} as Runtime;
+// A synchronous compatibility bridge for primitive modules. Contexts are owned by
+// sessions; entering one restores its caller even if a host callback re-enters q.
+// No proxy or per-element dispatch is added to numeric kernels.
+export let RT: Runtime = {} as Runtime;
+
+export function withRuntime<T>(runtime: Runtime, action: () => T): T {
+  if (RT === runtime) return action();
+  const previous = RT;
+  RT = runtime;
+  try {
+    return action();
+  } finally {
+    RT = previous;
+  }
+}

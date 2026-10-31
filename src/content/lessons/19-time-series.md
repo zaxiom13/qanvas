@@ -1,4 +1,5 @@
 ---
+id: time-series
 title: A dash of finance
 chapter: Data
 blurb: kdb+ grew up on trading floors. Timestamps, buckets and moving averages — drawn.
@@ -6,19 +7,19 @@ blurb: kdb+ grew up on trading floors. Timestamps, buckets and moving averages �
 
 q has real types for time. A **timestamp** is a date and a time, down to the nanosecond:
 
-```q
+```q id=time-series:0
 2026.03.14D09:30:00.000000000
 ```
 
 Time arithmetic just works. Add a **timespan**:
 
-```q
+```q id=time-series:1
 2026.03.14D09:30:00.000000000+0D00:05:00
 ```
 
 Underneath, times are numbers — so lists of times are ordinary lists:
 
-```q
+```q id=time-series:2
 09:30:00+60*til 5
 ```
 
@@ -26,7 +27,7 @@ Underneath, times are numbers — so lists of times are ordinary lists:
 
 Let's invent a stock: 390 minutes of trading, with the price taking a random walk.
 
-```q
+```q id=time-series:3
 n:390
 t:09:30+til n
 px:100+sums 0.1*-1+2*n?2f
@@ -36,7 +37,7 @@ tape:([] time:t; price:px)
 
 `xbar` rounds down into buckets, so `select … by 30 xbar time` groups the minutes into half-hours:
 
-```q
+```q id=time-series:4
 select open:first price, high:max price, low:min price, close:last price by 30 xbar time from tape
 ```
 
@@ -46,7 +47,7 @@ That's the kind of query kdb+ answers over billions of rows.
 
 Now the fun part — a candlestick chart, straight from a query:
 
-```q sketch
+```q sketch id=time-series:5
 n:390
 t:09:30+til n
 px:100+sums 0.12*-1+2*n?2f
@@ -73,7 +74,7 @@ path (x;y 4 mavg bars`c)
 
 ## Your turn
 
-```q challenge
+```q challenge id=time-series:6
 %% goal Group the tape into 60-minute bars and draw one circle per bar at its closing price.
 n:390
 t:09:30+til n

@@ -15,9 +15,12 @@ A creative-coding studio for the **q** language (the language of kdb+), running 
 ```bash
 npm install
 npm run dev        # http://127.0.0.1:5173
-npm test           # ~1300 tests: q parity, examples, lessons, dojo, reference
+npm run check      # module boundaries + types
+npm test           # q parity against real q, every lesson and dojo solution, saved formats
 npm run build      # static site in dist/
 ```
+
+**Changing the code?** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) maps each kind of change to the folder that owns it.
 
 `tools/oracle.mjs` runs expressions through a real q (KDB-X in WSL) so `tools/diff.ts` can compare outputs.
 

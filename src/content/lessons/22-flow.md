@@ -1,4 +1,5 @@
 ---
+id: flow
 title: Flow fields
 chapter: Nature
 blurb: Turn noise into wind, and let a thousand particles ride it.
@@ -8,7 +9,7 @@ A **flow field** gives every spot on the canvas a direction. Particles look up t
 
 First let's *see* the field: a grid of short lines, each pointing along the noise angle.
 
-```q sketch
+```q sketch id=flow:0
 g:15+30*grid[20;20]
 a:tau*2*noise g%200
 background 245 240 230
@@ -18,7 +19,7 @@ line[g;g+12*(cos a;sin a)]
 
 Now let particles ride it. Without clearing the background, their paths build up into silk:
 
-```q sketch
+```q sketch id=flow:1
 n:1500
 p:(n?600f;n?600f)
 setup:{background 14 13 22}
@@ -38,7 +39,7 @@ draw:{
 
 ## Your turn
 
-```q challenge
+```q challenge id=flow:2
 %% goal Colour each particle by the direction it's travelling in, using hsb.
 n:1500
 p:(n?600f;n?600f)

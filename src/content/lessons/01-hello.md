@@ -1,4 +1,5 @@
 ---
+id: hello
 title: Hello, canvas
 chapter: First light
 blurb: Draw your first shape, and meet the canvas you'll be painting on.
@@ -8,7 +9,7 @@ Welcome to **Qanvas**. Over these lessons you're going to learn **q** — the ar
 
 Let's draw something. Press **Run** on the cell below (or press <kbd>Ctrl</kbd>+<kbd>Enter</kbd> inside it).
 
-```q sketch
+```q sketch id=hello:0
 circle[300 300;100]
 ```
 
@@ -26,7 +27,7 @@ The canvas is 600 pixels wide and 600 tall. The top-left corner is `0 0`, and **
 
 Before drawing the circle, let's paint the background and choose an ink:
 
-```q sketch
+```q sketch id=hello:1
 background 30
 circle[300 300;100;`coral]
 ```
@@ -40,7 +41,7 @@ Notice that `background 30` has no brackets. When a function takes one argument,
 
 `center` is a name Qanvas gives you: the middle of the canvas. Run this cell to see its value:
 
-```q
+```q id=hello:2
 center
 ```
 
@@ -48,7 +49,7 @@ When you run a plain expression, you see its **value** underneath. Click the lit
 
 ## Your turn
 
-```q challenge
+```q challenge id=hello:3
 %% goal Draw one big circle — radius 150 or more — right in the middle, on a black background.
 background 30
 circle[300 100;50;`lemon]

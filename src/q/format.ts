@@ -1,7 +1,8 @@
+import { Builtin, Comp, Derived, Lambda, Proj } from "./fns";
 import {
   fmtDate, fmtDatetime, fmtMinute, fmtMonth, fmtSecond, fmtTime, fmtTimespan, fmtTimestamp,
 } from "./temporal";
-import { QAtom, QDict, QFn, QTable, QValue, QVec, count, isKeyed, items, typeChar } from "./value";
+import { QAtom, QDict, QFn, QIdentity, QTable, QValue, QVec, count, isKeyed, items, typeChar } from "./value";
 
 export interface FmtOpts {
   precision: number; // \P
@@ -11,10 +12,22 @@ export interface FmtOpts {
 
 export const DEFAULT_FMT: FmtOpts = { precision: 7, rows: 25, cols: 80 };
 
-// Function display is provided by the interpreter (it knows about lambdas, projections...)
-let fnFormatter: (f: QFn) => string = () => "<fn>";
-export function setFnFormatter(f: (f: QFn) => string) {
-  fnFormatter = f;
+export function fmtFn(f: QFn, p: number): string {
+  if (f instanceof QIdentity) return "::";
+  if (f instanceof Lambda) return f.src;
+  if (f instanceof Builtin) return f.name;
+  if (f instanceof Proj) {
+    const base = f.f instanceof QFn ? fmtFn(f.f, p) : inline(f.f, p);
+    const args = [...f.args];
+    while (args.length > 1 && args[args.length - 1] === undefined) args.pop();
+    return `${base}[${args.map((a) => (a === undefined ? "" : inline(a, p))).join(";")}]`;
+  }
+  if (f instanceof Derived) {
+    const base = f.f instanceof QFn ? fmtFn(f.f, p) : inline(f.f, p);
+    return base + f.adv;
+  }
+  if (f instanceof Comp) return "'[" + f.fs.map((g) => (g instanceof QFn ? fmtFn(g, p) : inline(g, p))).join(";") + "]";
+  return "<fn>";
 }
 
 // ---------- numbers ----------
@@ -177,7 +190,7 @@ export function inline(x: QValue, p: number): string {
     const k = inlineNested(x.k, p);
     return k + "!" + inlineNested(x.v, p);
   }
-  return fnFormatter(x as QFn);
+  return fmtFn(x as QFn, p);
 }
 
 function inlineNested(x: QValue, p: number): string {
@@ -352,7 +365,7 @@ export function lines(x: QValue, o: FmtOpts = DEFAULT_FMT, top = true): string[]
   }
   if (x instanceof QVec) return [fmtSimpleVec(x, p)];
   if (x instanceof QAtom) return [fmtAtom(x, p)];
-  return [fnFormatter(x as QFn)];
+  return [fmtFn(x as QFn, p)];
 }
 
 /** Full console text (with \c truncation). */

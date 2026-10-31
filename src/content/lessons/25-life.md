@@ -1,4 +1,5 @@
 ---
+id: life
 title: The Game of Life
 chapter: Pixels
 blurb: Conway's classic — a whole grid updated by one small rule, in a few lines of arrays.
@@ -16,14 +17,14 @@ In most languages that's four nested loops. In q it's a handful of whole-grid op
 
 `rotate` shifts a list. On a grid — a list of rows — it shifts the rows up or down:
 
-```q
+```q id=life:0
 g:(1 0 0;0 1 0;0 0 1)
 1 rotate g
 ```
 
 To shift sideways, rotate each row with `rotate'`:
 
-```q
+```q id=life:1
 1 rotate' g
 ```
 
@@ -31,7 +32,7 @@ To shift sideways, rotate each row with `rotate'`:
 
 Shift the grid all nine ways (including not at all) and add the results. Every cell ends up holding the sum of itself and its eight neighbours:
 
-```q
+```q id=life:2
 g:(0 0 0 0;0 1 1 0;0 1 0 0;0 0 0 0)
 v:(-1 0 1) rotate\: g
 nb:sum raze {(-1 0 1) {x rotate' y}\: x} each v
@@ -42,7 +43,7 @@ nb
 
 With the total including the cell itself, the rules become: *alive next time if the total is 3, or if it's alive now and the total is 4*.
 
-```q sketch
+```q sketch id=life:3
 n:60
 world:n cut (n*n)?2
 step:{[w]
@@ -62,7 +63,7 @@ Click to reseed. Because `rotate` wraps around, the world is secretly a doughnut
 
 ## Your turn
 
-```q challenge
+```q challenge id=life:4
 %% goal Start with an empty 20×20 world and place a glider: row;column 0 1, 1 2, 2 0, 2 1 and 2 2.
 world:20 cut 400#0
 step:{[w] v:(-1 0 1) rotate\: w; nb:sum raze {(-1 0 1) {x rotate' y}\: x} each v; (nb=3) or w and nb=4}

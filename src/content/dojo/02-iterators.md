@@ -1,10 +1,11 @@
 ---
+id: iterators
 title: Iterators & matrices
 chapter: Dojo
 blurb: over, scan, each — and lists of lists.
 ---
 
-```q challenge
+```q challenge id=dojo:iterators:fibonacci
 %% title Fibonacci
 %% level core
 %% goal Build the first 10 Fibonacci numbers, starting 1 1.
@@ -16,7 +17,7 @@ answer:1 1
 answer:{x,sum -2#x}/[8;1 1]
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:doubling
 %% title Doubling
 %% level warmup
 %% goal Starting from 1, double it 7 times and keep every step: 1 2 4 … 128.
@@ -28,7 +29,7 @@ answer:1
 answer:{x*2}\[7;1]
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:growth-milestones
 %% title Growth milestones
 %% level core
 %% goal growth holds daily multipliers. Find the first days where the running product passes 2, 3 and 4.
@@ -44,7 +45,7 @@ cp:prds growth
 answer:{first where cp>x} each 2 3 4
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:row-sums
 %% title Row sums
 %% level warmup
 %% goal m is a matrix. Build the sum of each row, sorted descending.
@@ -58,7 +59,7 @@ m:(1 2 3;4 5 6;7 8 9;10 6 8)
 answer:desc sum each m
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:ragged-max
 %% title Ragged max
 %% level warmup
 %% goal nested is a list of lists of different lengths. Build the max of each, sorted descending.
@@ -72,7 +73,7 @@ nested:(3 7 2 8;15 4 9;30 12 25 18 6;42 1;99 50 75)
 answer:desc max each nested
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:transpose
 %% title Transpose
 %% level warmup
 %% goal Flip the matrix m on its side, and take row 1 of the result.
@@ -86,7 +87,7 @@ m:(1 2 3 4;5 6 7 8;9 10 11 12)
 answer:(flip m) 1
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:chunks
 %% title Chunks
 %% level core
 %% goal Cut flat into groups of 4, sum each group, and sort the sums descending.
@@ -100,7 +101,7 @@ flat:1 2 3 8 5 6 7 8 9 10 11 8
 answer:desc sum each 4 cut flat
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:identity
 %% title Identity
 %% level core
 %% goal Build a 4×4 identity matrix: 1s on the diagonal, 0s everywhere else.
@@ -113,7 +114,7 @@ answer:4 4#0
 answer:"j"$(til 4)=/:til 4
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:matrix-multiply
 %% title Matrix multiply
 %% level core
 %% goal Multiply the matrices A and B, and take the first row of the result.
@@ -129,7 +130,7 @@ B:(5 6;7 8)
 answer:first A mmu B
 ```
 
-```q challenge
+```q challenge id=dojo:iterators:distances
 %% title Distances
 %% level core
 %% goal x, y and z hold coordinates of four points. Build their distances from the origin, sorted descending.

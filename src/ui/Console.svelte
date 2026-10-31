@@ -1,10 +1,10 @@
 <script lang="ts">
   import type { EditorView } from "@codemirror/view";
   import { tick } from "svelte";
-  import { app, consoleHub, type ConsoleLine } from "../lib/app.svelte";
-  import { explainError } from "../lib/explain";
+  import { app, consoleHub, type ConsoleLine } from "../app/state.svelte";
+  import { explainError } from "../presentation/explain";
   import { highlightToHtml } from "../editor/qlang";
-  import { shapeLabel } from "../lib/shape";
+  import { shapeLabel } from "../presentation/shape";
   import { inline } from "../q/format";
   import CodeEditor from "./CodeEditor.svelte";
   import ErrorCard from "./ErrorCard.svelte";
