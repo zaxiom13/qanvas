@@ -1,8 +1,8 @@
 import { Session, floats, bool, long, float, syms, list } from "../src/q/index";
-import { Api, Surface, installApi } from "../src/qanvas/api";
-import { QANVAS_Q } from "../src/qanvas/qlib";
+import { Api, Surface, installApi } from "../src/drawing/api";
+import { QANVAS_Q } from "../src/drawing/qlib";
 import { Lambda } from "../src/q/fns";
-import { nils } from "../src/qanvas/headless";
+import { nils } from "../src/runtime/headless";
 
 /** A CanvasRenderingContext2D stand-in that records calls. */
 export function mockCtx() {

@@ -1,4 +1,5 @@
 ---
+id: pixels
 title: Pictures from numbers
 chapter: Pixels
 blurb: A matrix of numbers is an image. Compute every pixel at once, like a shader.
@@ -6,7 +7,7 @@ blurb: A matrix of numbers is an image. Compute every pixel at once, like a shad
 
 `pixels m` paints a matrix onto the whole canvas. Each number is one pixel: 0 is black and 1 is white.
 
-```q sketch
+```q sketch id=pixels:0
 k:til[64]%63
 pixels k*\:k
 ```
@@ -17,7 +18,7 @@ A gradient: each cell is its row fraction times its column fraction.
 
 Here's the trick shader artists use, done in q: build the x and y of every pixel as two matrices, then write **one formula** for all of them at once.
 
-```q sketch
+```q sketch id=pixels:1
 w:200
 k:til[w]%w
 gx:w#enlist k
@@ -32,7 +33,7 @@ pixels 0.5+0.5*sin 60*d
 
 `heatmap` adds colour, and you can use any formula you like:
 
-```q sketch
+```q sketch id=pixels:2
 w:200
 k:til[w]%w
 gx:w#enlist k
@@ -44,7 +45,7 @@ heatmap[sin (10*gx)+(8*gy)+sin 12*gx*gy;`plasma]
 
 Put the formula in `draw` and add `time`, and the whole image flows — a classic "plasma" effect:
 
-```q sketch
+```q sketch id=pixels:3
 w:120
 k:til[w]%w
 gx:w#enlist k
@@ -61,7 +62,7 @@ draw:{
 
 ## Your turn
 
-```q challenge
+```q challenge id=pixels:4
 %% goal Make a 100×100 matrix where every value in row i is i%99 — a top-to-bottom gradient — and draw it with pixels.
 m:100#enlist til[100]%99
 pixels m

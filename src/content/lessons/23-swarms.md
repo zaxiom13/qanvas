@@ -1,4 +1,5 @@
 ---
+id: swarms
 title: Swarms
 chapter: Nature
 blurb: Simple steering rules, applied to everyone at once — and a flock appears.
@@ -11,14 +12,14 @@ In 1986 Craig Reynolds showed that flocks need only a few simple rules. Here are
 
 The centre of the flock is the average x and the average y. `avg each` averages each row:
 
-```q
+```q id=swarms:0
 p:(1 2 3f;10 20 60f)
 avg each p
 ```
 
 Subtract every creature's position from the centre and you have an arrow from each creature to the middle:
 
-```q sketch
+```q sketch id=swarms:1
 n:300
 p:(n?600f;n?600f)
 v:(-1+n?2f;-1+n?2f)
@@ -47,7 +48,7 @@ Anyone going faster than 3 is slowed down to exactly 3; everyone else is untouch
 
 Circles don't show which way something is heading. A short line from `p` along `v` does:
 
-```q sketch
+```q sketch id=swarms:2
 n:200
 p:(n?600f;n?600f)
 v:(-1+n?2f;-1+n?2f)
@@ -63,7 +64,7 @@ draw:{
 
 ## Your turn
 
-```q challenge
+```q challenge id=swarms:3
 %% goal Make the creatures flee: steer away from the mouse instead of toward it.
 n:200
 p:(n?600f;n?600f)

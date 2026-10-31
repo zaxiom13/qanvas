@@ -1,4 +1,5 @@
 ---
+id: neuron
 title: A neuron
 chapter: Learning machines
 blurb: The smallest learning machine — weights, a sum, a squash, and a nudge after every mistake.
@@ -6,7 +7,7 @@ blurb: The smallest learning machine — weights, a sum, a squash, and a nudge a
 
 A **neuron** takes some inputs, multiplies each by a **weight**, adds them up with a **bias**, and squashes the result into the range 0 to 1:
 
-```q
+```q id=neuron:0
 sig:{1%1+exp neg x}
 sig -5 0 5
 ```
@@ -15,7 +16,7 @@ sig -5 0 5
 
 With two inputs, the neuron's guess for a point `x y` is `sig b+(w0*x)+w1*y`. For a whole matrix of points `X` — one row per point — that's a single `mmu`:
 
-```q
+```q id=neuron:1
 X:(0 0f;0 1f;1 0f;1 1f)
 w:2 -1f
 X mmu w
@@ -32,7 +33,7 @@ Learning means nudging the weights so the error shrinks. For a sigmoid neuron th
 
 That's **gradient descent**. Let's teach a neuron to tell apart points on either side of a line. The background shows what the neuron believes; watch its boundary slide into place:
 
-```q sketch
+```q sketch id=neuron:2
 m:200
 P:flip (m?1f;m?1f)
 Y:"f"$(P[;1])>0.2+0.6*P[;0]
@@ -57,7 +58,7 @@ draw:{
 
 ## Your turn
 
-```q challenge
+```q challenge id=neuron:3
 %% goal Change the labels so the neuron learns a different line: points where y > 0.8-0.6*x get label 1.
 m:200
 P:flip (m?1f;m?1f)

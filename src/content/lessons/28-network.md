@@ -1,4 +1,5 @@
 ---
+id: network
 title: A network learns
 chapter: Learning machines
 blurb: Stack neurons into layers, and a network learns shapes no single neuron can — you'll see every weight.
@@ -16,7 +17,7 @@ The fix: a **hidden layer**. Several neurons each draw their own line; a final n
 
 Running the network forwards is two matrix multiplies:
 
-```q
+```q id=network:0
 sig:{1%1+exp neg x}
 tanh:{-1+2*sig 2*x}
 W1:(2 8)#0.5*til 16
@@ -34,7 +35,7 @@ To learn, the error flows **backwards** through the network — *backpropagation
 
 Here's everything together. Move your mouse over the canvas: the little diagram in the corner shows the network thinking about the point under your pointer. Each line is a weight — orange for positive, blue for negative, thicker for stronger — and each neuron lights up with its activation.
 
-```q sketch
+```q sketch id=network:1
 m:300
 P:flip (m?1f;m?1f)
 Y:"f"$0.06>sum each (P-\:0.5 0.5) xexp 2
@@ -86,7 +87,7 @@ Take a moment with that `draw`: three training steps, a heatmap of what the netw
 
 ## Your turn
 
-```q challenge
+```q challenge id=network:2
 %% goal Give the network 16 hidden neurons instead of 8.
 m:300
 P:flip (m?1f;m?1f)

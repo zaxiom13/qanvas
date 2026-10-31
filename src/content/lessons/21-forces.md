@@ -1,4 +1,5 @@
 ---
+id: forces
 title: Forces
 chapter: Nature
 blurb: Position, velocity, acceleration — Newton's laws for a whole crowd at once.
@@ -12,7 +13,7 @@ In *The Nature of Code*, every moving thing carries three vectors:
 
 Each frame: add the acceleration to `v`, then add `v` to `p`. A **force** is just an acceleration — and forces add up.
 
-```q sketch
+```q sketch id=forces:0
 n:300
 p:(n?600f;n?200f)
 v:(n#0f;n#0f)
@@ -43,7 +44,7 @@ Hold the mouse down for wind.
 
 A force can point somewhere. The arrow from each particle to the mouse is `mouse-p`; `unit` shrinks each arrow to length 1, so everyone feels the same pull:
 
-```q sketch
+```q sketch id=forces:1
 n:800
 p:(n?600f;n?600f)
 v:(n#0f;n#0f)
@@ -61,7 +62,7 @@ Eight hundred particles, each with its own position and velocity, and the whole 
 
 ## Your turn
 
-```q challenge
+```q challenge id=forces:2
 %% goal Add gravity: every frame, add 0 0.3 to the velocities of all the balls.
 n:50
 p:(20+11*til n;n#50f)

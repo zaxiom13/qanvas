@@ -1,4 +1,5 @@
 ---
+id: animation
 title: Animation
 chapter: Motion
 blurb: Define draw, and Qanvas calls it sixty times a second.
@@ -6,7 +7,7 @@ blurb: Define draw, and Qanvas calls it sixty times a second.
 
 Everything so far has been a still picture. To animate, define a function called `draw`. Qanvas calls it about 60 times a second, and each call paints one frame.
 
-```q sketch
+```q sketch id=animation:0
 draw:{
   background 20;
   ink `coral;
@@ -22,13 +23,13 @@ draw:{
 
 `time` is the number of seconds since the sketch started. Feed it to `sin` and you get a smooth swing between -1 and 1:
 
-```q
+```q id=animation:1
 sin 0 0.5 1 1.5 2
 ```
 
 Scale the swing and you have motion that breathes:
 
-```q sketch
+```q sketch id=animation:2
 draw:{
   background 20;
   ink 255 190 110;
@@ -40,7 +41,7 @@ draw:{
 
 Because everything is arrays, giving each shape its own timing is one expression. Here, every circle's phase depends on its position in the list:
 
-```q sketch
+```q sketch id=animation:3
 n:30
 xs:10+20*til n
 draw:{
@@ -57,7 +58,7 @@ That's a wave made of 30 circles, and not a loop in sight.
 
 If you don't call `background` every frame, the old frames stay. Draw a see-through background instead, and the past fades slowly:
 
-```q sketch
+```q sketch id=animation:4
 draw:{
   background 20 20 30 25;
   ink hsb[time%4;0.7;1];
@@ -67,7 +68,7 @@ draw:{
 
 ## Your turn
 
-```q challenge
+```q challenge id=animation:5
 %% goal Make a circle that moves back and forth horizontally across the middle of the canvas, forever.
 draw:{
   background 20;

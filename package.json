@@ -8,7 +8,7 @@
     "dev": "vite --host 127.0.0.1 --port 5173",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1 --port 5173",
-    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check": "node tools/check-architecture.mjs && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "oracle": "node tools/oracle.mjs",
     "deploy": "wrangler deploy"

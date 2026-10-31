@@ -1,4 +1,5 @@
 ---
+id: complex
 title: Complex numbers
 chapter: Pixels
 blurb: A complex number is a point. Square it, add, repeat — and the Mandelbrot set appears.
@@ -6,20 +7,20 @@ blurb: A complex number is a point. Square it, add, repeat — and the Mandelbro
 
 q doesn't have complex numbers built in, so Qanvas adds a small namespace, `.cx`, written in q itself. The idea is beautifully simple: **a complex number is a point** `(re;im)`. A whole grid of them is rows of points — exactly like everything else we've drawn.
 
-```q
+```q id=complex:0
 z:3 4f
 .cx.abs z
 ```
 
 The size of 3+4i is 5 — Pythagoras. Multiplying complex numbers *rotates and scales*:
 
-```q
+```q id=complex:1
 .cx.mul[0 1f;0 1f]
 ```
 
 That's *i* × *i* = -1.
 
-```q
+```q id=complex:2
 .cx.str .cx.mul[1 2f;3 4f]
 ```
 
@@ -27,7 +28,7 @@ That's *i* × *i* = -1.
 
 Multiplying by a complex number with length just over 1 turns a point and pushes it out a little. Do it over and over — with scan — and you trace a spiral:
 
-```q sketch
+```q sketch id=complex:3
 w:.cx.polar[1.04;0.3]
 z:flip 60 {.cx.mul[w;x]}\ 1 0f
 background 20
@@ -39,7 +40,7 @@ circle[center+10*z;4]
 
 For every point `c` on a grid, start at `z = 0` and repeat `z = z² + c`. Some points fly off to infinity; others stay near zero forever. Colour each point by how long it survives:
 
-```q sketch
+```q sketch id=complex:4
 w:240; h:240
 c:(-2.2+2.8*(til[w*h] mod w)%w; -1.4+2.8*(til[w*h] div w)%h)
 z:0*c
@@ -54,7 +55,7 @@ Every pixel iterates together: `.cx.sq z` squares 57,600 complex numbers at once
 
 Flip it around: fix `c`, and start `z` at each pixel. (Inside `draw` we call it `zs` — remember, `x`, `y` and `z` are reserved for a function's own arguments.) Every `c` gives a different shape — so let the mouse choose `c`:
 
-```q sketch
+```q sketch id=complex:5
 w:150; h:150
 z0:(-1.6+3.2*(til[w*h] mod w)%w; -1.6+3.2*(til[w*h] div w)%h)
 draw:{
@@ -67,7 +68,7 @@ draw:{
 
 ## Your turn
 
-```q challenge
+```q challenge id=complex:6
 %% goal Draw the Julia set for c = -0.8 0.156 as a single still image.
 w:160; h:160
 z:(-1.6+3.2*(til[w*h] mod w)%w; -1.6+3.2*(til[w*h] div w)%h)

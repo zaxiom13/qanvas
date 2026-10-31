@@ -1,4 +1,5 @@
 ---
+id: tables
 title: Tables
 chapter: Data
 blurb: A table is a list of rows and a dictionary of columns. It's the heart of kdb+.
@@ -6,26 +7,26 @@ blurb: A table is a list of rows and a dictionary of columns. It's the heart of 
 
 kdb+ is famous for tables, and they're refreshingly simple: a table is a set of named columns, all the same length.
 
-```q
+```q id=tables:0
 t:([] name:`ada`bo`cy; age:36 24 51; score:88.5 72 95)
 t
 ```
 
 Take a column by its name:
 
-```q
+```q id=tables:1
 t`age
 ```
 
 Take a row by its number — and a row is a dictionary:
 
-```q
+```q id=tables:2
 t 1
 ```
 
 A table is really a dictionary of columns turned on its side. `flip` shows it:
 
-```q
+```q id=tables:3
 flip t
 ```
 
@@ -33,7 +34,7 @@ flip t
 
 A table is a lovely way to describe a scene: one row per thing, one column per property. `circle` accepts a table directly, reading the columns `p` (position), `r` (radius) and — if present — `ink`:
 
-```q sketch
+```q sketch id=tables:4
 balls:([] p:(100 200;300 300;500 150;200 480;450 450); r:40 70 30 55 60; ink:`coral`sky`lemon`mint`violet)
 background 20
 circle balls
@@ -45,18 +46,18 @@ Each value in the `p` column is one point — a pair.
 
 `select` is q's query language, built right into the language:
 
-```q
+```q id=tables:5
 balls:([] p:(100 200;300 300;500 150;200 480;450 450); r:40 70 30 55 60; ink:`coral`sky`lemon`mint`violet)
 select from balls where r>45
 ```
 
-```q
+```q id=tables:6
 select p,r from balls where ink in `sky`mint
 ```
 
 Draw only what a query finds:
 
-```q sketch
+```q sketch id=tables:7
 balls:([] p:(100 200;300 300;500 150;200 480;450 450); r:40 70 30 55 60; ink:`coral`sky`lemon`mint`violet)
 background 20
 circle select from balls where r>45
@@ -64,7 +65,7 @@ circle select from balls where r>45
 
 ## Your turn
 
-```q challenge
+```q challenge id=tables:8
 %% goal Make a table dots with 3 rows and the columns p, r and ink, then draw it with circle dots.
 dots:([] p:(100 300;300 300); r:20 40)
 background 20

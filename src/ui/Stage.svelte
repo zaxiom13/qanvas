@@ -1,9 +1,10 @@
 <script lang="ts">
   import { onDestroy, onMount } from "svelte";
-  import { QanvasRuntime, type RunState } from "../qanvas/runtime";
-  import { consoleHub, type ConsoleTarget } from "../lib/app.svelte";
-  import { explainError, type Explained } from "../lib/explain";
-  import type { QError } from "../q/errors";
+  import type { QanvasRuntime } from "../adapters/browser/canvas-runtime";
+  import type { RunState } from "../runtime/contracts";
+  import { consoleHub, type ConsoleTarget } from "../app/state.svelte";
+  import { explainError, type Explained } from "../presentation/explain";
+  import { QError } from "../q/errors";
   import ErrorCard from "./ErrorCard.svelte";
   import { Camera, Maximize, Minimize, Pause, Play, RotateCcw, StepForward } from "./icons";
 
@@ -24,6 +25,9 @@
   let host: HTMLDivElement;
   let frame: HTMLDivElement;
   let rt: QanvasRuntime | null = null;
+  let disposed = false;
+  let resolveRuntime: (runtime: QanvasRuntime | null) => void;
+  const runtimeReady = new Promise<QanvasRuntime | null>((resolve) => (resolveRuntime = resolve));
   let runState = $state<RunState>("idle");
   let fps = $state(0);
   let err = $state<Explained | null>(null);
@@ -50,6 +54,8 @@
   };
 
   onMount(() => {
+    void import("../adapters/browser/canvas-runtime").then(({ QanvasRuntime }) => {
+    if (disposed) return;
     rt = new QanvasRuntime(host, {
       output: (kind, text) => consoleHub.push({ kind: kind === "out" ? "out" : kind === "err" ? "err" : "info", text, err: kind === "err" ? { name: "stderr", hint: text } : undefined }),
       error: (e: QError, src: string) => {
@@ -65,9 +71,20 @@
     ro = new ResizeObserver(fit);
     ro.observe(frame);
     if (connectConsole) consoleHub.use(target);
+    resolveRuntime(rt);
+    }).catch((cause) => {
+      if (disposed) return;
+      err = explainError(new QError("load", "Could not start the canvas. Try reloading the page. " + String(cause)), "");
+      runState = "error";
+      onError?.(err);
+      onState?.("error");
+      resolveRuntime(null);
+    });
   });
 
   onDestroy(() => {
+    disposed = true;
+    resolveRuntime(null);
     ro?.disconnect();
     rt?.destroy();
     if (consoleHub.target === target) consoleHub.use(null);
@@ -83,7 +100,7 @@
   }
 
   export async function run(src: string): Promise<Explained | null> {
-    if (!rt) return null;
+    if (!await runtimeReady || disposed || !rt) return err;
     lastSrc = src;
     err = null;
     onError?.(null);

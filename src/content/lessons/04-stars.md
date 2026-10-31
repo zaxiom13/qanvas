@@ -1,4 +1,5 @@
 ---
+id: stars
 title: Scatter the stars
 chapter: First light
 blurb: Random numbers, rows of points, and your first night sky.
@@ -8,13 +9,13 @@ blurb: Random numbers, rows of points, and your first night sky.
 
 `n?m` asks q for *n* random numbers below *m*:
 
-```q
+```q id=stars:0
 5?10
 ```
 
 Ask for floats (numbers with decimals) by giving a float limit. `1f` means "1, as a float":
 
-```q
+```q id=stars:1
 3?1f
 ```
 
@@ -22,14 +23,14 @@ Ask for floats (numbers with decimals) by giving a float limit. `1f` means "1, a
 
 Many points are written as two rows, `(xs;ys)`. So 200 random points on our 600×600 canvas are:
 
-```q
+```q id=stars:2
 p:(200?600f;200?600f)
 count each p
 ```
 
 `count each p` counts each row separately: 200 x's and 200 y's.
 
-```q sketch
+```q sketch id=stars:3
 p:(200?600f;200?600f)
 background 10 12 30
 ink 255 255 230
@@ -38,7 +39,7 @@ circle[p;2]
 
 A starry sky, in one call. Let's vary their sizes:
 
-```q sketch
+```q sketch id=stars:4
 n:300
 p:(n?600f;n?600f)
 background 10 12 30
@@ -52,14 +53,14 @@ circle[p;0.5+n?2.5]
 
 Add a pair to rows of points and *every* point moves: the x row gets the first number and the y row gets the second.
 
-```q
+```q id=stars:5
 p:(1 2 3f;10 20 30f)
 p+100 0
 ```
 
 ## Your turn
 
-```q challenge
+```q challenge id=stars:6
 %% goal Draw exactly 500 stars, all in the bottom half of the canvas (y between 300 and 600).
 n:500
 background 5 5 20

@@ -1,8 +1,8 @@
 import { describe, expect, test } from "vitest";
 import "./dom-shims";
 import { LESSONS } from "../src/content/lessons";
-import { checkCode } from "../src/lib/checker";
-import { runHeadless } from "../src/qanvas/headless";
+import { checkCode } from "../src/learning/checker";
+import { runHeadless } from "../src/runtime/headless";
 import { mockCtx } from "./helpers";
 
 describe("lessons", () => {

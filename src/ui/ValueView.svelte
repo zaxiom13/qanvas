@@ -1,6 +1,6 @@
 <script lang="ts" module>
   import { QDict, QTable, QVec, isKeyed, type QValue } from "../q/index";
-  import { isNumVec, numRows } from "../lib/shape";
+  import { isNumVec, numRows } from "../presentation/shape";
 
   /** Does this value have a picture worth showing? */
   export function hasVisual(v: QValue): boolean {
@@ -17,7 +17,7 @@
 </script>
 
 <script lang="ts">
-  import { cellText, inlineText } from "../lib/shape";
+  import { cellText, inlineText } from "../presentation/shape";
   import MiniPlot from "./MiniPlot.svelte";
 
   let { value }: { value: QValue } = $props();

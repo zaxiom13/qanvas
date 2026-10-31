@@ -1,10 +1,11 @@
 ---
+id: tables
 title: Tables
 chapter: Dojo
 blurb: select, update, by — kdb+ home turf.
 ---
 
-```q challenge
+```q challenge id=dojo:tables:city-revenue
 %% title City revenue
 %% level warmup
 %% goal From sales, build a table of city and totalRevenue for cities with at least 200 in total, biggest first.
@@ -20,7 +21,7 @@ t:0!select totalRevenue:sum revenue by city from sales
 answer:`totalRevenue xdesc select from t where totalRevenue>=200
 ```
 
-```q challenge
+```q challenge id=dojo:tables:hot-days
 %% title Hot days
 %% level warmup
 %% goal Build a table of day and tempC for days hotter than 24 °C, hottest first.
@@ -34,7 +35,7 @@ weather:([] day:`Mon`Tue`Wed`Thu`Fri`Sat`Sun; tempC:18 22 20 27 25 31 16)
 answer:`tempC xdesc select from weather where tempC>24
 ```
 
-```q challenge
+```q challenge id=dojo:tables:monthly-lift
 %% title Monthly lift
 %% level core
 %% goal For months where visits went up, build month and lift (the increase). Keep the two biggest lifts, biggest first.
@@ -49,7 +50,7 @@ t:1_update lift:deltas visits from traffic
 answer:2#`lift xdesc select month, lift from t where lift>0
 ```
 
-```q challenge
+```q challenge id=dojo:tables:top-salary-per-department
 %% title Top salary per department
 %% level core
 %% goal Build dept and maxSalary — the highest salary in each department — biggest first.
@@ -63,7 +64,7 @@ staff:([] name:`Alice`Bob`Carlos`Diana`Eve; dept:`Eng`Mktg`Eng`Ops`Mktg; salary:
 answer:`maxSalary xdesc 0!select maxSalary:max salary by dept from staff
 ```
 
-```q challenge
+```q challenge id=dojo:tables:goal-difference
 %% title Goal difference
 %% level core
 %% goal Build team and goalDiff — total goals scored minus conceded — best first.

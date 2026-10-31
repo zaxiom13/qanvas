@@ -1,4 +1,5 @@
 ---
+id: right-to-left
 title: q reads right to left
 chapter: First light
 blurb: There's no "times before plus" in q. Everything is evaluated right to left — and it's liberating.
@@ -6,7 +7,7 @@ blurb: There's no "times before plus" in q. Everything is evaluated right to lef
 
 A quick quiz. What is `2*3+4`?
 
-```q
+```q id=right-to-left:0
 2*3+4
 ```
 
@@ -16,13 +17,13 @@ Press **explain** under the result to watch q do it step by step.
 
 It sounds strange at first, but it's wonderfully simple: there are no precedence rules to memorise. Every operator is equal, and the only rule is *right to left*.
 
-```q
+```q id=right-to-left:1
 10-2-3
 ```
 
 That's `10-(2-3)`, which is 11. Parentheses work exactly as you'd expect when you need them:
 
-```q
+```q id=right-to-left:2
 (10-2)-3
 ```
 
@@ -30,13 +31,13 @@ That's `10-(2-3)`, which is 11. Parentheses work exactly as you'd expect when yo
 
 Read q right to left and it turns into a little story. `2*til 5` reads: *make `til 5`, then double it*.
 
-```q
+```q id=right-to-left:3
 2*til 5
 ```
 
 `count 2*til 5` reads: *make `til 5`, double it, then count it*. A function takes everything to its right as its argument:
 
-```q
+```q id=right-to-left:4
 count 2*til 5
 ```
 
@@ -44,19 +45,19 @@ count 2*til 5
 
 Say you want radii that start at 10 and grow by 3. `10+3*til 8` is exactly right, because `3*til 8` happens first:
 
-```q
+```q id=right-to-left:5
 10+3*til 8
 ```
 
 But `til 8*3` is not "til 8, times 3" — q works out `8*3` first and gives you `til 24`:
 
-```q
+```q id=right-to-left:6
 count til 8*3
 ```
 
 > **Heads up:** a space before `/` starts a **comment** in q, so `x /2` is `x` followed by a comment! q divides with `%` instead: `7%2` is `3.5`.
 
-```q
+```q id=right-to-left:7
 7%2
 ```
 
@@ -64,7 +65,7 @@ count til 8*3
 
 The sketch below should draw 6 circles with radii 10, 20, 30, 40, 50 and 60, but it has a right-to-left bug. Run it, read the error, and fix it.
 
-```q challenge
+```q challenge id=right-to-left:8
 %% goal Make the six radii 10 20 30 40 50 60.
 background 20
 ink `coral

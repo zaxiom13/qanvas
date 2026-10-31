@@ -1,10 +1,11 @@
 ---
+id: lists
 title: Lists
 chapter: Dojo
 blurb: Warm-ups for thinking in whole lists.
 ---
 
-```q challenge
+```q challenge id=dojo:lists:dot-product
 %% title Dot product
 %% level warmup
 %% goal Build answer: the dot product of a and b — multiply item by item, then add it all up.
@@ -20,7 +21,7 @@ b:2 3 4 5 6
 answer:sum a*b
 ```
 
-```q challenge
+```q challenge id=dojo:lists:normalize
 %% title Normalize
 %% level warmup
 %% goal Divide every value in v by the largest one, so the biggest becomes 1.
@@ -34,7 +35,7 @@ v:10 30 50 20 40
 answer:v%max v
 ```
 
-```q challenge
+```q challenge id=dojo:lists:running-max
 %% title Running max
 %% level warmup
 %% goal Build the running maximum of readings: each position holds the biggest value seen so far.
@@ -48,7 +49,7 @@ readings:3 1 5 2 4 8 6 7 9 0
 answer:maxs readings
 ```
 
-```q challenge
+```q challenge id=dojo:lists:evens-only
 %% title Evens only
 %% level warmup
 %% goal Keep only the even numbers from nums, in their original order.
@@ -62,7 +63,7 @@ nums:7 14 3 8 11 22 5 6 9
 answer:nums where 0=nums mod 2
 ```
 
-```q challenge
+```q challenge id=dojo:lists:string-lengths
 %% title String lengths
 %% level warmup
 %% goal Build the lengths of the words, sorted from longest to shortest.
@@ -76,7 +77,7 @@ words:("hello";"world!!";"q";"kdb";"programming")
 answer:desc count each words
 ```
 
-```q challenge
+```q challenge id=dojo:lists:peak-finder
 %% title Peak finder
 %% level core
 %% goal A peak is a value bigger than both of its neighbours. Find the peaks in signal, sorted from highest to lowest.
@@ -91,7 +92,7 @@ signal:3 7 4 8 5 2 9 1 6 3
 answer:desc signal where (signal>prev signal)&signal>next signal
 ```
 
-```q challenge
+```q challenge id=dojo:lists:segment-sums
 %% title Segment sums
 %% level core
 %% goal cuts holds the start of each segment of vals. Sum each segment, and sort the sums descending.
@@ -107,7 +108,7 @@ cuts:0 3 6
 answer:desc sum each cuts _ vals
 ```
 
-```q challenge
+```q challenge id=dojo:lists:top-three
 %% title Top three
 %% level core
 %% goal Find the positions of the three biggest values in vals, biggest first.
@@ -121,7 +122,7 @@ vals:12 5 8 30 3 45 20 99
 answer:3#idesc vals
 ```
 
-```q challenge
+```q challenge id=dojo:lists:rank
 %% title Rank
 %% level core
 %% goal Give each score its rank: 0 for the lowest, 1 for the next, and so on.
@@ -135,7 +136,7 @@ scores:72 45 95 58 83
 answer:iasc iasc scores
 ```
 
-```q challenge
+```q challenge id=dojo:lists:rising-edges
 %% title Rising edges
 %% level core
 %% goal Find the positions where temp crosses from 25 or below to above 25.
@@ -149,7 +150,7 @@ temp:20 23 28 30 24 22 27 29 25 20 31 26
 answer:where 1=deltas temp>25
 ```
 
-```q challenge
+```q challenge id=dojo:lists:unique-in-the-bag
 %% title Unique in the bag
 %% level warmup
 %% goal Collect the distinct values from every bag, sorted ascending.
@@ -163,7 +164,7 @@ bags:(1 2 3 4;3 4 5 6;5 6 7 8;7 8 9)
 answer:asc distinct raze bags
 ```
 
-```q challenge
+```q challenge id=dojo:lists:biggest-and-smallest-move
 %% title Biggest and smallest move
 %% level core
 %% goal prices has daily prices. Build answer as two numbers: the biggest daily rise and the biggest daily fall (as a negative number).

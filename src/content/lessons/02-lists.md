@@ -1,4 +1,5 @@
 ---
+id: lists
 title: One call, many shapes
 chapter: First light
 blurb: Lists are q's superpower. Hand a function a list and it does the whole list at once.
@@ -10,17 +11,17 @@ In most languages, drawing ten circles means writing a loop. In q you hand `circ
 
 A list is just values side by side, separated by spaces:
 
-```q
+```q id=lists:0
 10 20 30
 ```
 
 Arithmetic works on the **whole list at once**. No loop:
 
-```q
+```q id=lists:1
 10 20 30*2
 ```
 
-```q
+```q id=lists:2
 1 2 3+10 20 30
 ```
 
@@ -30,13 +31,13 @@ Two lists of the same length pair up item by item. A single number — an **atom
 
 `til n` gives the first *n* whole numbers, counting from zero. It's the heartbeat of array code:
 
-```q
+```q id=lists:3
 til 10
 ```
 
 Multiply it, and you've got evenly spaced positions:
 
-```q
+```q id=lists:4
 50*til 10
 ```
 
@@ -44,7 +45,7 @@ Multiply it, and you've got evenly spaced positions:
 
 Positions for many shapes are written as **two rows**: the x's and the y's. `(xs;ys)` — round brackets with a semicolon make a list of two things.
 
-```q sketch
+```q sketch id=lists:5
 xs:30+60*til 10
 background 20
 ink `sky
@@ -57,7 +58,7 @@ circle[(xs;300);25]
 
 The radius can be a list too, one per circle:
 
-```q sketch
+```q sketch id=lists:6
 xs:30+60*til 10
 background 20
 ink `sky
@@ -66,7 +67,7 @@ circle[(xs;300);3*1+til 10]
 
 ## Your turn
 
-```q challenge
+```q challenge id=lists:7
 %% goal Draw a column of 12 circles running down the canvas — all with the same x.
 background 20
 ink `mint

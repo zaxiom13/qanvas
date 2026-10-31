@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { EXAMPLES } from "../src/content/examples";
-import { decodeShare, encodeShare, findSharedCopy, shareKey, shareOpenedNote, SHARE_LINK_WARN, shareUrl, shareWarning, type Sketch } from "../src/lib/storage";
+import { decodeShare, encodeShare, findSharedCopy, shareKey, shareOpenedNote, SHARE_LINK_WARN, shareUrl, shareWarning } from "../src/sketches/share";
+import type { Sketch } from "../src/sketches/model";
 
 const sk = (id: string, code: string, share?: string): Sketch => ({ id, name: "s", code, created: 1, updated: 1, share });
 

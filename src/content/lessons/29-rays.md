@@ -1,4 +1,5 @@
 ---
+id: rays
 title: Rays
 chapter: Light
 blurb: Trace a ray through every pixel at once, and a sphere appears out of nothing but maths.
@@ -10,7 +11,7 @@ A ray tracer asks one question for every pixel: *if I look through this pixel, w
 
 The eye sits at `0 0 0`, looking along z. For every pixel we make a direction — a little across (x), a little up (y), and one step forward (z). In 3D, points are simply three rows: `(xs;ys;zs)`.
 
-```q
+```q id=rays:0
 w:4; h:4
 px:(til[w*h] mod w)%w
 py:(til[w*h] div w)%h
@@ -30,7 +31,7 @@ Put a sphere with centre `c` and radius `r` in front of the eye. For a ray from 
 
 The dot product `c·d` for *every* ray is `sum c*dir` — the three rows times three numbers, added up:
 
-```q sketch
+```q sketch id=rays:1
 w:200; h:200
 px:(til[w*h] mod w)%w; py:(til[w*h] div w)%h
 dir:unit (px-0.5;0.5-py;(w*h)#1f)
@@ -46,7 +47,7 @@ A white disc: every pixel whose ray touches the sphere.
 
 To look round, we need to know which way the surface faces at each hit. The hit point is `P = t·d`, and the **normal** — the direction the surface faces — is `P − c`, scaled to length 1. The brightness is how squarely the normal faces the light: one more dot product.
 
-```q sketch
+```q sketch id=rays:2
 w:200; h:200
 px:(til[w*h] mod w)%w; py:(til[w*h] div w)%h
 dir:unit (px-0.5;0.5-py;(w*h)#1f)
@@ -68,7 +69,7 @@ pixels w cut img
 
 ## Your turn
 
-```q challenge
+```q challenge id=rays:3
 %% goal Make the sphere coral: draw pixels from three channels (red;green;blue), where green is 0.4*img and blue is 0.3*img.
 w:200; h:200
 px:(til[w*h] mod w)%w; py:(til[w*h] div w)%h

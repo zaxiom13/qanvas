@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import "./dom-shims";
 import { PROBLEMS } from "../src/content/dojo";
-import { checkCode } from "../src/lib/checker";
+import { checkCode } from "../src/learning/checker";
 import { mockCtx } from "./helpers";
 
 describe("dojo", () => {
