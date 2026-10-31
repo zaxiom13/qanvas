@@ -67,4 +67,17 @@ describe("Workers Builds deployment", () => {
     expect(headers).toContain("Cache-Control: no-cache, no-store, must-revalidate");
     expect(headers).toContain("/index.html");
   });
+
+  test("Android APK workflow builds and publishes an APK for every pull request", () => {
+    const androidWf = read("../.github/workflows/android-apk.yml");
+    const capCfg = read("../capacitor.config.ts");
+    expect(pkg.scripts["android:sync"]).toBe("npm run build && cap sync android");
+    expect(capCfg).toContain("appId: 'dev.qanvas.app'");
+    expect(capCfg).toContain("webDir: 'dist'");
+    expect(androidWf).toMatch(/pull_request:/);
+    expect(androidWf).toMatch(/npm run android:sync/);
+    expect(androidWf).toMatch(/\.\/gradlew assembleDebug/);
+    expect(androidWf).toMatch(/actions\/upload-artifact@v4/);
+    expect(androidWf).toMatch(/gh release (create|upload)/);
+  });
 });

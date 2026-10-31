@@ -11,9 +11,13 @@
     "check": "node tools/check-architecture.mjs && svelte-check --tsconfig ./tsconfig.json",
     "test": "vitest run",
     "oracle": "node tools/oracle.mjs",
-    "deploy": "wrangler deploy"
+    "deploy": "wrangler deploy",
+    "android:sync": "npm run build && cap sync android"
   },
   "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "@capacitor/core": "^8.6.0",
     "@fontsource-variable/space-grotesk": "^5.3.0",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@types/node": "^26.6.3",
