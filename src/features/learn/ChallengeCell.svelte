@@ -4,10 +4,11 @@
   import type { Explained } from "../../presentation/explain";
   import { getProgress, markDone, saveAnswer } from "../../adapters/browser/persistence";
   import CodeEditor from "../../ui/CodeEditor.svelte";
+  import TweakCode from "../../ui/TweakCode.svelte";
   import ErrorCard from "../../ui/ErrorCard.svelte";
   import ValueView, { hasVisual, isTabular } from "../../ui/ValueView.svelte";
   import type { QValue } from "../../q/index";
-  import { Check, CircleCheck, CircleX, Eye, Lightbulb, RotateCcw, Target } from "../../ui/icons";
+  import { Check, CircleCheck, CircleX, Eye, Hand, Keyboard, Lightbulb, RotateCcw, Target } from "../../ui/icons";
 
   interface Props {
     id: string;
@@ -21,8 +22,11 @@
     /** q expression whose value is shown after each check (e.g. answer) */
     show?: string;
     badge?: string;
+    /** phone: offer tap-to-tweak as well as typing */
+    touch?: boolean;
   }
-  let { id, goal, starter, checks, hints, solution, runSketch, onSolved, show = "", badge = "Your turn" }: Props = $props();
+  let { id, goal, starter, checks, hints, solution, runSketch, onSolved, show = "", badge = "Your turn", touch = false }: Props = $props();
+  let typing = $state(true);
   let shown = $state<{ text: string; value?: QValue } | null>(null);
 
   let code = $state(untrack(() => starter));
@@ -77,14 +81,23 @@
   </header>
   <p class="goal">{goal}</p>
   <div class="ed">
-    <CodeEditor value={code} onChange={edit} onRun={check} compact label="Challenge code" />
+    {#if typing}
+      <CodeEditor value={code} onChange={edit} onRun={check} compact label="Challenge code" />
+    {:else}
+      <TweakCode {code} onChange={edit} hint="" label="Challenge code" />
+    {/if}
   </div>
   <div class="bar">
-    <button class="btn primary" onclick={check} disabled={checking}><Check size={16} /> {checking ? "Checking…" : "Check"}</button>
+    <button class="btn go" onclick={check} disabled={checking}><Check size={16} /> {checking ? "Checking…" : "Check"}</button>
     {#if hints.length && shownHints < hints.length}
       <button class="btn ghost" onclick={() => shownHints++}><Lightbulb size={15} /> {shownHints ? "Another hint" : "Hint"}</button>
     {/if}
     <button class="btn ghost" onclick={() => (showSolution = !showSolution)}><Eye size={15} /> {showSolution ? "Hide" : "Show"} solution</button>
+    {#if touch}
+      <button class="btn ghost icon" onclick={() => (typing = !typing)} aria-label={typing ? "Tap to tweak values" : "Type with the keyboard"} title={typing ? "Tweak values" : "Type"}>
+        {#if typing}<Hand size={16} />{:else}<Keyboard size={16} />{/if}
+      </button>
+    {/if}
     <button class="btn ghost icon" onclick={reset} title="Start over" aria-label="Reset challenge"><RotateCcw size={15} /></button>
   </div>
 

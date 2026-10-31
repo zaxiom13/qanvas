@@ -18,8 +18,8 @@ export default defineConfig({
         name: "Qanvas — learn q by drawing",
         short_name: "Qanvas",
         description: "A creative-coding studio for the q language. Works offline.",
-        theme_color: "#15141d",
-        background_color: "#15141d",
+        theme_color: "#0b0c11",
+        background_color: "#0b0c11",
         display: "standalone",
         start_url: "./",
         icons: [

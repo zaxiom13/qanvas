@@ -2,7 +2,7 @@ import { HighlightStyle, StreamLanguage, syntaxHighlighting, type StringStream }
 import { tags as t } from "@lezer/highlight";
 import { REFERENCE } from "../content/reference.ts";
 
-const Q_KEYWORDS = new Set(
+export const Q_KEYWORDS = new Set(
   REFERENCE.filter((r) => r.kind === "keyword" || r.kind === "iterator").map((r) => r.name).concat([
     "select", "update", "delete", "exec", "from", "where", "by", "if", "do", "while", "each", "over", "scan", "prior",
     "peach", "and", "or", "not", "null", "value", "key", "keys", "type", "show", "system", "string", "enlist", "flip",

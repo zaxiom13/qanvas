@@ -38,13 +38,14 @@ export const EXAMPLES: Example[] = Object.keys(files)
   .sort()
   .map((f) => parseSketchFile(f, files[f]));
 
+if (new Set(EXAMPLES.map((e) => e.id)).size !== EXAMPLES.length) throw new Error("Two examples share an id (the file name without its number).");
+
 export const EXAMPLE_BY_ID = new Map(EXAMPLES.map((e) => [e.id, e]));
 
-export const DEFAULT_SKETCH = `/ Welcome to the studio. Press Run (or Ctrl+Enter).
-/ Change a number and it re-runs live.
+export const DEFAULT_SKETCH = `/ Welcome to the studio.
 
 draw:{
-  background 20;
+  background \`night;
   ink hsb[time%5;0.6;1];
   circle[mouse;40+20*sin 3*time]
  }

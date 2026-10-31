@@ -7,11 +7,23 @@ const clamp255 = (v: number) => (v !== v ? 0 : v < 0 ? 0 : v > 255 ? 255 : v);
 export const rgbCss = (r: number, g: number, b: number, a = 255) =>
   a >= 255 ? `rgb(${clamp255(r) | 0},${clamp255(g) | 0},${clamp255(b) | 0})` : `rgba(${clamp255(r) | 0},${clamp255(g) | 0},${clamp255(b) | 0},${(clamp255(a) / 255).toFixed(3)})`;
 
-const NAMED: Record<string, string> = {
+export const NAMED: Record<string, string> = {
   // Qanvas palette (tuned to look good on both themes)
   ink: "#1d1b26", paper: "#f6f1e7", night: "#0f1020", cream: "#f3ead7", coral: "#ff6b5b", tangerine: "#ff9f1c",
   lemon: "#ffd23f", mint: "#3ddc97", teal: "#12a4a4", sky: "#4cc9f0", azure: "#3a86ff", indigo: "#5b5bd6",
   violet: "#9b5de5", rose: "#f15bb5", slate: "#6c7086", fog: "#c9c3b6", q: "#1e5cff", kx: "#0080ff",
+};
+
+/** Ready-made colour sets for palette: one colour per shape, cycling. */
+export const PALETTES: Record<string, string[]> = {
+  sunset: ["#ff5e5b", "#ff9f1c", "#ffd23f", "#f15bb5", "#9b5de5"],
+  ocean: ["#023e8a", "#0077b6", "#00b4d8", "#90e0ef", "#caf0f8"],
+  neon: ["#ff2bd6", "#00f0ff", "#c6ff3d", "#ffe600", "#ff5a1f"],
+  forest: ["#1b4332", "#2d6a4f", "#52b788", "#95d5b2", "#d8f3dc"],
+  candy: ["#ffadad", "#ffd6a5", "#fdffb6", "#caffbf", "#9bf6ff", "#a0c4ff", "#bdb2ff", "#ffc6ff"],
+  fire: ["#370617", "#9d0208", "#dc2f02", "#f48c06", "#ffba08"],
+  metro: ["#dc241f", "#ffce00", "#00843d", "#0098d8", "#9b0058", "#f4a9be", "#a1a5a7", "#1c3f94", "#b26300", "#00a77e"],
+  mono: ["#111111", "#444444", "#777777", "#aaaaaa", "#dddddd"],
 };
 
 export function namedColor(name: string): string {
