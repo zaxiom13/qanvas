@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Qanvas</string>
+    <string name="title_activity_main">Qanvas</string>
+    <string name="package_name">dev.qanvas.app</string>
+    <string name="custom_url_scheme">dev.qanvas.app</string>
+</resources>

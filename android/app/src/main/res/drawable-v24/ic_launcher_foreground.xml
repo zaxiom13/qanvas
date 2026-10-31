@@ -1,0 +1,50 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportHeight="512"
+    android:viewportWidth="512">
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.62"
+        android:scaleY="0.62">
+        <path
+            android:pathData="M236,118 A112,112 0 1,1 235.99,118"
+            android:strokeWidth="60"
+            android:fillColor="#00000000">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:startX="124"
+                    android:startY="118"
+                    android:endX="348"
+                    android:endY="342"
+                    android:type="linear">
+                    <item android:color="#FFFFB04A" android:offset="0.0" />
+                    <item android:color="#FFFF5A1F" android:offset="0.6" />
+                    <item android:color="#FFFF3D5A" android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path
+            android:pathData="M332,262 C340,330 352,372 398,414"
+            android:strokeWidth="60"
+            android:strokeLineCap="round"
+            android:fillColor="#00000000">
+            <aapt:attr name="android:strokeColor">
+                <gradient
+                    android:startX="332"
+                    android:startY="262"
+                    android:endX="398"
+                    android:endY="414"
+                    android:type="linear">
+                    <item android:color="#FFFF5A1F" android:offset="0.0" />
+                    <item android:color="#FFFF3D5A" android:offset="1.0" />
+                </gradient>
+            </aapt:attr>
+        </path>
+        <path
+            android:fillColor="#FFC6FF3D"
+            android:pathData="M224,206 L248,206 A12,12 0 0,1 260,218 L260,242 A12,12 0 0,1 248,254 L224,254 A12,12 0 0,1 212,242 L212,218 A12,12 0 0,1 224,206 Z" />
+    </group>
+</vector>
